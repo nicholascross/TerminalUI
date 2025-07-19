@@ -26,19 +26,23 @@ public class ListWidget {
         }
     }
 
-    /// Render visible lines given a height.
-    public func render(height: Int) -> [String] {
-        let count = min(height, items.count)
-        var lines = [String]()
+    /// Render the list into the given buffer region.
+    public func render(into renderer: Renderer, region: Region) {
+        let count = min(region.height, items.count)
+        // Clear region to spaces.
+        for y in 0..<region.height {
+            for x in 0..<region.width {
+                renderer.setCell(row: region.top + y, col: region.left + x, char: " ")
+            }
+        }
+        // Draw items.
         for i in 0..<count {
             let prefix = (i == selectedIndex ? "▶ " : "  ")
-            lines.append(prefix + items[i])
+            let text = prefix + items[i]
+            for (j, ch) in text.prefix(region.width).enumerated() {
+                renderer.setCell(row: region.top + i, col: region.left + j, char: ch)
+            }
         }
-        // Pad if fewer items than height
-        if count < height {
-            lines.append(contentsOf: Array(repeating: "", count: height - count))
-        }
-        return lines
     }
 }
 
@@ -74,10 +78,16 @@ public class TextInputWidget {
         }
     }
 
-    /// Render the input line at bottom.
-    public func render() {
+    /// Render the input prompt and buffer into the given region.
+    public func render(into renderer: Renderer, region: Region) {
         let text = prompt + buffer
-        print(text, terminator: "")
-        fflush(stdout)
+        // Clear region.
+        for x in 0..<region.width {
+            renderer.setCell(row: region.top, col: region.left + x, char: " ")
+        }
+        // Draw prompt and buffer.
+        for (j, ch) in text.prefix(region.width).enumerated() {
+            renderer.setCell(row: region.top, col: region.left + j, char: ch)
+        }
     }
 }

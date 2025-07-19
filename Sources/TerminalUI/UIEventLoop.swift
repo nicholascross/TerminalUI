@@ -16,12 +16,12 @@ public class UIEventLoop {
         self.layout = Layout(rows: rows, cols: cols)
         self.listWidget = ListWidget(items: [])
         self.inputWidget = TextInputWidget(prompt: "> ")
-        self.renderer = Renderer(rows: layout.mainAreaHeight, cols: cols)
+        self.renderer = Renderer(rows: rows, cols: cols)
         // On resize, update layout and renderer, then redraw
         Terminal.onResize = { [weak self] r, c in
             guard let self = self else { return }
             self.layout = Layout(rows: r, cols: c)
-            self.renderer = Renderer(rows: self.layout.mainAreaHeight, cols: c)
+            self.renderer = Renderer(rows: r, cols: c)
             self.redraw()
         }
     }
@@ -30,7 +30,10 @@ public class UIEventLoop {
     public func run() throws {
         running = true
         try Terminal.enableRawMode()
-        defer { try? Terminal.disableRawMode() }
+        defer {
+            try? Terminal.disableRawMode()
+            Terminal.showCursor()
+        }
 
         // Initial draw
         redraw()
@@ -58,16 +61,37 @@ public class UIEventLoop {
     }
 
     private func redraw() {
-        let lines = listWidget.render(height: layout.mainAreaHeight)
-        renderer.render(lines: lines)
+        Terminal.hideCursor()
+        renderer.clearBuffer()
+        // Main list: inset by 1 row/col under the main border.
+        let mainBorder = layout.mainRegion
+        let mainContent = Region(
+            top: mainBorder.top + 1,
+            left: mainBorder.left + 1,
+            width: max(mainBorder.width - 2, 0),
+            height: max(mainBorder.height - 2, 0)
+        )
+        listWidget.render(into: renderer, region: mainContent)
 
-        // Draw input prompt on bottom line and position cursor at buffer end
-        let row = layout.inputOffset + 1
-        let promptText = inputWidget.prompt + inputWidget.buffer
-        Terminal.moveCursor(row: row, col: 1)
-        inputWidget.render()
-        // Show editing cursor at end of input
-        Terminal.moveCursor(row: row, col: promptText.count + 1)
+        // Input box content: inset by 1 row/col under its border.
+        let inputBorder = layout.inputRegion
+        let inputContent = Region(
+            top: inputBorder.top + 1,
+            left: inputBorder.left + 1,
+            width: max(inputBorder.width - 2, 0),
+            height: 1
+        )
+        inputWidget.render(into: renderer, region: inputContent)
+
+        // Draw borders around main list and input box.
+        renderer.drawBorder(mainBorder)
+        renderer.drawBorder(inputBorder)
+        renderer.blit()
+        // Position and show the cursor at end of input buffer inside the input box.
+        let col = inputContent.left + 1 + (inputWidget.prompt + inputWidget.buffer).count
+        let row = inputContent.top + 1
+        Terminal.moveCursor(row: row, col: col)
         Terminal.showCursor()
+        fflush(stdout)
     }
 }
