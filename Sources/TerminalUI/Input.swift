@@ -42,7 +42,7 @@ public class Input {
         switch byte {
         case 3:
             return .ctrlC
-        case 10:
+        case 13, 10:
             return .enter
         case 127, 8:
             return .backspace

@@ -23,7 +23,9 @@ See module documentation in source files for examples.
 
 ## Example
 
-Run the interactive example (press ‘q’ or Ctrl-C to quit). Use ↑/↓ to move, and resize your terminal to see SIGWINCH handling:
+Run the interactive example (press ‘q’ or Ctrl-C to quit).
+Use ↑/↓ to navigate the list, type and press Enter (Return) to add items (when input is focused), and press Tab to switch focus between list and input widgets.
+Resize your terminal to see SIGWINCH handling:
 ```sh
 swift run TerminalUIExample
 ```

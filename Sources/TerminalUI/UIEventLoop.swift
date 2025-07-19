@@ -9,6 +9,8 @@ public class UIEventLoop {
     private var inputWidget: TextInputWidget
     private var renderer: Renderer
     private var running = false
+    private enum Focus { case list, input }
+    private var focus: Focus = .input
 
     public init(rows: Int, cols: Int) {
         self.layout = Layout(rows: rows, cols: cols)
@@ -37,13 +39,18 @@ public class UIEventLoop {
             switch event {
             case .char("q"), .ctrlC:
                 running = false
+            case .tab:
+                // Toggle focus between list and input
+                focus = (focus == .input ? .list : .input)
+                redraw()
             default:
-                // First, input widget consumes text/backspace/enter
-                if let line = inputWidget.handle(event: event) {
-                    // On Enter, add new item to list and reset view
-                    listWidget.items.append(line)
-                } else if listWidget.handle(event: event) {
-                    // Navigation keys
+                switch focus {
+                case .input:
+                    if let line = inputWidget.handle(event: event) {
+                        listWidget.items.append(line)
+                    }
+                case .list:
+                    _ = listWidget.handle(event: event)
                 }
                 redraw()
             }
