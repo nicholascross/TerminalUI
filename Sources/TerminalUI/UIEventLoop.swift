@@ -4,23 +4,40 @@ import Darwin.C
 /// Main event loop to drive UI based on input and state.
 public class UIEventLoop {
     private let input = Input()
-    private var layout: Layout
+    private var layout: LayoutNode
     private var widgets: [Widget]
     private var focusIndex: Int = 0
     private var renderer: Renderer
     private var running = false
 
-    public init(rows: Int, cols: Int, widgets: [Widget]) {
-        self.layout = Layout(rows: rows, cols: cols)
+    /// Initialize the event loop with a custom layout strategy.
+    public init(
+        rows: Int,
+        cols: Int,
+        widgets: [Widget],
+        layout: LayoutNode
+    ) {
+        self.layout = layout
+        self.layout.update(rows: rows, cols: cols)
         self.widgets = widgets
         self.renderer = Renderer(rows: rows, cols: cols)
         // On resize, update layout and renderer, then redraw
         Terminal.onResize = { [weak self] r, c in
             guard let self = self else { return }
-            self.layout = Layout(rows: r, cols: c)
+            self.layout.update(rows: r, cols: c)
             self.renderer = Renderer(rows: r, cols: c)
             self.redraw()
         }
+    }
+
+    /// Convenience initializer using the default absolute Layout.
+    public convenience init(
+        rows: Int,
+        cols: Int,
+        widgets: [Widget]
+    ) {
+        self.init(rows: rows, cols: cols, widgets: widgets,
+                  layout: Layout(rows: rows, cols: cols))
     }
 
     /// Start processing input events and updating the UI.
