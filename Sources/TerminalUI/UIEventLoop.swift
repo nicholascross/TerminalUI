@@ -8,6 +8,8 @@ public class UIEventLoop {
     private var widgets: [Widget]
     private var focusIndex: Int = 0
     private var renderer: Renderer
+    private var rows: Int
+    private var cols: Int
     private var running = false
 
     /// Initialize the event loop with a custom layout strategy.
@@ -16,7 +18,9 @@ public class UIEventLoop {
         cols: Int,
         widgets: [Widget],
         layout: LayoutNode
-    ) {
+) {
+        self.rows = rows
+        self.cols = cols
         self.layout = layout
         self.layout.update(rows: rows, cols: cols)
         self.widgets = widgets
@@ -24,6 +28,8 @@ public class UIEventLoop {
         // On resize, update layout and renderer, then redraw
         Terminal.onResize = { [weak self] r, c in
             guard let self = self else { return }
+            self.rows = r
+            self.cols = c
             self.layout.update(rows: r, cols: c)
             self.renderer = Renderer(rows: r, cols: c)
             self.redraw()
@@ -80,17 +86,31 @@ public class UIEventLoop {
         renderer.clearBuffer()
         Terminal.hideCursor()
         renderer.clearBuffer()
-        let regions = layout.regions(for: widgets.count)
+        let container = Region(top: 0, left: 0, width: cols, height: rows)
+        let regions = layout.regions(for: widgets.count, in: container)
         for (widget, region) in zip(widgets, regions) {
             widget.render(into: renderer, region: region)
         }
         for region in regions {
-            // Draw a border around each widget (undo the 1-cell inset)
-            let border = Region(top: region.top - 1,
-                                left: region.left - 1,
-                                width: region.width + 2,
-                                height: region.height + 2)
-            renderer.drawBorder(border)
+            // Divider regions (1-cell thick): draw single lines
+            if region.width == 1 && region.height > 1 {
+                // vertical divider
+                for y in region.top..<(region.top + region.height) {
+                    renderer.setCell(row: y, col: region.left, char: "│")
+                }
+            } else if region.height == 1 && region.width > 1 {
+                // horizontal divider
+                for x in region.left..<(region.left + region.width) {
+                    renderer.setCell(row: region.top, col: x, char: "─")
+                }
+            } else if region.width > 1 && region.height > 1 {
+                // normal bordered pane (undo the 1-cell inset)
+                let border = Region(top: region.top - 1,
+                                    left: region.left - 1,
+                                    width: region.width + 2,
+                                    height: region.height + 2)
+                renderer.drawBorder(border)
+            }
         }
         renderer.blit()
         // Position cursor for focused text-input widget
