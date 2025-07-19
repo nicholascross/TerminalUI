@@ -61,8 +61,13 @@ public class UIEventLoop {
         let lines = listWidget.render(height: layout.mainAreaHeight)
         renderer.render(lines: lines)
 
-        // Draw input prompt on bottom line
-        Terminal.moveCursor(row: layout.inputOffset + 1, col: 1)
+        // Draw input prompt on bottom line and position cursor at buffer end
+        let row = layout.inputOffset + 1
+        let promptText = inputWidget.prompt + inputWidget.buffer
+        Terminal.moveCursor(row: row, col: 1)
         inputWidget.render()
+        // Show editing cursor at end of input
+        Terminal.moveCursor(row: row, col: promptText.count + 1)
+        Terminal.showCursor()
     }
 }

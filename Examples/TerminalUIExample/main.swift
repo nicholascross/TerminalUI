@@ -5,7 +5,6 @@ struct App {
     static func main() throws {
         let (rows, cols) = Terminal.getTerminalSize()
         Terminal.clearScreen()
-        Terminal.hideCursor()
         defer {
             Terminal.showCursor()
             Terminal.clearScreen()
