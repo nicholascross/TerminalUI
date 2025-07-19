@@ -19,8 +19,15 @@ struct App {
 
         // Build dynamic widget set
         let list = ListWidget(items: ["Item A", "Item B", "Item C"])
+        let textArea = TextAreaWidget(lines: [
+            "Line 1: Hello, World!",
+            "Line 2: This is a text area.",
+            "Line 3: Use ↑/↓ to scroll.",
+            "Line 4: Swift TerminalUI",
+            "Line 5: Enjoy!"
+        ])
         let input = TextInputWidget(prompt: "> ")
-        let widgets: [Widget] = [list, input]
+        let widgets: [Widget] = [list, textArea, input]
         let loop = UIEventLoop(rows: rows, cols: cols, widgets: widgets)
         try loop.run()
     }
