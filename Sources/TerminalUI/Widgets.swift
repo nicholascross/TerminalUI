@@ -1,7 +1,7 @@
 import Foundation
 
 /// A simple list widget displaying select-able items.
-public class ListWidget {
+public class ListWidget: Widget {
     /// Items to display in the list.
     public var items: [String]
     /// Currently selected index.
@@ -46,8 +46,9 @@ public class ListWidget {
     }
 }
 
+
 /// A text input widget capturing line input.
-public class TextInputWidget {
+public class TextInputWidget: Widget {
     /// Prompt shown before input.
     public let prompt: String
     /// Current input buffer.
@@ -89,5 +90,15 @@ public class TextInputWidget {
         for (j, ch) in text.prefix(region.width).enumerated() {
             renderer.setCell(row: region.top, col: region.left + j, char: ch)
         }
+    }
+}
+
+// MARK: - Widget conformance
+extension TextInputWidget {
+    public func handle(event: InputEvent) -> Bool {
+        if let _ = self.handle(event: event) {
+            return true
+        }
+        return false
     }
 }

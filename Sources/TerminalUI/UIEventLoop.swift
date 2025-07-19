@@ -5,17 +5,14 @@ import Darwin.C
 public class UIEventLoop {
     private let input = Input()
     private var layout: Layout
-    public var listWidget: ListWidget
-    private var inputWidget: TextInputWidget
+    private var widgets: [Widget]
+    private var focusIndex: Int = 0
     private var renderer: Renderer
     private var running = false
-    private enum Focus { case list, input }
-    private var focus: Focus = .input
 
-    public init(rows: Int, cols: Int) {
+    public init(rows: Int, cols: Int, widgets: [Widget]) {
         self.layout = Layout(rows: rows, cols: cols)
-        self.listWidget = ListWidget(items: [])
-        self.inputWidget = TextInputWidget(prompt: "> ")
+        self.widgets = widgets
         self.renderer = Renderer(rows: rows, cols: cols)
         // On resize, update layout and renderer, then redraw
         Terminal.onResize = { [weak self] r, c in
@@ -43,17 +40,18 @@ public class UIEventLoop {
             case .char("q"), .ctrlC:
                 running = false
             case .tab:
-                // Toggle focus between list and input
-                focus = (focus == .input ? .list : .input)
+                focusIndex = (focusIndex + 1) % widgets.count
                 redraw()
             default:
-                switch focus {
-                case .input:
-                    if let line = inputWidget.handle(event: event) {
-                        listWidget.items.append(line)
+                let widget = widgets[focusIndex]
+                if let ti = widget as? TextInputWidget {
+                    if let line = ti.handle(event: event) {
+                        if let list = widgets.first(where: { $0 is ListWidget }) as? ListWidget {
+                            list.items.append(line)
+                        }
                     }
-                case .list:
-                    _ = listWidget.handle(event: event)
+                } else {
+                    _ = widget.handle(event: event)
                 }
                 redraw()
             }
@@ -63,35 +61,29 @@ public class UIEventLoop {
     private func redraw() {
         Terminal.hideCursor()
         renderer.clearBuffer()
-        // Main list: inset by 1 row/col under the main border.
-        let mainBorder = layout.mainRegion
-        let mainContent = Region(
-            top: mainBorder.top + 1,
-            left: mainBorder.left + 1,
-            width: max(mainBorder.width - 2, 0),
-            height: max(mainBorder.height - 2, 0)
-        )
-        listWidget.render(into: renderer, region: mainContent)
-
-        // Input box content: inset by 1 row/col under its border.
-        let inputBorder = layout.inputRegion
-        let inputContent = Region(
-            top: inputBorder.top + 1,
-            left: inputBorder.left + 1,
-            width: max(inputBorder.width - 2, 0),
-            height: 1
-        )
-        inputWidget.render(into: renderer, region: inputContent)
-
-        // Draw borders around main list and input box.
-        renderer.drawBorder(mainBorder)
-        renderer.drawBorder(inputBorder)
+        Terminal.hideCursor()
+        renderer.clearBuffer()
+        let regions = layout.regions(for: widgets.count)
+        for (widget, region) in zip(widgets, regions) {
+            widget.render(into: renderer, region: region)
+        }
+        for region in regions {
+            // Draw a border around each widget (undo the 1-cell inset)
+            let border = Region(top: region.top - 1,
+                                left: region.left - 1,
+                                width: region.width + 2,
+                                height: region.height + 2)
+            renderer.drawBorder(border)
+        }
         renderer.blit()
-        // Position and show the cursor at end of input buffer inside the input box.
-        let col = inputContent.left + 1 + (inputWidget.prompt + inputWidget.buffer).count
-        let row = inputContent.top + 1
-        Terminal.moveCursor(row: row, col: col)
-        Terminal.showCursor()
+        // Position cursor for focused text-input widget
+        if let ti = widgets[focusIndex] as? TextInputWidget {
+            let region = regions[focusIndex]
+            let col = region.left + (ti.prompt + ti.buffer).count + 1
+            let row = region.top + 1
+            Terminal.moveCursor(row: row, col: col)
+            Terminal.showCursor()
+        }
         fflush(stdout)
     }
 }

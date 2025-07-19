@@ -17,9 +17,11 @@ struct App {
             print("Resized to \(rows)x\(cols)")
         }
 
-        let loop = UIEventLoop(rows: rows, cols: cols)
-        // Pre-populate with some items
-        loop.listWidget.items = ["Item A", "Item B", "Item C"]
+        // Build dynamic widget set
+        let list = ListWidget(items: ["Item A", "Item B", "Item C"])
+        let input = TextInputWidget(prompt: "> ")
+        let widgets: [Widget] = [list, input]
+        let loop = UIEventLoop(rows: rows, cols: cols, widgets: widgets)
         try loop.run()
     }
 }
