@@ -10,6 +10,9 @@ public class ListWidget: Widget {
     public var items: [String]
     /// Currently selected index.
     public var selectedIndex: Int = 0
+    /// Closure invoked when the user presses Enter on the current selection.
+    /// Parameters are the selected index and corresponding item string.
+    public var onSelect: ((Int, String) -> Void)?
 
     public init(items: [String], title: String? = nil) {
         self.items = items
@@ -25,6 +28,11 @@ public class ListWidget: Widget {
             return true
         case .downArrow:
             selectedIndex = min(items.count - 1, selectedIndex + 1)
+            return true
+        case .enter:
+            if !items.isEmpty {
+                onSelect?(selectedIndex, items[selectedIndex])
+            }
             return true
         default:
             return false
