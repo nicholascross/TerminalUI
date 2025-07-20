@@ -48,23 +48,31 @@ public struct Stack: LayoutNode {
     public func regions(for widgetCount: Int) -> [Region] {
         guard !children.isEmpty else { return [] }
 
+        let totalSpacing = spacing * max(0, children.count - 1)
+        // determine fixed and flexible portions, and extra remainder to align trailing edge
         let fixedTotal: Int
         let flexibleCount: Int
-        let totalSpacing = spacing * max(0, children.count - 1)
         let availFlex: Int
-        let flexSize: Int
-
+        var flexSize: Int
+        var baseFlex = 0, extraFlex = 0, remainingFlex = 0
+        var baseFlexV = 0, extraFlexV = 0, remainingFlexV = 0
         switch axis {
         case .horizontal:
             fixedTotal = children.compactMap { $0.desiredWidth }.reduce(0, +)
             flexibleCount = children.filter { $0.desiredWidth == nil }.count
             availFlex = max(cols - totalSpacing - fixedTotal, 0)
-            flexSize = flexibleCount > 0 ? availFlex / flexibleCount : 0
+            baseFlex = flexibleCount > 0 ? availFlex / flexibleCount : 0
+            extraFlex = flexibleCount > 0 ? availFlex % flexibleCount : 0
+            flexSize = baseFlex
+            remainingFlex = flexibleCount
         case .vertical:
             fixedTotal = children.compactMap { $0.desiredHeight }.reduce(0, +)
             flexibleCount = children.filter { $0.desiredHeight == nil }.count
             availFlex = max(rows - totalSpacing - fixedTotal, 0)
-            flexSize = flexibleCount > 0 ? availFlex / flexibleCount : 0
+            baseFlexV = flexibleCount > 0 ? availFlex / flexibleCount : 0
+            extraFlexV = flexibleCount > 0 ? availFlex % flexibleCount : 0
+            flexSize = baseFlexV
+            remainingFlexV = flexibleCount
         }
 
         var offsetPrimary = 0
@@ -74,10 +82,23 @@ public struct Stack: LayoutNode {
             let outer: Region
             switch axis {
             case .horizontal:
-                childSize = child.desiredWidth ?? flexSize
+                if let w = child.desiredWidth {
+                    childSize = w
+                } else {
+                    // assign extra remainder to the last flexible pane for trailing alignment
+                    let add = remainingFlex == 1 ? baseFlex + extraFlex : baseFlex
+                    childSize = add
+                    remainingFlex -= 1
+                }
                 outer = Region(top: 0, left: offsetPrimary, width: childSize, height: rows)
             case .vertical:
-                childSize = child.desiredHeight ?? flexSize
+                if let h = child.desiredHeight {
+                    childSize = h
+                } else {
+                    let add = remainingFlexV == 1 ? baseFlexV + extraFlexV : baseFlexV
+                    childSize = add
+                    remainingFlexV -= 1
+                }
                 outer = Region(top: offsetPrimary, left: 0, width: cols, height: childSize)
             }
             let inner = outer

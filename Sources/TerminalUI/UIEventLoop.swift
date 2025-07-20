@@ -100,16 +100,16 @@ public class UIEventLoop {
         var masks = [MaskKey: Int]()
         for region in regions {
             if region.width == 1, region.height > 1 {
-                // vertical divider: mark north/south edges
-                for y in region.top ..< (region.top + region.height) {
+                // vertical divider (explicit widget): mark north/south edges
+                for y in region.top ..< region.top + region.height {
                     masks[MaskKey(row: y, col: region.left), default: 0] |= N | S
                 }
             } else if region.width > 1, region.height > 0 {
-                // pane border: top/bottom (E/W) and left/right (N/S), clamped to screen
-                let top = max(region.top - 1, 0)
-                let left = max(region.left - 1, 0)
-                let bottom = min(region.top + region.height, rows - 1)
-                let right = min(region.left + region.width, columns - 1)
+                // pane border: mark top/bottom (E/W) and left/right (N/S)
+                let top = region.top
+                let left = region.left
+                let bottom = region.top + region.height - 1
+                let right = region.left + region.width - 1
                 for x in (left + 1) ..< right {
                     masks[MaskKey(row: top, col: x), default: 0] |= E | W
                     masks[MaskKey(row: bottom, col: x), default: 0] |= E | W
@@ -119,10 +119,10 @@ public class UIEventLoop {
                     masks[MaskKey(row: y, col: right), default: 0] |= N | S
                 }
                 // mark corners to render corner characters
-                masks[MaskKey(row: top, col: left), default: 0] |= S | E
-                masks[MaskKey(row: top, col: right), default: 0] |= S | W
-                masks[MaskKey(row: bottom, col: left), default: 0] |= N | E
-                masks[MaskKey(row: bottom, col: right), default: 0] |= N | W
+                masks[MaskKey(row: top,    col: left),   default: 0] |= S | E
+                masks[MaskKey(row: top,    col: right),  default: 0] |= S | W
+                masks[MaskKey(row: bottom, col: left),   default: 0] |= N | E
+                masks[MaskKey(row: bottom, col: right),  default: 0] |= N | W
             }
         }
         // Render merged borders with proper box-drawing joins
