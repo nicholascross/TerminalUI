@@ -21,6 +21,22 @@ public class TextAreaWidget: Widget {
         self.isUserInteractive = isUserInteractive
     }
 
+    /// Full text content: joined lines separated by newlines.
+    public var text: String {
+        get { lines.joined(separator: "\n") }
+        set { lines = newValue.split(separator: "\n", omittingEmptySubsequences: false).map(String.init) }
+    }
+
+    /// Convenience initializer accepting a single string; splits on newlines for display.
+    public convenience init(
+        text: String,
+        title: String? = nil,
+        isUserInteractive: Bool = true
+    ) {
+        let lines = text.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
+        self.init(lines: lines, title: title, isUserInteractive: isUserInteractive)
+    }
+
     /// Handle scrolling events (up/down arrows). Returns true if event consumed.
     @discardableResult
     public func handle(event: InputEvent) -> Bool {
