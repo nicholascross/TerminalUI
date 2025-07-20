@@ -2,13 +2,16 @@ import Foundation
 
 /// A text input widget capturing line input.
 public class TextInputWidget: Widget {
+    /// Optional title displayed over the top border of the input.
+    public var title: String?
     /// Prompt shown before input.
     public let prompt: String
     /// Current input buffer.
     public private(set) var buffer: String = ""
 
-    public init(prompt: String = "> ") {
+    public init(prompt: String = "> ", title: String? = nil) {
         self.prompt = prompt
+        self.title = title
     }
 
     /// Handle character and control events; returns completed line on Enter.

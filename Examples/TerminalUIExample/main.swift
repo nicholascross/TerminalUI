@@ -23,7 +23,7 @@ struct App {
                     .frame(height: 3)
 
                 Stack(axis: .horizontal, spacing: 1) {
-                    ListWidget(items: ["Item A", "Item B", "Item C"])
+                    ListWidget(items: ["Item A", "Item B", "Item C"], title: "Items")
                         .frame(width: 20)
                     Stack(axis: .vertical, spacing: 0) {
                         TextAreaWidget(lines: [
@@ -32,16 +32,16 @@ struct App {
                             "Line 3: Use ↑/↓ to scroll.",
                             "Line 4: Swift TerminalUI",
                             "Line 5: Enjoy!"
-                        ])
+                        ], title: "Details")
                         TextAreaWidget(lines: [
                             "Line 1: Hello, World!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!",
                             "Line 2: This is a text area.",
                             "Line 3: Use ↑/↓ to scroll."
-                        ])
+                        ], title: "More Details")
                     }
                 }
 
-                TextInputWidget(prompt: "> ")
+                TextInputWidget(prompt: "> ", title: "Input")
                     .frame(height: 3)
             }
         }

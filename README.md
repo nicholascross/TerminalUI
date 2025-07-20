@@ -26,7 +26,7 @@ If the terminal size is too small to display fixed-size frames, TerminalUI will 
 ## Example
 
 Run the interactive example (press 'q' or Ctrl-C to quit). The interface now consists of:
-
+- Each widget displays its optional title over the top border.
 - A fixed-height header banner at the top.
 - A two-pane split: left pane shows a selectable list (fixed width), and right pane shows a scrollable text area.
 - A fixed-height input box at the bottom.

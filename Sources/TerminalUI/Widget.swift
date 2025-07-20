@@ -2,6 +2,8 @@ import Foundation
 
 /// A generic UI widget that can render itself and handle events.
 public protocol Widget {
+    /// Optional title displayed over the top border of the widget.
+    var title: String? { get set }
     /// Renders the widget into the given region.
     func render(into renderer: Renderer, region: Region)
 

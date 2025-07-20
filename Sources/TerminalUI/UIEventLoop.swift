@@ -229,6 +229,19 @@ public class UIEventLoop {
             }()
             renderer.setCell(row: row, col: col, char: ch)
         }
+        // Draw widget titles over top borders
+        for (widget, region) in zip(widgets, regions) {
+            if let title = widget.title {
+                let titleText = " \(title) "
+                let maxLen = max(0, region.width - 2)
+                let text = String(titleText.prefix(maxLen))
+                let startCol = region.left + 1
+                let row = region.top
+                for (i, ch) in text.enumerated() {
+                    renderer.setCell(row: row, col: startCol + i, char: ch)
+                }
+            }
+        }
         renderer.blit()
         // Position cursor for focused text-input widget
         if let ti = widgets[focusIndex] as? TextInputWidget {

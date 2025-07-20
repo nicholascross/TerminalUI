@@ -2,13 +2,16 @@ import Foundation
 
 /// A text area widget for displaying multiple lines of text.
 public class TextAreaWidget: Widget {
+    /// Optional title displayed over the top border of the text area.
+    public var title: String?
     /// Lines of text to display in the area.
     public var lines: [String]
     /// Current scroll offset (index of the topmost displayed line).
     public var scrollOffset: Int = 0
 
-    public init(lines: [String]) {
+    public init(lines: [String], title: String? = nil) {
         self.lines = lines
+        self.title = title
     }
 
     /// Handle scrolling events (up/down arrows). Returns true if event consumed.

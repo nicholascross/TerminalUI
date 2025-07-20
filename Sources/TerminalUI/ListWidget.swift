@@ -2,13 +2,16 @@ import Foundation
 
 /// A simple list widget displaying select-able items.
 public class ListWidget: Widget {
+    /// Optional title displayed over the top border of the list.
+    public var title: String?
     /// Items to display in the list.
     public var items: [String]
     /// Currently selected index.
     public var selectedIndex: Int = 0
 
-    public init(items: [String]) {
+    public init(items: [String], title: String? = nil) {
         self.items = items
+        self.title = title
     }
 
     /// Handle navigation keys; returns true if event consumed.
