@@ -119,6 +119,9 @@ public protocol LayoutNode {
     var desiredWidth: Int? { get }
     /// Desired height in cells; nil if flexible (handled by container).
     var desiredHeight: Int? { get }
+    /// Minimum required size (width, height) to display fixed frames in the layout.
+    /// Flexible regions contribute zero; fixed frames (.frame) are included.
+    func minimalSize(widgetCount: Int) -> (width: Int, height: Int)
 }
 
 /// A helper to nest multiple LayoutNodes in a SwiftUI-like DSL.
@@ -148,6 +151,10 @@ public extension LayoutNode {
     var desiredWidth: Int? { nil }
     /// Default desired height (flexible).
     var desiredHeight: Int? { nil }
+    /// Minimum required size for this layout node (fixed frames only).
+    func minimalSize(widgetCount: Int) -> (width: Int, height: Int) {
+        return (0, 0)
+    }
 }
 
 /// Wrap a layout leaf with a fixed frame (width and/or height).
@@ -200,5 +207,34 @@ public struct WidgetLeaf: LayoutNode {
 
     public func regions(for widgetCount: Int) -> [Region] {
         return [Region(top: 0, left: 0, width: columns, height: rows)]
+    }
+}
+
+// MARK: - Minimal size calculation
+extension Stack {
+    /// Compute minimal required size to accommodate fixed frames in this stack.
+    public func minimalSize(widgetCount: Int) -> (width: Int, height: Int) {
+        let childSizes = children.map { $0.minimalSize(widgetCount: widgetCount) }
+        let totalSpacing = spacing * max(0, children.count - 1)
+        switch axis {
+        case .horizontal:
+            let width = childSizes.reduce(0) { $0 + $1.width } + totalSpacing
+            let height = childSizes.reduce(0) { max($0, $1.height) }
+            return (width, height)
+        case .vertical:
+            let width = childSizes.reduce(0) { max($0, $1.width) }
+            let height = childSizes.reduce(0) { $0 + $1.height } + totalSpacing
+            return (width, height)
+        }
+    }
+}
+
+extension Sized {
+    /// Minimal size honors fixed width/height or defers to wrapped child.
+    public func minimalSize(widgetCount: Int) -> (width: Int, height: Int) {
+        let childSize = wrapped.minimalSize(widgetCount: widgetCount)
+        let w = desiredWidth ?? childSize.width
+        let h = desiredHeight ?? childSize.height
+        return (w, h)
     }
 }

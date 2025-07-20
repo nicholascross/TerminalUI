@@ -21,6 +21,8 @@ TMPDIR="$(pwd)/.build/tmp" HOME="$(pwd)/.build/home" swift build --disable-sandb
 
 See module documentation in source files for examples.
 
+If the terminal size is too small to display fixed-size frames, TerminalUI will show a warning message instead of attempting to render the UI.
+
 ## Example
 
 Run the interactive example (press 'q' or Ctrl-C to quit). The interface now consists of:

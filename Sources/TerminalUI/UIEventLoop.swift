@@ -93,6 +93,26 @@ public class UIEventLoop {
         renderer.clearBuffer()
         let container = Region(top: 0, left: 0, width: columns, height: rows)
         let regions = layout.regions(for: widgets.count, in: container)
+        // If the available terminal is too small for fixed frames, show warning
+        let (minWidth, minHeight) = layout.minimalSize(widgetCount: widgets.count)
+        if columns < minWidth || rows < minHeight {
+            Terminal.clearScreen()
+            Terminal.moveCursor(row: 1, col: 1)
+            print("Screen too small: current=\(columns)x\(rows), minimum=\(minWidth)x\(minHeight)")
+            fflush(stdout)
+            return
+        }
+        // Ensure each widget has at least a 1×1 content region
+        for (idx, region) in regions.enumerated() {
+            let contentRegion = region.inset(by: 1)
+            if contentRegion.width <= 0 || contentRegion.height <= 0 {
+                Terminal.clearScreen()
+                Terminal.moveCursor(row: 1, col: 1)
+                print("Screen too small: widget #\(idx) needs at least 1×1 content area (got \(contentRegion.width)x\(contentRegion.height))")
+                fflush(stdout)
+                return
+            }
+        }
         for (widget, region) in zip(widgets, regions) {
             // Render widget content inset by 1 cell so top row isn't under the border
             let contentRegion = region.inset(by: 1)
