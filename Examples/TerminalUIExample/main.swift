@@ -3,7 +3,6 @@ import TerminalUI
 @main
 struct App {
     static func main() throws {
-        let (rows, cols) = Terminal.getTerminalSize()
         Terminal.clearScreen()
         defer {
             Terminal.showCursor()
@@ -41,9 +40,11 @@ struct App {
                 .frame(height: 3)
         }
 
-        let loop = UIEventLoop(rows: rows, cols: cols,
-                               widgets: widgets,
-                               layout: rootLayout)
+        let loop = UIEventLoop(
+            widgets: widgets,
+            layout: rootLayout
+        )
+
         try loop.run()
     }
 }

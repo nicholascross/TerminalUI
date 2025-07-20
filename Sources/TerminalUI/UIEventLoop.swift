@@ -9,41 +9,39 @@ public class UIEventLoop {
     private var focusIndex: Int = 0
     private var renderer: Renderer
     private var rows: Int
-    private var cols: Int
+    private var columns: Int
     private var running = false
+
+    public convenience init(
+        widgets: [Widget],
+        layout: LayoutNode
+    ) {
+        let (rows, columns) = Terminal.getTerminalSize()
+        self.init(rows: rows, columns: columns, widgets: widgets, layout: layout)
+    }
 
     /// Initialize the event loop with a custom layout strategy.
     public init(
         rows: Int,
-        cols: Int,
+        columns: Int,
         widgets: [Widget],
         layout: LayoutNode
 ) {
         self.rows = rows
-        self.cols = cols
+        self.columns = columns
         self.layout = layout
-        self.layout.update(rows: rows, cols: cols)
+        self.layout.update(rows: rows, cols: columns)
         self.widgets = widgets
-        self.renderer = Renderer(rows: rows, cols: cols)
+        self.renderer = Renderer(rows: rows, cols: columns)
         // On resize, update layout and renderer, then redraw
-        Terminal.onResize = { [weak self] r, c in
+        Terminal.onResize = { [weak self] rows, columns in
             guard let self = self else { return }
-            self.rows = r
-            self.cols = c
-            self.layout.update(rows: r, cols: c)
-            self.renderer = Renderer(rows: r, cols: c)
+            self.rows = rows
+            self.columns = columns
+            self.layout.update(rows: rows, cols: columns)
+            self.renderer = Renderer(rows: rows, cols: columns)
             self.redraw()
         }
-    }
-
-    /// Convenience initializer using the default absolute Layout.
-    public convenience init(
-        rows: Int,
-        cols: Int,
-        widgets: [Widget]
-    ) {
-        self.init(rows: rows, cols: cols, widgets: widgets,
-                  layout: Layout(rows: rows, cols: cols))
     }
 
     /// Start processing input events and updating the UI.
@@ -84,9 +82,7 @@ public class UIEventLoop {
     private func redraw() {
         Terminal.hideCursor()
         renderer.clearBuffer()
-        Terminal.hideCursor()
-        renderer.clearBuffer()
-        let container = Region(top: 0, left: 0, width: cols, height: rows)
+        let container = Region(top: 0, left: 0, width: columns, height: rows)
         let regions = layout.regions(for: widgets.count, in: container)
         for (widget, region) in zip(widgets, regions) {
             widget.render(into: renderer, region: region)

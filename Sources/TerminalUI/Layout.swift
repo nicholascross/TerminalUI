@@ -13,10 +13,7 @@ public struct Region {
         self.width = width
         self.height = height
     }
-}
 
-// MARK: - Region Inset Helper
-public extension Region {
     /// Returns a region inset by a specified number of cells on each side.
     /// The inset reduces width and height by twice the inset, not going below zero.
     func inset(by inset: Int = 1) -> Region {
@@ -24,62 +21,6 @@ public extension Region {
                left: left + inset,
                width: max(width - 2 * inset, 0),
                height: max(height - 2 * inset, 0))
-    }
-}
-
-/// Defines screen regions and layout calculations.
-public struct Layout {
-    public let rows: Int
-    public let cols: Int
-    /// Height of the input box region, including top and bottom borders and content line.
-    public var inputHeight: Int = 3
-
-    public init(rows: Int, cols: Int, inputHeight: Int = 3) {
-        self.rows = rows
-        self.cols = cols
-        self.inputHeight = inputHeight
-    }
-
-    /// Height available for main display area.
-    public var mainAreaHeight: Int {
-        return rows - inputHeight
-    }
-
-    /// Offset of the input region from the top.
-    public var inputOffset: Int {
-        return mainAreaHeight
-    }
-
-    /// Region covering the main display area (above the input).
-    public var mainRegion: Region {
-        Region(top: 0, left: 0, width: cols, height: mainAreaHeight)
-    }
-
-    /// Region covering the input area at the bottom.
-    public var inputRegion: Region {
-        Region(top: inputOffset, left: 0, width: cols, height: inputHeight)
-    }
-
-    /// Returns an array of regions for rendering `widgetCount` widgets in order.
-    public func regions(for widgetCount: Int) -> [Region] {
-        switch widgetCount {
-        case 0:
-            return []
-        case 1:
-            // Single widget occupies main region inset by border
-            return [mainRegion.inset()]
-        case 2:
-            // First widget in main region, second in input region
-            return [mainRegion.inset(), inputRegion.inset()]
-        default:
-            // Stack widgets vertically, each with a 1-cell border inset
-            let heightPer = rows / widgetCount
-            return (0..<widgetCount).map { index in
-                let topPosition = index * heightPer
-                let region = Region(top: topPosition, left: 0, width: cols, height: heightPer)
-                return region.inset()
-            }
-        }
     }
 }
 
@@ -97,12 +38,6 @@ public protocol LayoutNode {
     var borderInsets: Int { get }
 }
 
-extension Layout: LayoutNode {
-    public mutating func update(rows: Int, cols: Int) {
-        self = Layout(rows: rows, cols: cols, inputHeight: inputHeight)
-    }
-}
-
 /// A helper to nest multiple LayoutNodes in a SwiftUI-like DSL.
 @resultBuilder
 public enum LayoutBuilder {
@@ -117,12 +52,12 @@ public extension LayoutNode {
     func regions(for widgetCount: Int, in container: Region) -> [Region] {
         var copy = self
         copy.update(rows: container.height, cols: container.width)
-        let regs = copy.regions(for: widgetCount)
-        return regs.map { r in
-            Region(top: container.top + r.top,
-                   left: container.left + r.left,
-                   width: r.width,
-                   height: r.height)
+        let regions = copy.regions(for: widgetCount)
+        return regions.map { region in
+            Region(top: container.top + region.top,
+                   left: container.left + region.left,
+                   width: region.width,
+                   height: region.height)
         }
     }
 
@@ -142,12 +77,14 @@ public struct HStack: LayoutNode {
 
     public init(spacing: Int = 0, @LayoutBuilder _ build: () -> [LayoutNode]) {
         self.spacing = spacing
-        self.children = build()
+        children = build()
     }
+
     public mutating func update(rows: Int, cols: Int) {
         self.rows = rows
         self.cols = cols
     }
+
     public func regions(for widgetCount: Int) -> [Region] {
         guard !children.isEmpty else { return [] }
         // fixed-size frames and flexible items; share remaining space
@@ -178,12 +115,14 @@ public struct VStack: LayoutNode {
 
     public init(spacing: Int = 0, @LayoutBuilder _ build: () -> [LayoutNode]) {
         self.spacing = spacing
-        self.children = build()
+        children = build()
     }
+
     public mutating func update(rows: Int, cols: Int) {
         self.rows = rows
         self.cols = cols
     }
+
     public func regions(for widgetCount: Int) -> [Region] {
         guard !children.isEmpty else { return [] }
         // fixed-size frames and flexible items; share remaining space
@@ -206,20 +145,22 @@ public struct VStack: LayoutNode {
     }
 }
 
-
 /// Wrap a layout leaf with a fixed frame (width and/or height).
 public struct Sized<Child: LayoutNode>: LayoutNode {
     public let wrapped: any LayoutNode
     public let desiredWidth: Int?
     public let desiredHeight: Int?
+
     public init(_ child: Child, width: Int? = nil, height: Int? = nil) {
-        self.wrapped = child
-        self.desiredWidth = width
-        self.desiredHeight = height
+        wrapped = child
+        desiredWidth = width
+        desiredHeight = height
     }
-    public mutating func update(rows: Int, cols: Int) {
+
+    public mutating func update(rows _: Int, cols _: Int) {
         // no-op; sizing handled by parent stacks/grids
     }
+
     public func regions(for widgetCount: Int) -> [Region] {
         wrapped.regions(for: widgetCount)
     }
@@ -232,36 +173,6 @@ public extension LayoutNode {
     }
 }
 
-
-/// Wrap a LayoutNode so it draws a 1-cell box around its content.
-public struct Bordered<Child: LayoutNode>: LayoutNode {
-    public let wrapped: any LayoutNode
-    public init(_ child: Child) {
-        self.wrapped = child
-    }
-    public mutating func update(rows: Int, cols: Int) {
-        // no-op: content region is already inset by parent stack logic
-    }
-    // Propagate fixed-size markers through border, adding 1-cell padding on each side
-    public var desiredWidth: Int? {
-        wrapped.desiredWidth.map { $0 + 2 }
-    }
-    public var desiredHeight: Int? {
-        wrapped.desiredHeight.map { $0 + 2 }
-    }
-    /// Inset by one cell on each side to leave room for border lines.
-    public var borderInsets: Int { 1 }
-    public func regions(for widgetCount: Int) -> [Region] {
-        wrapped.regions(for: widgetCount)
-    }
-}
-
-public extension LayoutNode {
-    /// Apply a 1-cell border around this layout leaf.
-    func bordered() -> Bordered<Self> { Bordered(self) }
-}
-
-
 /// A leaf node that binds one Widget index to the full container region.
 public struct WidgetLeaf: LayoutNode {
     public let index: Int
@@ -270,10 +181,12 @@ public struct WidgetLeaf: LayoutNode {
     public init(_ index: Int) {
         self.index = index
     }
+
     public mutating func update(rows: Int, cols: Int) {
         self.rows = rows
         self.cols = cols
     }
+
     public func regions(for widgetCount: Int) -> [Region] {
         guard index < widgetCount else { return [] }
         return [Region(top: 0, left: 0, width: cols, height: rows)]
