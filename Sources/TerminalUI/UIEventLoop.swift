@@ -1,5 +1,5 @@
-import Foundation
 import Darwin.C
+import Foundation
 
 /// Main event loop to drive UI based on input and state.
 public class UIEventLoop {
@@ -26,13 +26,13 @@ public class UIEventLoop {
         columns: Int,
         widgets: [Widget],
         layout: LayoutNode
-) {
+    ) {
         self.rows = rows
         self.columns = columns
         self.layout = layout
         self.layout.update(rows: rows, cols: columns)
         self.widgets = widgets
-        self.renderer = Renderer(rows: rows, cols: columns)
+        renderer = Renderer(rows: rows, cols: columns)
         // On resize, update layout and renderer, then redraw
         Terminal.onResize = { [weak self] rows, columns in
             guard let self = self else { return }
@@ -99,25 +99,30 @@ public class UIEventLoop {
         let N = 1, S = 2, W = 4, E = 8
         var masks = [MaskKey: Int]()
         for region in regions {
-            if region.width == 1 && region.height > 1 {
+            if region.width == 1, region.height > 1 {
                 // vertical divider: mark north/south edges
-                for y in region.top..<(region.top + region.height) {
+                for y in region.top ..< (region.top + region.height) {
                     masks[MaskKey(row: y, col: region.left), default: 0] |= N | S
                 }
-            } else if region.width > 1 && region.height > 0 {
+            } else if region.width > 1, region.height > 0 {
                 // pane border: top/bottom (E/W) and left/right (N/S), clamped to screen
-                let top    = max(region.top - 1, 0)
-                let left   = max(region.left - 1, 0)
+                let top = max(region.top - 1, 0)
+                let left = max(region.left - 1, 0)
                 let bottom = min(region.top + region.height, rows - 1)
-                let right  = min(region.left + region.width, columns - 1)
-                for x in (left + 1)..<right {
-                    masks[MaskKey(row: top,    col: x), default: 0] |= E | W
+                let right = min(region.left + region.width, columns - 1)
+                for x in (left + 1) ..< right {
+                    masks[MaskKey(row: top, col: x), default: 0] |= E | W
                     masks[MaskKey(row: bottom, col: x), default: 0] |= E | W
                 }
-                for y in (top + 1)..<bottom {
-                    masks[MaskKey(row: y, col: left),  default: 0] |= N | S
+                for y in (top + 1) ..< bottom {
+                    masks[MaskKey(row: y, col: left), default: 0] |= N | S
                     masks[MaskKey(row: y, col: right), default: 0] |= N | S
                 }
+                // mark corners to render corner characters
+                masks[MaskKey(row: top, col: left), default: 0] |= S | E
+                masks[MaskKey(row: top, col: right), default: 0] |= S | W
+                masks[MaskKey(row: bottom, col: left), default: 0] |= N | E
+                masks[MaskKey(row: bottom, col: right), default: 0] |= N | W
             }
         }
         // Render merged borders with proper box-drawing joins
@@ -125,18 +130,18 @@ public class UIEventLoop {
             let row = key.row, col = key.col
             let ch: Character = {
                 switch mask {
-                case N|S|E|W: return "┼"
-                case S|E|W:   return "┬"
-                case N|E|W:   return "┴"
-                case N|S|E:   return "├"
-                case N|S|W:   return "┤"
-                case N|S:     return "│"
-                case E|W:     return "─"
-                case S|E:     return "┌"
-                case S|W:     return "┐"
-                case N|E:     return "└"
-                case N|W:     return "┘"
-                default:      return mask & (N|S) != 0 ? "│" : "─"
+                case N | S | E | W: return "┼"
+                case S | E | W: return "┬"
+                case N | E | W: return "┴"
+                case N | S | E: return "├"
+                case N | S | W: return "┤"
+                case N | S: return "│"
+                case E | W: return "─"
+                case S | E: return "┌"
+                case S | W: return "┐"
+                case N | E: return "└"
+                case N | W: return "┘"
+                default: return mask & (N | S) != 0 ? "│" : "─"
                 }
             }()
             renderer.setCell(row: row, col: col, char: ch)
