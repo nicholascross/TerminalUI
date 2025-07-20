@@ -31,8 +31,8 @@ struct App {
         let widgets: [Widget] = [list, textArea, input]
 
         // Build a SwiftUI-like stack layout instead of manual constraints
-        let rootLayout = VStack(spacing: 0) {
-            HStack(spacing: 0) {
+        let rootLayout = Stack(axis: .vertical, spacing: 0) {
+            Stack(axis: .horizontal, spacing: 0) {
                 WidgetLeaf(0)
                 WidgetLeaf(1)
             }

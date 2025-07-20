@@ -16,7 +16,7 @@ public struct Region {
 
     /// Returns a region inset by a specified number of cells on each side.
     /// The inset reduces width and height by twice the inset, not going below zero.
-    func inset(by inset: Int = 1) -> Region {
+    func inset(by inset: Int) -> Region {
         Region(top: top + inset,
                left: left + inset,
                width: max(width - 2 * inset, 0),
@@ -24,29 +24,28 @@ public struct Region {
     }
 }
 
-private enum Axis {
+public enum Axis {
     case horizontal, vertical
 }
 
-private struct StackLayout: LayoutNode {
+public struct Stack: LayoutNode {
     let axis: Axis
     var spacing: Int
     var children: [LayoutNode]
     private var rows: Int = 0, cols: Int = 0
-    private var borderInsets: Int { 1 }
 
-    init(axis: Axis, spacing: Int, children: [LayoutNode]) {
+    public init(axis: Axis, spacing: Int, @LayoutBuilder _ build: () -> [LayoutNode]) {
         self.axis = axis
         self.spacing = spacing
-        self.children = children
+        self.children = build()
     }
 
-    mutating func update(rows: Int, cols: Int) {
+    public mutating func update(rows: Int, cols: Int) {
         self.rows = rows
         self.cols = cols
     }
 
-    func regions(for widgetCount: Int) -> [Region] {
+    public func regions(for widgetCount: Int) -> [Region] {
         guard !children.isEmpty else { return [] }
 
         let fixedTotal: Int
@@ -81,8 +80,7 @@ private struct StackLayout: LayoutNode {
                 childSize = child.desiredHeight ?? flexSize
                 outer = Region(top: offsetPrimary, left: 0, width: cols, height: childSize)
             }
-            let inset = min(borderInsets, outer.width / 2, outer.height / 2)
-            let inner = outer.inset(by: inset)
+            let inner = outer
             out += child.regions(for: widgetCount, in: inner)
             offsetPrimary += childSize + spacing
         }
@@ -131,52 +129,6 @@ public extension LayoutNode {
     var desiredHeight: Int? { nil }
 }
 
-/// A horizontal stack layout: lays out its child LayoutNodes side by side.
-public struct HStack: LayoutNode {
-    private var stack: StackLayout
-
-    /// The spacing (in cells) between child elements.
-    public var spacing: Int {
-        get { stack.spacing }
-        set { stack.spacing = newValue }
-    }
-
-    public init(spacing: Int = 0, @LayoutBuilder _ build: () -> [LayoutNode]) {
-        stack = StackLayout(axis: .horizontal, spacing: spacing, children: build())
-    }
-
-    public mutating func update(rows: Int, cols: Int) {
-        stack.update(rows: rows, cols: cols)
-    }
-
-    public func regions(for widgetCount: Int) -> [Region] {
-        stack.regions(for: widgetCount)
-    }
-}
-
-/// A vertical stack layout: lays out its child LayoutNodes top to bottom.
-public struct VStack: LayoutNode {
-    private var stack: StackLayout
-
-    /// The spacing (in cells) between child elements.
-    public var spacing: Int {
-        get { stack.spacing }
-        set { stack.spacing = newValue }
-    }
-
-    public init(spacing: Int = 0, @LayoutBuilder _ build: () -> [LayoutNode]) {
-        stack = StackLayout(axis: .vertical, spacing: spacing, children: build())
-    }
-
-    public mutating func update(rows: Int, cols: Int) {
-        stack.update(rows: rows, cols: cols)
-    }
-
-    public func regions(for widgetCount: Int) -> [Region] {
-        stack.regions(for: widgetCount)
-    }
-}
-
 /// Wrap a layout leaf with a fixed frame (width and/or height).
 public struct Sized<Child: LayoutNode>: LayoutNode {
     /// The child layout node being sized; its update(_:_:) is forwarded to propagate container
@@ -213,7 +165,8 @@ public extension LayoutNode {
 /// A leaf node that binds one Widget index to the full container region.
 public struct WidgetLeaf: LayoutNode {
     public let index: Int
-    private var rows: Int = 0, cols: Int = 0
+    private var rows: Int = 0
+    private var columns: Int = 0
 
     public init(_ index: Int) {
         self.index = index
@@ -221,11 +174,10 @@ public struct WidgetLeaf: LayoutNode {
 
     public mutating func update(rows: Int, cols: Int) {
         self.rows = rows
-        self.cols = cols
+        self.columns = cols
     }
 
     public func regions(for widgetCount: Int) -> [Region] {
-        guard index < widgetCount else { return [] }
-        return [Region(top: 0, left: 0, width: cols, height: rows)]
+        return [Region(top: 0, left: 0, width: columns, height: rows)]
     }
 }
