@@ -40,6 +40,8 @@ public class UIEventLoop {
             self.columns = columns
             self.layout.update(rows: rows, cols: columns)
             self.renderer = Renderer(rows: rows, cols: columns)
+            // Clear screen on resize to avoid leftover artifacts
+            Terminal.clearScreen()
             self.redraw()
         }
     }
@@ -53,7 +55,8 @@ public class UIEventLoop {
             Terminal.showCursor()
         }
 
-        // Initial draw
+        // Clear screen and perform initial draw
+        Terminal.clearScreen()
         redraw()
         while running {
             let event = try input.readEvent()
