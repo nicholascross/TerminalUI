@@ -147,7 +147,8 @@ public struct VStack: LayoutNode {
 
 /// Wrap a layout leaf with a fixed frame (width and/or height).
 public struct Sized<Child: LayoutNode>: LayoutNode {
-    public let wrapped: any LayoutNode
+    /// The child layout node being sized; its update(_:_:) is forwarded to propagate container size.
+    public var wrapped: any LayoutNode
     public let desiredWidth: Int?
     public let desiredHeight: Int?
 
@@ -157,8 +158,11 @@ public struct Sized<Child: LayoutNode>: LayoutNode {
         desiredHeight = height
     }
 
-    public mutating func update(rows _: Int, cols _: Int) {
-        // no-op; sizing handled by parent stacks/grids
+    public mutating func update(rows: Int, cols: Int) {
+        // Forward size updates to the wrapped child so it can compute its regions correctly.
+        var child = wrapped
+        child.update(rows: rows, cols: cols)
+        wrapped = child
     }
 
     public func regions(for widgetCount: Int) -> [Region] {
