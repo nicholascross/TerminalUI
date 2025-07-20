@@ -1,6 +1,47 @@
 import Darwin.C
 import Foundation
 
+/// Result builder that lets you declare Widgets inline in your layout DSL.
+/// Widgets are collected in declaration order, and each is replaced by a WidgetLeaf internally.
+@resultBuilder
+public enum UIBuilder {
+    private static var widgets: [Widget] = []
+
+    /// Reset the collected widget buffer. Called automatically at the start of building.
+    static func resetWidgets() {
+        widgets = []
+    }
+
+    /// The widgets collected during the most recent build.
+    public static var collectedWidgets: [Widget] { widgets }
+
+    /// Wrap a raw Widget: record it and emit the corresponding leaf node.
+    public static func buildExpression(_ widget: Widget) -> WidgetLeaf {
+        let idx = widgets.count
+        widgets.append(widget)
+        return WidgetLeaf(idx)
+    }
+
+    /// Pass through any existing LayoutNode (e.g. Stack, Sized, WidgetLeaf).
+    public static func buildExpression(_ node: any LayoutNode) -> any LayoutNode {
+        return node
+    }
+
+    /// Combine multiple nodes into the root array.
+    public static func buildBlock(_ nodes: any LayoutNode...) -> [any LayoutNode] {
+        return nodes
+    }
+}
+
+// Allow calling `.frame(width:height:)` directly on Widgets within the UIBuilder DSL.
+public extension Widget {
+    /// Record this widget in UIBuilder and wrap it in a fixed-size leaf.
+    func frame(width: Int? = nil, height: Int? = nil) -> Sized<WidgetLeaf> {
+        let leaf = UIBuilder.buildExpression(self)
+        return leaf.frame(width: width, height: height)
+    }
+}
+
 /// Main event loop to drive UI based on input and state.
 public class UIEventLoop {
     private let input = Input()
@@ -12,12 +53,31 @@ public class UIEventLoop {
     private var columns: Int
     private var running = false
 
+    /// Build a UIEventLoop by declaring widgets inline in the layout DSL.
+    ///
+    /// Example:
+    /// ```swift
+    /// let loop = UIEventLoop {
+    ///   Stack(axis: .vertical, spacing: 1) {
+    ///     headerWidget.frame(height: 3)
+    ///     ListWidget(items: [...]).frame(width: 20)
+    ///     // inline widgets automatically collected
+    ///   }
+    /// }
+    /// try loop.run()
+    /// ```
     public convenience init(
-        widgets: [Widget],
-        layout: LayoutNode
+        @UIBuilder _ build: () -> [any LayoutNode]
     ) {
+        // Collect inline widgets in declaration order
+        UIBuilder.resetWidgets()
+        let roots = build()
+        let widgets = UIBuilder.collectedWidgets
+        guard let root = roots.first else {
+            fatalError("UIBuilder must produce at least one root layout node")
+        }
         let (rows, columns) = Terminal.getTerminalSize()
-        self.init(rows: rows, columns: columns, widgets: widgets, layout: layout)
+        self.init(rows: rows, columns: columns, widgets: widgets, layout: root)
     }
 
     /// Initialize the event loop with a custom layout strategy.

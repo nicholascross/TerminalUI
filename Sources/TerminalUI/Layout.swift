@@ -31,10 +31,10 @@ public enum Axis {
 public struct Stack: LayoutNode {
     let axis: Axis
     var spacing: Int
-    var children: [LayoutNode]
+    var children: [any LayoutNode]
     private var rows: Int = 0, cols: Int = 0
 
-    public init(axis: Axis, spacing: Int, @LayoutBuilder _ build: () -> [LayoutNode]) {
+    public init(axis: Axis, spacing: Int, @UIBuilder _ build: () -> [any LayoutNode]) {
         self.axis = axis
         self.spacing = spacing
         self.children = build()
@@ -53,7 +53,6 @@ public struct Stack: LayoutNode {
         let fixedTotal: Int
         let flexibleCount: Int
         let availFlex: Int
-        var flexSize: Int
         var baseFlex = 0, extraFlex = 0, remainingFlex = 0
         var baseFlexV = 0, extraFlexV = 0, remainingFlexV = 0
         switch axis {
@@ -63,7 +62,6 @@ public struct Stack: LayoutNode {
             availFlex = max(cols - totalSpacing - fixedTotal, 0)
             baseFlex = flexibleCount > 0 ? availFlex / flexibleCount : 0
             extraFlex = flexibleCount > 0 ? availFlex % flexibleCount : 0
-            flexSize = baseFlex
             remainingFlex = flexibleCount
         case .vertical:
             fixedTotal = children.compactMap { $0.desiredHeight }.reduce(0, +)
@@ -71,7 +69,6 @@ public struct Stack: LayoutNode {
             availFlex = max(rows - totalSpacing - fixedTotal, 0)
             baseFlexV = flexibleCount > 0 ? availFlex / flexibleCount : 0
             extraFlexV = flexibleCount > 0 ? availFlex % flexibleCount : 0
-            flexSize = baseFlexV
             remainingFlexV = flexibleCount
         }
 
@@ -124,13 +121,6 @@ public protocol LayoutNode {
     func minimalSize(widgetCount: Int) -> (width: Int, height: Int)
 }
 
-/// A helper to nest multiple LayoutNodes in a SwiftUI-like DSL.
-@resultBuilder
-public enum LayoutBuilder {
-    public static func buildBlock(_ nodes: LayoutNode...) -> [LayoutNode] {
-        return nodes
-    }
-}
 
 public extension LayoutNode {
     /// Compute regions for rendering widgets inside an arbitrary container region,
