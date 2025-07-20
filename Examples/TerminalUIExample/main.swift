@@ -25,18 +25,24 @@ struct App {
             "Line 4: Swift TerminalUI",
             "Line 5: Enjoy!"
         ])
-
         let input = TextInputWidget(prompt: "> ")
 
-        let widgets: [Widget] = [list, textArea, input]
+        // Add a header widget to test fixed-height framing and padding
+        let header = TextAreaWidget(lines: [" TerminalUI Example "])
 
-        // Build a SwiftUI-like stack layout instead of manual constraints
-        let rootLayout = Stack(axis: .vertical, spacing: 0) {
-            Stack(axis: .horizontal, spacing: 0) {
-                WidgetLeaf(0)
+        // Define widget set including header, list, text area, and input
+        let widgets: [Widget] = [header, list, textArea, input]
+
+        // Build a SwiftUI-like stack layout with nested stacks, spacing, and fixed frames
+        let rootLayout = Stack(axis: .vertical, spacing: 1) {
+            WidgetLeaf(0)
+                .frame(height: 3)
+            Stack(axis: .horizontal, spacing: 1) {
                 WidgetLeaf(1)
+                    .frame(width: 20)
+                WidgetLeaf(2)
             }
-            WidgetLeaf(2)
+            WidgetLeaf(3)
                 .frame(height: 3)
         }
 
