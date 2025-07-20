@@ -23,10 +23,19 @@ See module documentation in source files for examples.
 
 ## Example
 
-Run the interactive example (press ‘q’ or Ctrl-C to quit).
-The bottom input field is now rendered inside a bordered box (top border, content line, bottom border).
-Use ↑/↓ to navigate the list, type and press Enter to add items, press Tab to switch focus, and see the blinking cursor inside the box.
-Resize your terminal to see SIGWINCH handling:
+Run the interactive example (press 'q' or Ctrl-C to quit). The interface now consists of:
+
+- A fixed-height header banner at the top.
+- A two-pane split: left pane shows a selectable list (fixed width), and right pane shows a scrollable text area.
+- A fixed-height input box at the bottom.
+
+Borders are drawn around each region with proper joins and spacing. Use:
+
+- ↑/↓ to scroll the header or text area and to move selection in the list.
+- Type and press Enter in the input box to append items to the list.
+- Tab to cycle focus through header, list, text area, and input.
+- Resize your terminal to see SIGWINCH (resize) handling.
+
 ```sh
 swift run TerminalUIExample
 ```
