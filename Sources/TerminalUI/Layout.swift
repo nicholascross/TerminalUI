@@ -89,6 +89,12 @@ public protocol LayoutNode {
     mutating func update(rows: Int, cols: Int)
     /// Compute regions for rendering the given number of widgets.
     func regions(for widgetCount: Int) -> [Region]
+    /// Desired width in cells; nil if flexible (handled by container).
+    var desiredWidth: Int? { get }
+    /// Desired height in cells; nil if flexible (handled by container).
+    var desiredHeight: Int? { get }
+    /// Number of cells to inset for borders around this node.
+    var borderInsets: Int { get }
 }
 
 extension Layout: LayoutNode {
@@ -119,6 +125,13 @@ public extension LayoutNode {
                    height: r.height)
         }
     }
+
+    /// Default desired width (flexible).
+    var desiredWidth: Int? { nil }
+    /// Default desired height (flexible).
+    var desiredHeight: Int? { nil }
+    /// Default insets for borders (none).
+    var borderInsets: Int { 0 }
 }
 
 /// A horizontal stack layout: lays out its child LayoutNodes side by side.
@@ -137,36 +150,20 @@ public struct HStack: LayoutNode {
     }
     public func regions(for widgetCount: Int) -> [Region] {
         guard !children.isEmpty else { return [] }
-        // count dividers and fixed-size frames, then divide remaining space among flex items
-        let dividerCount = children.filter { $0 is Divider }.count
-        let sizeMarkers = children.compactMap { $0 as? SizedMarker }.filter { $0.desiredWidth != nil }
-        let fixedWidthTotal = sizeMarkers.compactMap { $0.desiredWidth }.reduce(0, +)
-        let flexibleCount = children.count - dividerCount - sizeMarkers.count
+        // fixed-size frames and flexible items; share remaining space
+        let fixedWidthTotal = children.compactMap { $0.desiredWidth }.reduce(0, +)
+        let flexibleCount = children.filter { $0.desiredWidth == nil }.count
         let totalSpacing = spacing * max(0, children.count - 1)
-        let totalDividerWidth = dividerCount
-        let availFlexWidth = max(cols - totalSpacing - totalDividerWidth - fixedWidthTotal, 0)
+        let availFlexWidth = max(cols - totalSpacing - fixedWidthTotal, 0)
         let flexWidth = flexibleCount > 0 ? availFlexWidth / flexibleCount : 0
+
         var offsetX = 0
         var out: [Region] = []
         for child in children {
-            // determine width: divider=1, fixed if Sized.frame(width:), else flexible
-            let childWidth: Int = {
-                switch child {
-                case is Divider: return 1
-                case let s as SizedMarker where s.desiredWidth != nil: return s.desiredWidth!
-                default: return flexWidth
-                }
-            }()
+            let childWidth = child.desiredWidth ?? flexWidth
             let outer = Region(top: 0, left: offsetX, width: childWidth, height: rows)
-            if child is Divider {
-                out += child.regions(for: widgetCount, in: outer)
-            } else if let b = child as? BorderedMarker {
-                // inset content to leave room for its border
-                let sub = outer.inset()
-                out += b.wrapped.regions(for: widgetCount, in: sub)
-            } else {
-                out += child.regions(for: widgetCount, in: outer)
-            }
+            let inner = child.borderInsets > 0 ? outer.inset(by: child.borderInsets) : outer
+            out += child.regions(for: widgetCount, in: inner)
             offsetX += childWidth + spacing
         }
         return out
@@ -189,53 +186,29 @@ public struct VStack: LayoutNode {
     }
     public func regions(for widgetCount: Int) -> [Region] {
         guard !children.isEmpty else { return [] }
-        // count dividers and fixed-height frames, then share remaining space
-        let dividerCount = children.filter { $0 is Divider }.count
-        let sizeMarkers = children.compactMap { $0 as? SizedMarker }.filter { $0.desiredHeight != nil }
-        let fixedHeightTotal = sizeMarkers.compactMap { $0.desiredHeight }.reduce(0, +)
-        let flexibleCount = children.count - dividerCount - sizeMarkers.count
+        // fixed-size frames and flexible items; share remaining space
+        let fixedHeightTotal = children.compactMap { $0.desiredHeight }.reduce(0, +)
+        let flexibleCount = children.filter { $0.desiredHeight == nil }.count
         let totalSpacing = spacing * max(0, children.count - 1)
-        let totalDividerHeight = dividerCount
-        let availFlexHeight = max(rows - totalSpacing - totalDividerHeight - fixedHeightTotal, 0)
+        let availFlexHeight = max(rows - totalSpacing - fixedHeightTotal, 0)
         let flexHeight = flexibleCount > 0 ? availFlexHeight / flexibleCount : 0
+
         var offsetY = 0
         var out: [Region] = []
         for child in children {
-            let childHeight: Int = {
-                switch child {
-                case is Divider: return 1
-                case let s as SizedMarker where s.desiredHeight != nil: return s.desiredHeight!
-                default: return flexHeight
-                }
-            }()
+            let childHeight = child.desiredHeight ?? flexHeight
             let outer = Region(top: offsetY, left: 0, width: cols, height: childHeight)
-            if let _ = child as? Divider {
-                out += child.regions(for: widgetCount, in: outer)
-            } else if let b = child as? BorderedMarker {
-                // inset content to leave room for its border
-                let sub = outer.inset()
-                out += b.wrapped.regions(for: widgetCount, in: sub)
-            } else {
-                out += child.regions(for: widgetCount, in: outer)
-            }
+            let inner = child.borderInsets > 0 ? outer.inset(by: child.borderInsets) : outer
+            out += child.regions(for: widgetCount, in: inner)
             offsetY += childHeight + spacing
         }
         return out
     }
 }
 
-/// A marker protocol for layout leaves that request fixed width and/or height.
-public protocol SizedMarker {
-    /// The wrapped child layout to size.
-    var wrapped: any LayoutNode { get }
-    /// Desired width in cells; nil if flexible.
-    var desiredWidth: Int? { get }
-    /// Desired height in cells; nil if flexible.
-    var desiredHeight: Int? { get }
-}
 
 /// Wrap a layout leaf with a fixed frame (width and/or height).
-public struct Sized<Child: LayoutNode>: LayoutNode, SizedMarker {
+public struct Sized<Child: LayoutNode>: LayoutNode {
     public let wrapped: any LayoutNode
     public let desiredWidth: Int?
     public let desiredHeight: Int?
@@ -259,14 +232,9 @@ public extension LayoutNode {
     }
 }
 
-/// A marker protocol for layout leaves that request a surrounding 1-cell border.
-public protocol BorderedMarker {
-    /// The wrapped child layout to which the 1-cell border will be applied.
-    var wrapped: any LayoutNode { get }
-}
 
 /// Wrap a LayoutNode so it draws a 1-cell box around its content.
-public struct Bordered<Child: LayoutNode>: LayoutNode, BorderedMarker, SizedMarker {
+public struct Bordered<Child: LayoutNode>: LayoutNode {
     public let wrapped: any LayoutNode
     public init(_ child: Child) {
         self.wrapped = child
@@ -276,11 +244,13 @@ public struct Bordered<Child: LayoutNode>: LayoutNode, BorderedMarker, SizedMark
     }
     // Propagate fixed-size markers through border, adding 1-cell padding on each side
     public var desiredWidth: Int? {
-        (wrapped as? any SizedMarker)?.desiredWidth.map { $0 + 2 }
+        wrapped.desiredWidth.map { $0 + 2 }
     }
     public var desiredHeight: Int? {
-        (wrapped as? any SizedMarker)?.desiredHeight.map { $0 + 2 }
+        wrapped.desiredHeight.map { $0 + 2 }
     }
+    /// Inset by one cell on each side to leave room for border lines.
+    public var borderInsets: Int { 1 }
     public func regions(for widgetCount: Int) -> [Region] {
         wrapped.regions(for: widgetCount)
     }
@@ -291,19 +261,6 @@ public extension LayoutNode {
     func bordered() -> Bordered<Self> { Bordered(self) }
 }
 
-/// A divider line that, in an HStack, is drawn vertically (1-column thick),
-/// or in a VStack is drawn horizontally (1-row thick).
-public struct Divider: LayoutNode {
-    private var rows: Int = 0, cols: Int = 0
-    public init() {}
-    public mutating func update(rows: Int, cols: Int) {
-        self.rows = rows
-        self.cols = cols
-    }
-    public func regions(for widgetCount: Int) -> [Region] {
-        [Region(top: 0, left: 0, width: cols, height: rows)]
-    }
-}
 
 /// A leaf node that binds one Widget index to the full container region.
 public struct WidgetLeaf: LayoutNode {
