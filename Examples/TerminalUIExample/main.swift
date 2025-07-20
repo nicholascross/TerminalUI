@@ -34,12 +34,11 @@ struct App {
         // Build a SwiftUI-like stack layout instead of manual constraints
         let rootLayout = VStack(spacing: 1) {
             HStack(spacing: 1) {
-                WidgetLeaf(0).bordered()
-                WidgetLeaf(1).bordered()
+                WidgetLeaf(0)
+                WidgetLeaf(1)
             }
             WidgetLeaf(2)
-                // .frame(height: 3)
-                // .bordered()
+                .frame(height: 3)
         }
 
         let loop = UIEventLoop(rows: rows, cols: cols,
