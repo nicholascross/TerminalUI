@@ -26,7 +26,7 @@ struct App {
 
         let list = ListWidget(items: ["Item A", "Item B", "Item C"], title: "Items")
         list.onSelect = { _, item in
-            details.lines = ["Selected item: \(item)"]
+            details.lines = item.split(separator: "\n").map { String($0) }
         }
 
         let loop = UIEventLoop {

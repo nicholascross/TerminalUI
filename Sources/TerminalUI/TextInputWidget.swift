@@ -29,9 +29,14 @@ public class TextInputWidget: Widget {
             }
             return nil
         case .enter:
-            let line = buffer
+            // Insert a newline for multi-line editing rather than submitting immediately
+            buffer.append("\n")
+            return nil
+        case .submit:
+            // Submit the entire buffer (e.g. on Ctrl-D)
+            let text = buffer
             buffer = ""
-            return line
+            return text
         default:
             return nil
         }
@@ -39,14 +44,21 @@ public class TextInputWidget: Widget {
 
     /// Render the input prompt and buffer into the given region.
     public func render(into renderer: Renderer, region: Region) {
-        let text = prompt + buffer
-        // Clear region.
-        for x in 0..<region.width {
-            renderer.setCell(row: region.top, col: region.left + x, char: " ")
+        // Split buffer into lines (preserve empty final line)
+        let lines = buffer.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
+        // Clear full region
+        for y in 0..<region.height {
+            for x in 0..<region.width {
+                renderer.setCell(row: region.top + y, col: region.left + x, char: " ")
+            }
         }
-        // Draw prompt and buffer.
-        for (j, ch) in text.prefix(region.width).enumerated() {
-            renderer.setCell(row: region.top, col: region.left + j, char: ch)
+        // Draw each line (prefix prompt on first line)
+        for (i, line) in lines.enumerated() {
+            guard i < region.height else { break }
+            let text = (i == 0 ? prompt + line : line)
+            for (j, ch) in text.prefix(region.width).enumerated() {
+                renderer.setCell(row: region.top + i, col: region.left + j, char: ch)
+            }
         }
     }
 }

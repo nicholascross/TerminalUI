@@ -260,12 +260,16 @@ public class UIEventLoop {
             }
         }
         renderer.blit()
-        // Position cursor for focused text-input widget
+        // Position cursor for focused multi-line text-input widget
         if let ti = widgets[focusIndex] as? TextInputWidget {
-            // Position cursor inside the boxed content (inset by 1)
             let contentRegion = regions[focusIndex].inset(by: 1)
-            let row = contentRegion.top + 1
-            let col = contentRegion.left + (ti.prompt + ti.buffer).count + 1
+            // Determine current line index and buffer lines
+            let lines = ti.buffer.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
+            let lineIndex = min(lines.count - 1, contentRegion.height - 1)
+            // Row and column within content region (plus legacy offset)
+            let row = contentRegion.top + lineIndex + 1
+            let prefix = lineIndex == 0 ? ti.prompt.count : 0
+            let col = contentRegion.left + prefix + lines[lineIndex].count + 1
             Terminal.moveCursor(row: row, col: col)
             Terminal.showCursor()
         }

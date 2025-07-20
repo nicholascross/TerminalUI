@@ -7,6 +7,8 @@ public enum InputEvent {
     case enter
     case backspace
     case tab
+    /// Submit multi-line buffer (e.g. Ctrl-D)
+    case submit
     case upArrow
     case downArrow
     case leftArrow
@@ -42,6 +44,8 @@ public class Input {
         switch byte {
         case 3:
             return .ctrlC
+        case 4:
+            return .submit
         case 13, 10:
             return .enter
         case 127, 8:
