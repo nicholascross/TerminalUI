@@ -4,6 +4,8 @@ import Foundation
 public class ListWidget: Widget {
     /// Optional title displayed over the top border of the list.
     public var title: String?
+    /// This widget handles user input and can be focused.
+    public var isUserInteractive: Bool { return true }
     /// Items to display in the list.
     public var items: [String]
     /// Currently selected index.

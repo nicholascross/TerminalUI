@@ -19,7 +19,10 @@ struct App {
         // Build UI inline: widgets are collected and laid out in-place
         let loop = UIEventLoop {
             Stack(axis: .vertical, spacing: 0) {
-                TextAreaWidget(lines: [" TerminalUI Example "])
+                TextAreaWidget(
+                    lines: [" TerminalUI Example "],
+                    isUserInteractive: false
+                )
                     .frame(height: 3)
 
                 Stack(axis: .horizontal, spacing: 1) {

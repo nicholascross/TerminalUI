@@ -92,6 +92,8 @@ public class UIEventLoop {
         self.layout = layout
         self.layout.update(rows: rows, cols: columns)
         self.widgets = widgets
+        // Start focus on the first interactive widget, if any
+        self.focusIndex = widgets.firstIndex(where: { $0.isUserInteractive }) ?? 0
         renderer = Renderer(rows: rows, cols: columns)
         // On resize, update layout and renderer, then redraw
         Terminal.onResize = { [weak self] rows, columns in
@@ -124,7 +126,11 @@ public class UIEventLoop {
             case .char("q"), .ctrlC:
                 running = false
             case .tab:
-                focusIndex = (focusIndex + 1) % widgets.count
+                var next = focusIndex
+                repeat {
+                    next = (next + 1) % widgets.count
+                } while !widgets[next].isUserInteractive && next != focusIndex
+                focusIndex = next
                 redraw()
             default:
                 let widget = widgets[focusIndex]
@@ -229,15 +235,26 @@ public class UIEventLoop {
             }()
             renderer.setCell(row: row, col: col, char: ch)
         }
-        // Draw widget titles over top borders
-        for (widget, region) in zip(widgets, regions) {
+        // Draw widget titles over top borders, indicating focus and interactivity
+        for index in widgets.indices {
+            let widget = widgets[index]
+            let region = regions[index]
+            let maxLen = max(0, region.width - 2)
+            var titleText: String?
             if let title = widget.title {
-                let titleText = " \(title) "
-                let maxLen = max(0, region.width - 2)
-                let text = String(titleText.prefix(maxLen))
+                if widget.isUserInteractive && index == focusIndex {
+                    titleText = "[\(title)]"
+                } else {
+                    titleText = " \(title) "
+                }
+            } else if widget.isUserInteractive && index == focusIndex {
+                titleText = "*"
+            }
+            if let text = titleText {
+                let textToDraw = String(text.prefix(maxLen))
                 let startCol = region.left + 1
                 let row = region.top
-                for (i, ch) in text.enumerated() {
+                for (i, ch) in textToDraw.enumerated() {
                     renderer.setCell(row: row, col: startCol + i, char: ch)
                 }
             }

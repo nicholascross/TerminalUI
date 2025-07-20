@@ -4,14 +4,21 @@ import Foundation
 public class TextAreaWidget: Widget {
     /// Optional title displayed over the top border of the text area.
     public var title: String?
+    /// Determines whether the text area accepts scroll input and can receive focus.
+    public let isUserInteractive: Bool
     /// Lines of text to display in the area.
     public var lines: [String]
     /// Current scroll offset (index of the topmost displayed line).
     public var scrollOffset: Int = 0
 
-    public init(lines: [String], title: String? = nil) {
+    public init(
+        lines: [String],
+        title: String? = nil,
+        isUserInteractive: Bool = true
+    ) {
         self.lines = lines
         self.title = title
+        self.isUserInteractive = isUserInteractive
     }
 
     /// Handle scrolling events (up/down arrows). Returns true if event consumed.

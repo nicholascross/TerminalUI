@@ -4,6 +4,8 @@ import Foundation
 public class TextInputWidget: Widget {
     /// Optional title displayed over the top border of the input.
     public var title: String?
+    /// This widget handles user input and can be focused.
+    public var isUserInteractive: Bool { return true }
     /// Prompt shown before input.
     public let prompt: String
     /// Current input buffer.
