@@ -24,6 +24,72 @@ public struct Region {
     }
 }
 
+private enum Axis {
+    case horizontal, vertical
+}
+
+private struct StackLayout: LayoutNode {
+    let axis: Axis
+    var spacing: Int
+    var children: [LayoutNode]
+    private var rows: Int = 0, cols: Int = 0
+    private var borderInsets: Int { 1 }
+
+    init(axis: Axis, spacing: Int, children: [LayoutNode]) {
+        self.axis = axis
+        self.spacing = spacing
+        self.children = children
+    }
+
+    mutating func update(rows: Int, cols: Int) {
+        self.rows = rows
+        self.cols = cols
+    }
+
+    func regions(for widgetCount: Int) -> [Region] {
+        guard !children.isEmpty else { return [] }
+
+        let fixedTotal: Int
+        let flexibleCount: Int
+        let totalSpacing = spacing * max(0, children.count - 1)
+        let availFlex: Int
+        let flexSize: Int
+
+        switch axis {
+        case .horizontal:
+            fixedTotal = children.compactMap { $0.desiredWidth }.reduce(0, +)
+            flexibleCount = children.filter { $0.desiredWidth == nil }.count
+            availFlex = max(cols - totalSpacing - fixedTotal, 0)
+            flexSize = flexibleCount > 0 ? availFlex / flexibleCount : 0
+        case .vertical:
+            fixedTotal = children.compactMap { $0.desiredHeight }.reduce(0, +)
+            flexibleCount = children.filter { $0.desiredHeight == nil }.count
+            availFlex = max(rows - totalSpacing - fixedTotal, 0)
+            flexSize = flexibleCount > 0 ? availFlex / flexibleCount : 0
+        }
+
+        var offsetPrimary = 0
+        var out: [Region] = []
+        for child in children {
+            let childSize: Int
+            let outer: Region
+            switch axis {
+            case .horizontal:
+                childSize = child.desiredWidth ?? flexSize
+                outer = Region(top: 0, left: offsetPrimary, width: childSize, height: rows)
+            case .vertical:
+                childSize = child.desiredHeight ?? flexSize
+                outer = Region(top: offsetPrimary, left: 0, width: cols, height: childSize)
+            }
+            let inset = min(borderInsets, outer.width / 2, outer.height / 2)
+            let inner = outer.inset(by: inset)
+            out += child.regions(for: widgetCount, in: inner)
+            offsetPrimary += childSize + spacing
+        }
+        return out
+    }
+}
+
 /// A protocol for pluggable layout algorithms.
 public protocol LayoutNode {
     /// Update internal state when container size changes (e.g., on resize).
@@ -34,8 +100,6 @@ public protocol LayoutNode {
     var desiredWidth: Int? { get }
     /// Desired height in cells; nil if flexible (handled by container).
     var desiredHeight: Int? { get }
-    /// Number of cells to inset for borders around this node.
-    var borderInsets: Int { get }
 }
 
 /// A helper to nest multiple LayoutNodes in a SwiftUI-like DSL.
@@ -65,89 +129,58 @@ public extension LayoutNode {
     var desiredWidth: Int? { nil }
     /// Default desired height (flexible).
     var desiredHeight: Int? { nil }
-    /// Default insets for borders (none).
-    var borderInsets: Int { 0 }
 }
 
 /// A horizontal stack layout: lays out its child LayoutNodes side by side.
 public struct HStack: LayoutNode {
-    public var spacing: Int
-    public var children: [LayoutNode]
-    private var rows: Int = 0, cols: Int = 0
+    private var stack: StackLayout
+
+    /// The spacing (in cells) between child elements.
+    public var spacing: Int {
+        get { stack.spacing }
+        set { stack.spacing = newValue }
+    }
 
     public init(spacing: Int = 0, @LayoutBuilder _ build: () -> [LayoutNode]) {
-        self.spacing = spacing
-        children = build()
+        stack = StackLayout(axis: .horizontal, spacing: spacing, children: build())
     }
 
     public mutating func update(rows: Int, cols: Int) {
-        self.rows = rows
-        self.cols = cols
+        stack.update(rows: rows, cols: cols)
     }
 
     public func regions(for widgetCount: Int) -> [Region] {
-        guard !children.isEmpty else { return [] }
-        // fixed-size frames and flexible items; share remaining space
-        let fixedWidthTotal = children.compactMap { $0.desiredWidth }.reduce(0, +)
-        let flexibleCount = children.filter { $0.desiredWidth == nil }.count
-        let totalSpacing = spacing * max(0, children.count - 1)
-        let availFlexWidth = max(cols - totalSpacing - fixedWidthTotal, 0)
-        let flexWidth = flexibleCount > 0 ? availFlexWidth / flexibleCount : 0
-
-        var offsetX = 0
-        var out: [Region] = []
-        for child in children {
-            let childWidth = child.desiredWidth ?? flexWidth
-            let outer = Region(top: 0, left: offsetX, width: childWidth, height: rows)
-            let inner = child.borderInsets > 0 ? outer.inset(by: child.borderInsets) : outer
-            out += child.regions(for: widgetCount, in: inner)
-            offsetX += childWidth + spacing
-        }
-        return out
+        stack.regions(for: widgetCount)
     }
 }
 
 /// A vertical stack layout: lays out its child LayoutNodes top to bottom.
 public struct VStack: LayoutNode {
-    public var spacing: Int
-    public var children: [LayoutNode]
-    private var rows: Int = 0, cols: Int = 0
+    private var stack: StackLayout
+
+    /// The spacing (in cells) between child elements.
+    public var spacing: Int {
+        get { stack.spacing }
+        set { stack.spacing = newValue }
+    }
 
     public init(spacing: Int = 0, @LayoutBuilder _ build: () -> [LayoutNode]) {
-        self.spacing = spacing
-        children = build()
+        stack = StackLayout(axis: .vertical, spacing: spacing, children: build())
     }
 
     public mutating func update(rows: Int, cols: Int) {
-        self.rows = rows
-        self.cols = cols
+        stack.update(rows: rows, cols: cols)
     }
 
     public func regions(for widgetCount: Int) -> [Region] {
-        guard !children.isEmpty else { return [] }
-        // fixed-size frames and flexible items; share remaining space
-        let fixedHeightTotal = children.compactMap { $0.desiredHeight }.reduce(0, +)
-        let flexibleCount = children.filter { $0.desiredHeight == nil }.count
-        let totalSpacing = spacing * max(0, children.count - 1)
-        let availFlexHeight = max(rows - totalSpacing - fixedHeightTotal, 0)
-        let flexHeight = flexibleCount > 0 ? availFlexHeight / flexibleCount : 0
-
-        var offsetY = 0
-        var out: [Region] = []
-        for child in children {
-            let childHeight = child.desiredHeight ?? flexHeight
-            let outer = Region(top: offsetY, left: 0, width: cols, height: childHeight)
-            let inner = child.borderInsets > 0 ? outer.inset(by: child.borderInsets) : outer
-            out += child.regions(for: widgetCount, in: inner)
-            offsetY += childHeight + spacing
-        }
-        return out
+        stack.regions(for: widgetCount)
     }
 }
 
 /// Wrap a layout leaf with a fixed frame (width and/or height).
 public struct Sized<Child: LayoutNode>: LayoutNode {
-    /// The child layout node being sized; its update(_:_:) is forwarded to propagate container size.
+    /// The child layout node being sized; its update(_:_:) is forwarded to propagate container
+    /// size.
     public var wrapped: any LayoutNode
     public let desiredWidth: Int?
     public let desiredHeight: Int?

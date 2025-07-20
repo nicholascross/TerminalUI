@@ -94,14 +94,8 @@ public class UIEventLoop {
                 for y in region.top..<(region.top + region.height) {
                     renderer.setCell(row: y, col: region.left, char: "│")
                 }
-            } else if region.height == 1 && region.width > 1 {
-                // horizontal borders for single-line region (top and bottom)
-                for x in region.left..<(region.left + region.width) {
-                    renderer.setCell(row: region.top - 1, col: x, char: "─")
-                    renderer.setCell(row: region.top + 1, col: x, char: "─")
-                }
-            } else if region.width > 1 && region.height > 1 {
-                // normal bordered pane (undo the 1-cell inset)
+            } else if region.width > 1 && region.height > 0 {
+                // bordered pane (single- or multi-line region)
                 let border = Region(top: region.top - 1,
                                     left: region.left - 1,
                                     width: region.width + 2,
