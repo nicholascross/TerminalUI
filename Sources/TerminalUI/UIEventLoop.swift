@@ -120,31 +120,43 @@ public class UIEventLoop {
         // Clear screen and perform initial draw
         Terminal.clearScreen()
         redraw()
-        while running {
-            let event = try input.readEvent()
-            switch event {
-            case .char("q"), .ctrlC:
-                running = false
-            case .tab:
-                var next = focusIndex
-                repeat {
-                    next = (next + 1) % widgets.count
-                } while !widgets[next].isUserInteractive && next != focusIndex
-                focusIndex = next
-                redraw()
-            default:
-                let widget = widgets[focusIndex]
-                if let ti = widget as? TextInputWidget {
-                    if let line = ti.handle(event: event) {
-                        if let list = widgets.first(where: { $0 is ListWidget }) as? ListWidget {
-                            list.items.append(line)
+        // Batch paste events: only redraw once between paste start/end markers
+        var inPaste = false
+        do {
+            while running {
+                let event = try input.readEvent()
+                switch event {
+                case .pasteStart:
+                    inPaste = true
+                case .pasteEnd:
+                    inPaste = false
+                    redraw()
+                // 'q' quits only outside of a paste; during a paste literal 'q's go into the buffer
+                case .char("q") where !inPaste, .ctrlC:
+                    running = false
+                case .tab:
+                    var next = focusIndex
+                    repeat {
+                        next = (next + 1) % widgets.count
+                    } while !widgets[next].isUserInteractive && next != focusIndex
+                    focusIndex = next
+                    if !inPaste { redraw() }
+                default:
+                    let widget = widgets[focusIndex]
+                    if let ti = widget as? TextInputWidget {
+                        if let line = ti.handle(event: event) {
+                            if let list = widgets.first(where: { $0 is ListWidget }) as? ListWidget {
+                                list.items.append(line)
+                            }
                         }
+                    } else {
+                        _ = widget.handle(event: event)
                     }
-                } else {
-                    _ = widget.handle(event: event)
+                    if !inPaste { redraw() }
                 }
-                redraw()
             }
+        } catch {
+            fputs("Input error: \(error)\n", stderr)
         }
     }
 

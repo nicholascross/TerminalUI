@@ -121,7 +121,6 @@ public protocol LayoutNode {
     func minimalSize(widgetCount: Int) -> (width: Int, height: Int)
 }
 
-
 public extension LayoutNode {
     /// Compute regions for rendering widgets inside an arbitrary container region,
     /// nesting child layouts as needed.
@@ -192,15 +191,16 @@ public struct WidgetLeaf: LayoutNode {
 
     public mutating func update(rows: Int, cols: Int) {
         self.rows = rows
-        self.columns = cols
+        columns = cols
     }
 
-    public func regions(for widgetCount: Int) -> [Region] {
+    public func regions(for _: Int) -> [Region] {
         return [Region(top: 0, left: 0, width: columns, height: rows)]
     }
 }
 
 // MARK: - Minimal size calculation
+
 extension Stack {
     /// Compute minimal required size to accommodate fixed frames in this stack.
     public func minimalSize(widgetCount: Int) -> (width: Int, height: Int) {

@@ -15,7 +15,8 @@ public enum Terminal {
         _originalTermios = orig
         var raw = orig
         raw.c_lflag &= ~(UInt(ECHO | ICANON | IEXTEN | ISIG))
-        raw.c_iflag &= ~(UInt(IXON | ICRNL))
+        // Disable flow control, carriage return-to-newline translation, and other input processing
+        raw.c_iflag &= ~(UInt(BRKINT | ICRNL | INPCK | ISTRIP | IXON))
         raw.c_cflag |= UInt(CS8)
         raw.c_oflag &= ~(UInt(OPOST))
         raw.c_cc.6 = 1 // VMIN
@@ -26,6 +27,9 @@ public enum Terminal {
         _rawModeEnabled = true
         // Install SIGWINCH handler for window resize events
         signal(SIGWINCH, _resizeHandler)
+        // Enable bracketed paste mode
+        print("\u{1B}[?2004h", terminator: "")
+        fflush(stdout)
     }
 
     /// Disable raw mode and restore terminal settings.
@@ -34,6 +38,9 @@ public enum Terminal {
         guard tcsetattr(STDIN_FILENO, TCSAFLUSH, &orig) == 0 else {
             throw NSError(domain: NSPOSIXErrorDomain, code: Int(errno), userInfo: nil)
         }
+        // Disable bracketed paste mode
+        print("\u{1B}[?2004l", terminator: "")
+        fflush(stdout)
         _rawModeEnabled = false
     }
 

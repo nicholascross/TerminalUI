@@ -34,7 +34,9 @@ Run the interactive example (press 'q' or Ctrl-C to quit). The interface now con
 Borders are drawn around each region with proper joins and spacing. Use:
 
 - ↑/↓ to scroll the header or text area and to move selection in the list.
-- Type and press Enter in the input box to append items to the list.
+- Type or paste multiple lines into the input box. Press Enter to insert a newline, and press Ctrl-D to submit the buffer (appends it as a single item to the list).
+  Bracketed paste (ESC[200~...ESC[201~) is supported so pasted blocks arrive verbatim.
+- Supports full UTF-8 characters (e.g. Unicode, emojis) in the input buffer.
 - Tab to cycle focus through header, list, text area, and input.
 - Resize your terminal to see SIGWINCH (resize) handling.
 
