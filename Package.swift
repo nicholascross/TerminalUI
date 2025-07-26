@@ -22,5 +22,10 @@ let package = Package(
             dependencies: ["TerminalUI"],
             path: "Examples/TerminalUIExample"
         ),
+        .testTarget(
+            name: "TerminalUITests",
+            dependencies: ["TerminalUI"],
+            path: "Tests/TerminalUITests"
+        ),
     ]
 )
