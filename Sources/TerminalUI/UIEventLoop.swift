@@ -44,7 +44,7 @@ public extension Widget {
 
 /// Main event loop to drive UI based on input and state.
 public class UIEventLoop {
-    private let input = Input()
+    private let input = TerminalInput()
     private var layout: LayoutNode
     private var widgets: [Widget]
     private var focusIndex: Int = 0
