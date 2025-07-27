@@ -67,7 +67,7 @@ public class TextInputWidget: Widget {
 // MARK: - Widget conformance
 extension TextInputWidget {
     public func handle(event: InputEvent) -> Bool {
-        if let _ = self.handle(event: event) {
+        if self.handle(event: event) != nil {
             return true
         }
         return false
