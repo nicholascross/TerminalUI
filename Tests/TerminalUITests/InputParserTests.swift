@@ -7,21 +7,21 @@ struct InputParserTests {
     func feed(_ bytes: [UInt8]) -> [InputEvent] {
         var parser = InputParser()
         var out: [InputEvent] = []
-        for b in bytes {
-            if let ev = parser.consume(b) {
-                out.append(ev)
+        for byte in bytes {
+            if let event = parser.consume(byte) {
+                out.append(event)
             }
         }
-        if let ev = parser.flushEOF() {
-            out.append(ev)
+        if let event = parser.flushEOF() {
+            out.append(event)
         }
         return out
     }
 
     @Test
     func printableASCII() {
-        let ev = feed([UInt8(ascii: "a")])
-        #expect(ev == [InputEvent.char("a")])
+        let events = feed([UInt8(ascii: "a")])
+        #expect(events == [InputEvent.char("a")])
     }
 
     @Test
@@ -57,9 +57,9 @@ struct InputParserTests {
             (UInt8(ascii: "C"), .rightArrow),
             (UInt8(ascii: "D"), .leftArrow)
         ]
-        for (code, ev) in types {
+        for (code, expectedEvent) in types {
             let seq: [UInt8] = [27, 91, code]
-            #expect(feed(seq) == [ev])
+            #expect(feed(seq) == [expectedEvent])
         }
     }
 
@@ -71,9 +71,9 @@ struct InputParserTests {
             (UInt8(ascii: "C"), .rightArrow),
             (UInt8(ascii: "D"), .leftArrow)
         ]
-        for (code, ev) in types {
+        for (code, expectedEvent) in types {
             let seq: [UInt8] = [27, 79, code]
-            #expect(feed(seq) == [ev])
+            #expect(feed(seq) == [expectedEvent])
         }
     }
 
@@ -85,16 +85,16 @@ struct InputParserTests {
 
     @Test
     func csiOverflow() {
-        let bs = Array(repeating: UInt8(ascii: "b"), count: maxCSILength + 1)
-        let seq = [27, 91] + bs
+        let overflowBytes = Array(repeating: UInt8(ascii: "b"), count: maxCSILength + 1)
+        let seq = [27, 91] + overflowBytes
         #expect(feed(seq) == [.unknown])
     }
 
     @Test
     func validUTF8() {
         let euros: [UInt8] = [0xE2, 0x82, 0xAC]
-        let ev = feed(euros)
-        #expect(ev == [InputEvent.char("€")])
+        let events = feed(euros)
+        #expect(events == [InputEvent.char("€")])
     }
 
     @Test
