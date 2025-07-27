@@ -10,14 +10,18 @@ private struct StdoutStream: TextOutputStream {
 
 /// Low-level control over terminal: raw mode, cursor control, styling, and size.
 /// Global terminal control and styling utilities.
-public enum Terminal {
+public final class Terminal {
+    /// Shared singleton for global terminal control.
+    public static let shared = Terminal()
+
+    private init() {}
     /// The output stream to use for terminal control sequences and text.
-    public static var output: TextOutputStream = StdoutStream()
+    public var output: TextOutputStream = StdoutStream()
     /// Called on terminal resize with new (rows, cols).
-    public static var onResize: ((Int, Int) -> Void)?
+    public var onResize: ((Int, Int) -> Void)?
 
     /// Enable raw mode (disable canonical input and echo).
-    public static func enableRawMode() throws {
+    public func enableRawMode() throws {
         var orig = termios()
         guard tcgetattr(STDIN_FILENO, &orig) == 0 else {
             throw NSError(domain: NSPOSIXErrorDomain, code: Int(errno), userInfo: nil)
@@ -43,7 +47,7 @@ public enum Terminal {
     }
 
     /// Disable raw mode and restore terminal settings.
-    public static func disableRawMode() throws {
+    public func disableRawMode() throws {
         guard _rawModeEnabled, var orig = _originalTermios else { return }
         guard tcsetattr(STDIN_FILENO, TCSAFLUSH, &orig) == 0 else {
             throw NSError(domain: NSPOSIXErrorDomain, code: Int(errno), userInfo: nil)
@@ -55,28 +59,28 @@ public enum Terminal {
     }
 
     /// Clear the entire screen.
-    public static func clearScreen() {
+    public func clearScreen() {
         output.write("\u{1B}[2J")
         moveCursor(row: 1, col: 1)
     }
 
     /// Move the cursor to the specified row and column (1-based).
-    public static func moveCursor(row: Int, col: Int) {
+    public func moveCursor(row: Int, col: Int) {
         output.write("\u{1B}[\(row);\(col)H")
     }
 
     /// Hide the cursor.
-    public static func hideCursor() {
+    public func hideCursor() {
         output.write("\u{1B}[?25l")
     }
 
     /// Show the cursor.
-    public static func showCursor() {
+    public func showCursor() {
         output.write("\u{1B}[?25h")
     }
 
     /// Apply the given style.
-    public static func setStyle(_ style: Style) {
+    public func setStyle(_ style: Style) {
         var codes: [Int] = []
         if style.contains(.bold) { codes.append(1) }
         if style.contains(.underline) { codes.append(4) }
@@ -86,12 +90,12 @@ public enum Terminal {
     }
 
     /// Reset all styles.
-    public static func resetStyle() {
+    public func resetStyle() {
         output.write("\u{1B}[0m")
     }
 
     /// Query the current terminal size (rows, columns).
-    public static func getTerminalSize() -> (rows: Int, cols: Int) {
+    public func getTerminalSize() -> (rows: Int, cols: Int) {
         var windowSize = winsize()
         if ioctl(STDOUT_FILENO, TIOCGWINSZ, &windowSize) == 0 {
             return (rows: Int(windowSize.ws_row), cols: Int(windowSize.ws_col))
@@ -99,13 +103,13 @@ public enum Terminal {
         return (rows: 24, cols: 80)
     }
     // Stored original terminal state
-    private static var _originalTermios: termios?
-    private static var _rawModeEnabled = false
+    private var _originalTermios: termios?
+    private var _rawModeEnabled = false
 
     // C signal handler for SIGWINCH
-    private static let _resizeHandler: @convention(c) (Int32) -> Void = { _ in
-        if let resizeCallback = Terminal.onResize {
-            let size = Terminal.getTerminalSize()
+    private let _resizeHandler: @convention(c) (Int32) -> Void = { _ in
+        if let resizeCallback = Terminal.shared.onResize {
+            let size = Terminal.shared.getTerminalSize()
             resizeCallback(size.rows, size.cols)
         }
     }

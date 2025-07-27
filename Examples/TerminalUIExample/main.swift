@@ -1,14 +1,14 @@
 import TerminalUI
 
-Terminal.clearScreen()
+Terminal.shared.clearScreen()
 defer {
-    Terminal.showCursor()
-    Terminal.clearScreen()
+    Terminal.shared.showCursor()
+    Terminal.shared.clearScreen()
 }
 
 // Print resize events
-Terminal.onResize = { _, _ in
-    Terminal.clearScreen()
+Terminal.shared.onResize = { _, _ in
+    Terminal.shared.clearScreen()
 }
 
 // Build UI inline: widgets are collected and laid out in-place

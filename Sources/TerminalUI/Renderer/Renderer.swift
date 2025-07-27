@@ -102,21 +102,21 @@ public class Renderer {
         // Only redraw rows that have changed since last blit.
         for (rowIndex, row) in buffer.enumerated() {
             guard rowIndex < lastBuffer.count, row == lastBuffer[rowIndex] else {
-                Terminal.moveCursor(row: rowIndex + 1, col: 1)
+                Terminal.shared.moveCursor(row: rowIndex + 1, col: 1)
                 var skip = 0
                 for cell in row {
                     if skip > 0 {
                         skip -= 1
                         continue
                     }
-                    Terminal.setStyle(cell.style)
-                    Terminal.output.write(String(cell.char))
+                    Terminal.shared.setStyle(cell.style)
+                    Terminal.shared.output.write(String(cell.char))
                     let width = cell.char.terminalColumnWidth
                     if width > 1 {
                         skip = width - 1
                     }
                 }
-                Terminal.resetStyle()
+                Terminal.shared.resetStyle()
                 continue
             }
         }

@@ -15,9 +15,9 @@ struct RendererTests {
     /// Capture terminal output during the block using the TextOutputStream abstraction.
     private func captureOutput(_ block: () -> Void) -> String {
         let stream = StringStream()
-        let original = Terminal.output
-        Terminal.output = stream
-        defer { Terminal.output = original }
+        let original = Terminal.shared.output
+        Terminal.shared.output = stream
+        defer { Terminal.shared.output = original }
 
         block()
         return stream.content
