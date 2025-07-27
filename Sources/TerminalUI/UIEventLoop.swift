@@ -143,8 +143,8 @@ public class UIEventLoop {
                     if !inPaste { redraw() }
                 default:
                     let widget = widgets[focusIndex]
-                    if let ti = widget as? TextInputWidget {
-                        if let line = ti.handle(event: event) {
+                    if let textInputWidget = widget as? TextInputWidget {
+                        if let line = textInputWidget.handle(event: event) {
                             if let list = widgets.first(where: { $0 is ListWidget }) as? ListWidget {
                                 list.items.append(line)
                             }
@@ -186,7 +186,8 @@ public class UIEventLoop {
             if contentRegion.width <= 0 || contentRegion.height <= 0 {
                 Terminal.clearScreen()
                 Terminal.moveCursor(row: 1, col: 1)
-                print("Screen too small: widget #\(idx) needs at least 1×1 content area (got \(contentRegion.width)x\(contentRegion.height))")
+                let sizeInfo = "(got \(contentRegion.width)x\(contentRegion.height))"
+                print("Screen too small: widget #\(idx) needs at least 1×1 content area \(sizeInfo)")
                 fflush(stdout)
                 return
             }
@@ -196,58 +197,81 @@ public class UIEventLoop {
             let contentRegion = region.inset(by: 1)
             widget.render(into: renderer, region: contentRegion)
         }
-        // Build a unified border mask to render shared joins correctly
-        let N = 1, S = 2, W = 4, E = 8
+        renderBorders(regions: regions)
+        renderTitles(regions: regions)
+        renderer.blit()
+        // Position cursor for focused multi-line text-input widget
+        if let textInputWidget = widgets[focusIndex] as? TextInputWidget {
+            let contentRegion = regions[focusIndex].inset(by: 1)
+            // Determine current line index and buffer lines
+            let lines = textInputWidget.buffer.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
+            let lineIndex = min(lines.count - 1, contentRegion.height - 1)
+            // Row and column within content region (plus legacy offset)
+            let row = contentRegion.top + lineIndex + 1
+            let prefix = lineIndex == 0 ? textInputWidget.prompt.count : 0
+            let col = contentRegion.left + prefix + lines[lineIndex].count + 1
+            Terminal.moveCursor(row: row, col: col)
+            Terminal.showCursor()
+        }
+        fflush(stdout)
+    }
+
+    /// Renders borders around widget regions with correct box-drawing characters.
+    private func renderBorders(regions: [Region]) {
+        let northMask = 1, southMask = 2, westMask = 4, eastMask = 8
         var masks = [MaskKey: Int]()
         for region in regions {
             if region.width == 1, region.height > 1 {
                 // vertical divider (explicit widget): mark north/south edges
-                for y in region.top ..< region.top + region.height {
-                    masks[MaskKey(row: y, col: region.left), default: 0] |= N | S
+                for rowIndex in region.top ..< region.top + region.height {
+                    masks[MaskKey(row: rowIndex, col: region.left), default: 0] |= northMask | southMask
                 }
             } else if region.width > 1, region.height > 0 {
-                // pane border: mark top/bottom (E/W) and left/right (N/S)
+                // pane border: mark top/bottom (east/west) and left/right (north/south)
                 let top = region.top
                 let left = region.left
                 let bottom = region.top + region.height - 1
                 let right = region.left + region.width - 1
-                for x in (left + 1) ..< right {
-                    masks[MaskKey(row: top, col: x), default: 0] |= E | W
-                    masks[MaskKey(row: bottom, col: x), default: 0] |= E | W
+                for colIndex in (left + 1) ..< right {
+                    masks[MaskKey(row: top, col: colIndex), default: 0] |= eastMask | westMask
+                    masks[MaskKey(row: bottom, col: colIndex), default: 0] |= eastMask | westMask
                 }
-                for y in (top + 1) ..< bottom {
-                    masks[MaskKey(row: y, col: left), default: 0] |= N | S
-                    masks[MaskKey(row: y, col: right), default: 0] |= N | S
+                for rowIndex in (top + 1) ..< bottom {
+                    masks[MaskKey(row: rowIndex, col: left), default: 0] |= northMask | southMask
+                    masks[MaskKey(row: rowIndex, col: right), default: 0] |= northMask | southMask
                 }
                 // mark corners to render corner characters
-                masks[MaskKey(row: top, col: left), default: 0] |= S | E
-                masks[MaskKey(row: top, col: right), default: 0] |= S | W
-                masks[MaskKey(row: bottom, col: left), default: 0] |= N | E
-                masks[MaskKey(row: bottom, col: right), default: 0] |= N | W
+                masks[MaskKey(row: top, col: left), default: 0] |= southMask | eastMask
+                masks[MaskKey(row: top, col: right), default: 0] |= southMask | westMask
+                masks[MaskKey(row: bottom, col: left), default: 0] |= northMask | eastMask
+                masks[MaskKey(row: bottom, col: right), default: 0] |= northMask | westMask
             }
         }
         // Render merged borders with proper box-drawing joins
         for (key, mask) in masks {
             let row = key.row, col = key.col
-            let ch: Character = {
+            let char: Character = {
                 switch mask {
-                case N | S | E | W: return "┼"
-                case S | E | W: return "┬"
-                case N | E | W: return "┴"
-                case N | S | E: return "├"
-                case N | S | W: return "┤"
-                case N | S: return "│"
-                case E | W: return "─"
-                case S | E: return "┌"
-                case S | W: return "┐"
-                case N | E: return "└"
-                case N | W: return "┘"
-                default: return mask & (N | S) != 0 ? "│" : "─"
+                case northMask | southMask | eastMask | westMask: return "┼"
+                case southMask | eastMask | westMask: return "┬"
+                case northMask | eastMask | westMask: return "┴"
+                case northMask | southMask | eastMask: return "├"
+                case northMask | southMask | westMask: return "┤"
+                case northMask | southMask: return "│"
+                case eastMask | westMask: return "─"
+                case southMask | eastMask: return "┌"
+                case southMask | westMask: return "┐"
+                case northMask | eastMask: return "└"
+                case northMask | westMask: return "┘"
+                default: return mask & (northMask | southMask) != 0 ? "│" : "─"
                 }
             }()
-            renderer.setCell(row: row, col: col, char: ch)
+            renderer.setCell(row: row, col: col, char: char)
         }
-        // Draw widget titles over top borders, indicating focus and interactivity
+    }
+
+    /// Draws widget titles over top borders, indicating focus and interactivity.
+    private func renderTitles(regions: [Region]) {
         for index in widgets.indices {
             let widget = widgets[index]
             let region = regions[index]
@@ -266,25 +290,10 @@ public class UIEventLoop {
                 let textToDraw = String(text.prefix(maxLen))
                 let startCol = region.left + 1
                 let row = region.top
-                for (i, ch) in textToDraw.enumerated() {
-                    renderer.setCell(row: row, col: startCol + i, char: ch)
+                for (offset, char) in textToDraw.enumerated() {
+                    renderer.setCell(row: row, col: startCol + offset, char: char)
                 }
             }
         }
-        renderer.blit()
-        // Position cursor for focused multi-line text-input widget
-        if let ti = widgets[focusIndex] as? TextInputWidget {
-            let contentRegion = regions[focusIndex].inset(by: 1)
-            // Determine current line index and buffer lines
-            let lines = ti.buffer.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
-            let lineIndex = min(lines.count - 1, contentRegion.height - 1)
-            // Row and column within content region (plus legacy offset)
-            let row = contentRegion.top + lineIndex + 1
-            let prefix = lineIndex == 0 ? ti.prompt.count : 0
-            let col = contentRegion.left + prefix + lines[lineIndex].count + 1
-            Terminal.moveCursor(row: row, col: col)
-            Terminal.showCursor()
-        }
-        fflush(stdout)
     }
 }
