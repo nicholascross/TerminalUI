@@ -59,20 +59,23 @@ public class Renderer {
         style borderStyle: BorderStyle = .unicode,
         cellStyle: Style = []
     ) {
-        // TODO: Fix issue where if region contains characters with width != 1,
-        //       the border may not align correctly.  This happens for emojis for example.
-        //       The issue is results in the column numbers not aligning and it only
-        //       impacts the right edge of the border directly but due to overflow it can
-        //       cause border artifacts to appear on the next line as well.
-
-
-        let (h, v, tl, tr, bl, br): (Character, Character, Character, Character, Character, Character)
+        let horizontal, vertical, topLeft, topRight, bottomLeft, bottomRight: Character
 
         switch borderStyle {
         case .unicode:
-            (h, v, tl, tr, bl, br) = ("─", "│", "┌", "┐", "└", "┘")
+            horizontal = "─"
+            vertical = "│"
+            topLeft = "┌"
+            topRight = "┐"
+            bottomLeft = "└"
+            bottomRight = "┘"
         case .ascii:
-            (h, v, tl, tr, bl, br) = ("-", "|", "+", "+", "+", "+")
+            horizontal = "-"
+            vertical = "|"
+            topLeft = "+"
+            topRight = "+"
+            bottomLeft = "+"
+            bottomRight = "+"
         }
 
         let top = region.top, left = region.left
@@ -81,28 +84,28 @@ public class Renderer {
 
         // Top/bottom edges (only if width >= 2).
         if right > left {
-            for x in (left + 1) ..< right {
-                setCell(row: top, col: x, char: h, style: cellStyle)
-                setCell(row: bottom, col: x, char: h, style: cellStyle)
+            for columnIndex in (left + 1) ..< right {
+                setCell(row: top, col: columnIndex, char: horizontal, style: cellStyle)
+                setCell(row: bottom, col: columnIndex, char: horizontal, style: cellStyle)
             }
         }
         // Left/right edges (only if height >= 2).
         if bottom > top {
-            for y in (top + 1) ..< bottom {
-                setCell(row: y, col: left, char: v, style: cellStyle)
-                setCell(row: y, col: right, char: v, style: cellStyle)
+            for rowIndex in (top + 1) ..< bottom {
+                setCell(row: rowIndex, col: left, char: vertical, style: cellStyle)
+                setCell(row: rowIndex, col: right, char: vertical, style: cellStyle)
             }
         }
         // Corners (if region is at least 1x1).
         if region.width > 0, region.height > 0 {
-            setCell(row: top, col: left, char: tl, style: cellStyle)
+            setCell(row: top, col: left, char: topLeft, style: cellStyle)
             if right > left {
-                setCell(row: top, col: right, char: tr, style: cellStyle)
+                setCell(row: top, col: right, char: topRight, style: cellStyle)
             }
             if bottom > top {
-                setCell(row: bottom, col: left, char: bl, style: cellStyle)
+                setCell(row: bottom, col: left, char: bottomLeft, style: cellStyle)
                 if right > left {
-                    setCell(row: bottom, col: right, char: br, style: cellStyle)
+                    setCell(row: bottom, col: right, char: bottomRight, style: cellStyle)
                 }
             }
         }
@@ -111,9 +114,9 @@ public class Renderer {
     /// Flush the buffer to the terminal, respecting per-cell style.
     public func blit() {
         // Only redraw rows that have changed since last blit.
-        for (i, row) in buffer.enumerated() {
-            guard i < lastBuffer.count, row == lastBuffer[i] else {
-                Terminal.moveCursor(row: i + 1, col: 1)
+        for (rowIndex, row) in buffer.enumerated() {
+            guard rowIndex < lastBuffer.count, row == lastBuffer[rowIndex] else {
+                Terminal.moveCursor(row: rowIndex + 1, col: 1)
                 var skip = 0
                 for cell in row {
                     if skip > 0 {
@@ -122,9 +125,9 @@ public class Renderer {
                     }
                     Terminal.setStyle(cell.style)
                     Terminal.output.write(String(cell.char))
-                    let w = cell.char.terminalColumnWidth
-                    if w > 1 {
-                        skip = w - 1
+                    let width = cell.char.terminalColumnWidth
+                    if width > 1 {
+                        skip = width - 1
                     }
                 }
                 Terminal.resetStyle()

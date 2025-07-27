@@ -1,6 +1,5 @@
 import TerminalUI
 
-
 Terminal.clearScreen()
 defer {
     Terminal.showCursor()
@@ -8,7 +7,7 @@ defer {
 }
 
 // Print resize events
-Terminal.onResize = { rows, cols in
+Terminal.onResize = { _, _ in
     Terminal.clearScreen()
 }
 
@@ -37,7 +36,7 @@ let loop = UIEventLoop {
             isUserInteractive: false
         )
         .frame(height: 3)
-        
+
         Stack(axis: .horizontal, spacing: 1) {
             list.frame(width: 20)
             Stack(axis: .vertical, spacing: 0) {
@@ -52,11 +51,10 @@ let loop = UIEventLoop {
                 )
             }
         }
-        
+
         TextInputWidget(prompt: "> ", title: "Input")
             .frame(height: 3)
     }
 }
 
 try loop.run()
-

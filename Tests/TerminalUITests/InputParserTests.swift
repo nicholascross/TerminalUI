@@ -55,7 +55,7 @@ struct InputParserTests {
             (UInt8(ascii: "A"), .upArrow),
             (UInt8(ascii: "B"), .downArrow),
             (UInt8(ascii: "C"), .rightArrow),
-            (UInt8(ascii: "D"), .leftArrow),
+            (UInt8(ascii: "D"), .leftArrow)
         ]
         for (code, ev) in types {
             let seq: [UInt8] = [27, 91, code]
@@ -69,7 +69,7 @@ struct InputParserTests {
             (UInt8(ascii: "A"), .upArrow),
             (UInt8(ascii: "B"), .downArrow),
             (UInt8(ascii: "C"), .rightArrow),
-            (UInt8(ascii: "D"), .leftArrow),
+            (UInt8(ascii: "D"), .leftArrow)
         ]
         for (code, ev) in types {
             let seq: [UInt8] = [27, 79, code]

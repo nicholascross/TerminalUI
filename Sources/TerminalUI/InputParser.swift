@@ -160,15 +160,15 @@ public struct InputParser: Sendable {
 
 // MARK: - Constants
 private let ESC: UInt8 = 0x1B
-private let CR:  UInt8 = 13
-private let LF:  UInt8 = 10
+private let CR: UInt8 = 13
+private let LF: UInt8 = 10
 private let DEL: UInt8 = 127
-private let BS:  UInt8 = 8
+private let BS: UInt8 = 8
 private let TAB: UInt8 = 9
 private let maxCSILength = 32
 private let arrowMap: [UInt8: InputEvent] = [
     UInt8(ascii: "A"): .upArrow,
     UInt8(ascii: "B"): .downArrow,
     UInt8(ascii: "C"): .rightArrow,
-    UInt8(ascii: "D"): .leftArrow,
+    UInt8(ascii: "D"): .leftArrow
 ]

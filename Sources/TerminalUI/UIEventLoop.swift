@@ -220,10 +220,10 @@ public class UIEventLoop {
                     masks[MaskKey(row: y, col: right), default: 0] |= N | S
                 }
                 // mark corners to render corner characters
-                masks[MaskKey(row: top,    col: left),   default: 0] |= S | E
-                masks[MaskKey(row: top,    col: right),  default: 0] |= S | W
-                masks[MaskKey(row: bottom, col: left),   default: 0] |= N | E
-                masks[MaskKey(row: bottom, col: right),  default: 0] |= N | W
+                masks[MaskKey(row: top, col: left), default: 0] |= S | E
+                masks[MaskKey(row: top, col: right), default: 0] |= S | W
+                masks[MaskKey(row: bottom, col: left), default: 0] |= N | E
+                masks[MaskKey(row: bottom, col: right), default: 0] |= N | W
             }
         }
         // Render merged borders with proper box-drawing joins

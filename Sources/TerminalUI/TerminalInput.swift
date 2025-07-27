@@ -1,7 +1,6 @@
 import Darwin
 import Foundation
 
-
 /// A discrete key or control event read from the terminal.
 public enum InputEvent: Equatable, Hashable, Sendable {
     /// A Unicode character that was typed.

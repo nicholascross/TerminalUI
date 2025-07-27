@@ -4,13 +4,13 @@ import PackageDescription
 let package = Package(
     name: "TerminalUI",
     platforms: [
-        .macOS(.v11),
+        .macOS(.v11)
     ],
     products: [
         .library(
             name: "TerminalUI",
             targets: ["TerminalUI"]
-        ),
+        )
     ],
     targets: [
         .target(
@@ -26,6 +26,6 @@ let package = Package(
             name: "TerminalUITests",
             dependencies: ["TerminalUI"],
             path: "Tests/TerminalUITests"
-        ),
+        )
     ]
 )

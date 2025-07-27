@@ -2,7 +2,7 @@ import Foundation
 import Darwin.C
 
 /// A stream for writing text to stdout.
-fileprivate struct StdoutStream: TextOutputStream {
+private struct StdoutStream: TextOutputStream {
     func write(_ string: String) {
         fputs(string, stdout)
     }
