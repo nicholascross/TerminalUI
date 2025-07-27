@@ -1,13 +1,6 @@
 // InputParser: incremental state machine for parsing input bytes into InputEvent
 import Foundation
 
-private enum State {
-    case normal
-    case esc
-    case csi(buf: [UInt8])
-    case ss3
-}
-
 public struct InputParser: Sendable {
     public init() {}
 
@@ -189,6 +182,13 @@ public struct InputParser: Sendable {
     private var inPasteMode = false
     private var utf8Buf: [UInt8] = []
     private var utf8Need: Int = 0
+}
+
+private enum State {
+    case normal
+    case esc
+    case csi(buf: [UInt8])
+    case ss3
 }
 
 // MARK: - Constants
