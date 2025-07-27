@@ -1,8 +1,18 @@
 import Foundation
 import Darwin.C
 
+/// A stream for writing text to stdout.
+fileprivate struct StdoutStream: TextOutputStream {
+    func write(_ string: String) {
+        fputs(string, stdout)
+    }
+}
+
 /// Low-level control over terminal: raw mode, cursor control, styling, and size.
+/// Global terminal control and styling utilities.
 public enum Terminal {
+    /// The output stream to use for terminal control sequences and text.
+    public static var output: TextOutputStream = StdoutStream()
     /// Called on terminal resize with new (rows, cols).
     public static var onResize: ((Int, Int) -> Void)?
 
@@ -28,7 +38,7 @@ public enum Terminal {
         // Install SIGWINCH handler for window resize events
         signal(SIGWINCH, _resizeHandler)
         // Enable bracketed paste mode
-        print("\u{1B}[?2004h", terminator: "")
+        output.write("\u{1B}[?2004h")
         fflush(stdout)
     }
 
@@ -39,30 +49,30 @@ public enum Terminal {
             throw NSError(domain: NSPOSIXErrorDomain, code: Int(errno), userInfo: nil)
         }
         // Disable bracketed paste mode
-        print("\u{1B}[?2004l", terminator: "")
+        output.write("\u{1B}[?2004l")
         fflush(stdout)
         _rawModeEnabled = false
     }
 
     /// Clear the entire screen.
     public static func clearScreen() {
-        print("\u{1B}[2J", terminator: "")
+        output.write("\u{1B}[2J")
         moveCursor(row: 1, col: 1)
     }
 
     /// Move the cursor to the specified row and column (1-based).
     public static func moveCursor(row: Int, col: Int) {
-        print("\u{1B}[\(row);\(col)H", terminator: "")
+        output.write("\u{1B}[\(row);\(col)H")
     }
 
     /// Hide the cursor.
     public static func hideCursor() {
-        print("\u{1B}[?25l", terminator: "")
+        output.write("\u{1B}[?25l")
     }
 
     /// Show the cursor.
     public static func showCursor() {
-        print("\u{1B}[?25h", terminator: "")
+        output.write("\u{1B}[?25h")
     }
 
     /// Apply the given style.
@@ -72,12 +82,12 @@ public enum Terminal {
         if style.contains(.underline) { codes.append(4) }
         if style.contains(.reverse) { codes.append(7) }
         let seq = codes.map(String.init).joined(separator: ";")
-        print("\u{1B}[\(seq)m", terminator: "")
+        output.write("\u{1B}[\(seq)m")
     }
 
     /// Reset all styles.
     public static func resetStyle() {
-        print("\u{1B}[0m", terminator: "")
+        output.write("\u{1B}[0m")
     }
 
     /// Query the current terminal size (rows, columns).
