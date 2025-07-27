@@ -120,51 +120,72 @@ public class UIEventLoop {
         // Clear screen and perform initial draw
         Terminal.clearScreen()
         redraw()
-        // Batch paste events: only redraw once between paste start/end markers
         var inPaste = false
         do {
             while running {
                 let event = try input.readEvent()
-                switch event {
-                case .pasteStart:
-                    inPaste = true
-                case .pasteEnd:
-                    inPaste = false
-                    redraw()
-                // 'q' quits only outside of a paste; during a paste literal 'q's go into the buffer
-                case .char("q") where !inPaste, .ctrlC:
-                    running = false
-                case .tab:
-                    var next = focusIndex
-                    repeat {
-                        next = (next + 1) % widgets.count
-                    } while !widgets[next].isUserInteractive && next != focusIndex
-                    focusIndex = next
-                    if !inPaste { redraw() }
-                default:
-                    let widget = widgets[focusIndex]
-                    if let textInputWidget = widget as? TextInputWidget {
-                        if let line = textInputWidget.handle(event: event) {
-                            if let list = widgets.first(where: { $0 is ListWidget }) as? ListWidget {
-                                list.items.append(line)
-                            }
-                        }
-                    } else {
-                        _ = widget.handle(event: event)
-                    }
-                    if !inPaste { redraw() }
-                }
+                handle(event: event, inPaste: &inPaste)
             }
         } catch {
             fputs("Input error: \(error)\n", stderr)
         }
     }
 
+    private func handle(event: InputEvent, inPaste: inout Bool) {
+        switch event {
+        case .pasteStart:
+            inPaste = true
+
+        case .pasteEnd:
+            inPaste = false
+            redraw()
+
+        case .char("q") where !inPaste, .ctrlC:
+            running = false
+
+        case .tab:
+            focusNextWidget()
+            if !inPaste { redraw() }
+
+        default:
+            dispatchEventToCurrentWidget(event, inPaste: inPaste)
+        }
+    }
+
+    private func focusNextWidget() {
+        var next = focusIndex
+        repeat {
+            next = (next + 1) % widgets.count
+        } while !widgets[next].isUserInteractive && next != focusIndex
+        focusIndex = next
+    }
+
+    private func dispatchEventToCurrentWidget(_ event: InputEvent, inPaste: Bool) {
+        let widget = widgets[focusIndex]
+        if let textInput = widget as? TextInputWidget {
+            if let line = textInput.handle(event: event),
+               let list = widgets.first(where: { $0 is ListWidget }) as? ListWidget {
+                list.items.append(line)
+            }
+        } else {
+            _ = widget.handle(event: event)
+        }
+        if !inPaste { redraw() }
+    }
+
     /// A hashable key for accumulating border-edge masks.
     private struct MaskKey: Hashable {
-        let row: Int
-        let col: Int
-    }
+    let row: Int
+    let col: Int
+}
+// OptionSet representing border-edge masks for box-drawing.
+private struct BorderMask: OptionSet {
+    let rawValue: Int
+    static let north = BorderMask(rawValue: 1)
+    static let south = BorderMask(rawValue: 2)
+    static let west  = BorderMask(rawValue: 4)
+    static let east  = BorderMask(rawValue: 8)
+}
 
     private func redraw() {
         Terminal.hideCursor()
@@ -221,55 +242,71 @@ public class UIEventLoop {
 
     /// Renders borders around widget regions with correct box-drawing characters.
     private func renderBorders(regions: [Region]) {
-        let northMask = 1, southMask = 2, westMask = 4, eastMask = 8
-        var masks = [MaskKey: Int]()
+        let masks = buildBorderMasks(for: regions)
+        drawBorders(from: masks)
+    }
+
+    private func buildBorderMasks(for regions: [Region]) -> [MaskKey: BorderMask] {
+        var masks = [MaskKey: BorderMask]()
+
         for region in regions {
-            if region.width == 1, region.height > 1 {
-                // vertical divider (explicit widget): mark north/south edges
-                for rowIndex in region.top ..< region.top + region.height {
-                    masks[MaskKey(row: rowIndex, col: region.left), default: 0] |= northMask | southMask
-                }
-            } else if region.width > 1, region.height > 0 {
-                // pane border: mark top/bottom (east/west) and left/right (north/south)
-                let top = region.top
-                let left = region.left
-                let bottom = region.top + region.height - 1
-                let right = region.left + region.width - 1
-                for colIndex in (left + 1) ..< right {
-                    masks[MaskKey(row: top, col: colIndex), default: 0] |= eastMask | westMask
-                    masks[MaskKey(row: bottom, col: colIndex), default: 0] |= eastMask | westMask
-                }
-                for rowIndex in (top + 1) ..< bottom {
-                    masks[MaskKey(row: rowIndex, col: left), default: 0] |= northMask | southMask
-                    masks[MaskKey(row: rowIndex, col: right), default: 0] |= northMask | southMask
-                }
-                // mark corners to render corner characters
-                masks[MaskKey(row: top, col: left), default: 0] |= southMask | eastMask
-                masks[MaskKey(row: top, col: right), default: 0] |= southMask | westMask
-                masks[MaskKey(row: bottom, col: left), default: 0] |= northMask | eastMask
-                masks[MaskKey(row: bottom, col: right), default: 0] |= northMask | westMask
+            if region.width == 1 && region.height > 1 {
+                markVerticalDivider(region, in: &masks)
+            } else if region.width > 1 && region.height > 0 {
+                markPaneBorder(region, in: &masks)
             }
         }
-        // Render merged borders with proper box-drawing joins
+        return masks
+    }
+
+    private func markVerticalDivider(_ region: Region, in masks: inout [MaskKey: BorderMask]) {
+        for row in region.top ..< region.top + region.height {
+            masks[MaskKey(row: row, col: region.left), default: []].insert([.north, .south])
+        }
+    }
+
+    private func markPaneBorder(_ region: Region, in masks: inout [MaskKey: BorderMask]) {
+        let top = region.top
+        let bottom = region.top + region.height - 1
+        let left = region.left
+        let right = region.left + region.width - 1
+
+        for col in (left + 1) ..< right {
+            masks[MaskKey(row: top, col: col), default: []].insert([.east, .west])
+            masks[MaskKey(row: bottom, col: col), default: []].insert([.east, .west])
+        }
+        for row in (top + 1) ..< bottom {
+            masks[MaskKey(row: row, col: left), default: []].insert([.north, .south])
+            masks[MaskKey(row: row, col: right), default: []].insert([.north, .south])
+        }
+        masks[MaskKey(row: top, col: left), default: []].insert([.south, .east])
+        masks[MaskKey(row: top, col: right), default: []].insert([.south, .west])
+        masks[MaskKey(row: bottom, col: left), default: []].insert([.north, .east])
+        masks[MaskKey(row: bottom, col: right), default: []].insert([.north, .west])
+    }
+
+    private func drawBorders(from masks: [MaskKey: BorderMask]) {
         for (key, mask) in masks {
-            let row = key.row, col = key.col
-            let char: Character = {
-                switch mask {
-                case northMask | southMask | eastMask | westMask: return "┼"
-                case southMask | eastMask | westMask: return "┬"
-                case northMask | eastMask | westMask: return "┴"
-                case northMask | southMask | eastMask: return "├"
-                case northMask | southMask | westMask: return "┤"
-                case northMask | southMask: return "│"
-                case eastMask | westMask: return "─"
-                case southMask | eastMask: return "┌"
-                case southMask | westMask: return "┐"
-                case northMask | eastMask: return "└"
-                case northMask | westMask: return "┘"
-                default: return mask & (northMask | southMask) != 0 ? "│" : "─"
-                }
-            }()
-            renderer.setCell(row: row, col: col, char: char)
+            let char = boxCharacter(for: mask)
+            renderer.setCell(row: key.row, col: key.col, char: char)
+        }
+    }
+
+    private func boxCharacter(for mask: BorderMask) -> Character {
+        switch mask {
+        case [.north, .south, .west, .east]:   return "┼"
+        case [.south, .west, .east]:           return "┬"
+        case [.north, .west, .east]:           return "┴"
+        case [.north, .south, .east]:          return "├"
+        case [.north, .south, .west]:          return "┤"
+        case [.north, .south]:                 return "│"
+        case [.west, .east]:                   return "─"
+        case [.south, .east]:                  return "┌"
+        case [.south, .west]:                  return "┐"
+        case [.north, .east]:                  return "└"
+        case [.north, .west]:                  return "┘"
+        default:
+            return mask.intersection([.north, .south]).isEmpty ? "─" : "│"
         }
     }
 
