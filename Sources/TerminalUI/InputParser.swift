@@ -38,7 +38,7 @@ public struct InputParser: Sendable {
                     return .unknown
                 }
             }
-            if byte == ESC {
+            if byte == escapeCode {
                 state = .esc
                 return nil
             }
@@ -48,34 +48,34 @@ public struct InputParser: Sendable {
             if byte == 4 {
                 return .submit
             }
-            let b = byte
-            if b == CR || b == LF {
+            let byteValue = byte
+            if byteValue == carriageReturn || byteValue == lineFeed {
                 return .enter
             }
-            if b == DEL || b == BS {
+            if byteValue == deleteCode || byteValue == backspaceCode {
                 return .backspace
             }
-            if b == TAB {
+            if byteValue == tabCode {
                 return inPasteMode ? .char("\t") : .tab
             }
             // UTF-8 lead byte
-            if b & 0x80 != 0 {
+            if byteValue & 0x80 != 0 {
                 let need: Int
-                if b & 0xE0 == 0xC0 {
+                if byteValue & 0xE0 == 0xC0 {
                     need = 2
-                } else if b & 0xF0 == 0xE0 {
+                } else if byteValue & 0xF0 == 0xE0 {
                     need = 3
-                } else if b & 0xF8 == 0xF0 {
+                } else if byteValue & 0xF8 == 0xF0 {
                     need = 4
                 } else {
                     return .unknown
                 }
-                utf8Buf = [b]
+                utf8Buf = [byteValue]
                 utf8Need = need
                 return nil
             }
-            if b >= 0x20 && b <= 0x7E {
-                return .char(Character(UnicodeScalar(b)))
+            if byteValue >= 0x20 && byteValue <= 0x7E {
+                return .char(Character(UnicodeScalar(byteValue)))
             }
             return .unknown
 
@@ -112,9 +112,9 @@ public struct InputParser: Sendable {
                 }
                 return .unknown
             }
-            if let ev = arrowMap[byte] {
+            if let event = arrowMap[byte] {
                 state = .normal
-                return ev
+                return event
             }
             // continue accumulating intermediate/parameter bytes
             state = .csi(buf: buf)
@@ -122,8 +122,8 @@ public struct InputParser: Sendable {
 
         case .ss3:
             state = .normal
-            if let ev = arrowMap[byte] {
-                return ev
+            if let event = arrowMap[byte] {
+                return event
             }
             return .unknown
         }
@@ -159,12 +159,12 @@ public struct InputParser: Sendable {
 }
 
 // MARK: - Constants
-private let ESC: UInt8 = 0x1B
-private let CR: UInt8 = 13
-private let LF: UInt8 = 10
-private let DEL: UInt8 = 127
-private let BS: UInt8 = 8
-private let TAB: UInt8 = 9
+private let escapeCode: UInt8 = 0x1B
+private let carriageReturn: UInt8 = 13
+private let lineFeed: UInt8 = 10
+private let deleteCode: UInt8 = 127
+private let backspaceCode: UInt8 = 8
+private let tabCode: UInt8 = 9
 private let maxCSILength = 32
 private let arrowMap: [UInt8: InputEvent] = [
     UInt8(ascii: "A"): .upArrow,
