@@ -43,20 +43,20 @@ public class ListWidget: Widget {
     public func render(into renderer: Renderer, region: Region) {
         let count = min(region.height, items.count)
         // Clear region to spaces.
-        for y in 0..<region.height {
-            for x in 0..<region.width {
-                renderer.setCell(row: region.top + y, col: region.left + x, char: " ")
+        for rowOffset in 0..<region.height {
+            for colOffset in 0..<region.width {
+                renderer.setCell(row: region.top + rowOffset, col: region.left + colOffset, char: " ")
             }
         }
         // Draw items.
-        for i in 0..<count {
-            let prefix = (i == selectedIndex ? "▶ " : "  ")
-            let cleaned = items[i]
+        for rowIndex in 0..<count {
+            let prefix = (rowIndex == selectedIndex ? "▶ " : "  ")
+            let cleaned = items[rowIndex]
                 .replacingOccurrences(of: "\n", with: "")
                 .replacingTabs()
             let text = prefix + cleaned
-            for (j, ch) in text.prefix(region.width).enumerated() {
-                renderer.setCell(row: region.top + i, col: region.left + j, char: ch)
+            for (colIndex, character) in text.prefix(region.width).enumerated() {
+                renderer.setCell(row: region.top + rowIndex, col: region.left + colIndex, char: character)
             }
         }
     }
