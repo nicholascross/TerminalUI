@@ -93,7 +93,7 @@ public class UIEventLoop {
         self.layout.update(rows: rows, cols: columns)
         self.widgets = widgets
         // Start focus on the first interactive widget, if any
-        self.focusIndex = widgets.firstIndex(where: { $0.isUserInteractive }) ?? 0
+        focusIndex = widgets.firstIndex(where: { $0.isUserInteractive }) ?? 0
         renderer = Renderer(rows: rows, cols: columns)
         // On resize, update layout and renderer, then redraw
         Terminal.onResize = { [weak self] rows, columns in
@@ -163,8 +163,9 @@ public class UIEventLoop {
     private func dispatchEventToCurrentWidget(_ event: InputEvent, inPaste: Bool) {
         let widget = widgets[focusIndex]
         if let textInput = widget as? TextInputWidget {
-            if let line = textInput.handle(event: event),
-               let list = widgets.first(where: { $0 is ListWidget }) as? ListWidget {
+            if
+                let line = textInput.handle(event: event),
+                let list = widgets.first(where: { $0 is ListWidget }) as? ListWidget {
                 list.items.append(line)
             }
         } else {
@@ -175,17 +176,18 @@ public class UIEventLoop {
 
     /// A hashable key for accumulating border-edge masks.
     private struct MaskKey: Hashable {
-    let row: Int
-    let col: Int
-}
-// OptionSet representing border-edge masks for box-drawing.
-private struct BorderMask: OptionSet {
-    let rawValue: Int
-    static let north = BorderMask(rawValue: 1)
-    static let south = BorderMask(rawValue: 2)
-    static let west  = BorderMask(rawValue: 4)
-    static let east  = BorderMask(rawValue: 8)
-}
+        let row: Int
+        let col: Int
+    }
+
+    // OptionSet representing border-edge masks for box-drawing.
+    private struct BorderMask: OptionSet {
+        let rawValue: Int
+        static let north = BorderMask(rawValue: 1)
+        static let south = BorderMask(rawValue: 2)
+        static let west = BorderMask(rawValue: 4)
+        static let east = BorderMask(rawValue: 8)
+    }
 
     private func redraw() {
         Terminal.hideCursor()
@@ -208,7 +210,9 @@ private struct BorderMask: OptionSet {
                 Terminal.clearScreen()
                 Terminal.moveCursor(row: 1, col: 1)
                 let sizeInfo = "(got \(contentRegion.width)x\(contentRegion.height))"
-                print("Screen too small: widget #\(idx) needs at least 1×1 content area \(sizeInfo)")
+                print(
+                    "Screen too small: widget #\(idx) needs at least 1×1 content area \(sizeInfo)"
+                )
                 fflush(stdout)
                 return
             }
@@ -225,7 +229,10 @@ private struct BorderMask: OptionSet {
         if let textInputWidget = widgets[focusIndex] as? TextInputWidget {
             let contentRegion = regions[focusIndex].inset(by: 1)
             // Determine current line index and buffer lines
-            let lines = textInputWidget.buffer.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
+            let lines = textInputWidget.buffer.split(
+                separator: "\n",
+                omittingEmptySubsequences: false
+            ).map(String.init)
             let lineIndex = min(lines.count - 1, contentRegion.height - 1)
             // Compute cleaned line (tabs → spaces) to position cursor correctly
             let rawLine = lines[lineIndex]
@@ -250,9 +257,9 @@ private struct BorderMask: OptionSet {
         var masks = [MaskKey: BorderMask]()
 
         for region in regions {
-            if region.width == 1 && region.height > 1 {
+            if region.width == 1, region.height > 1 {
                 markVerticalDivider(region, in: &masks)
-            } else if region.width > 1 && region.height > 0 {
+            } else if region.width > 1, region.height > 0 {
                 markPaneBorder(region, in: &masks)
             }
         }
@@ -295,17 +302,17 @@ private struct BorderMask: OptionSet {
     // swiftlint:disable:next cyclomatic_complexity
     private func boxCharacter(for mask: BorderMask) -> Character {
         switch mask {
-        case [.north, .south, .west, .east]:   return "┼"
-        case [.south, .west, .east]:           return "┬"
-        case [.north, .west, .east]:           return "┴"
-        case [.north, .south, .east]:          return "├"
-        case [.north, .south, .west]:          return "┤"
-        case [.north, .south]:                 return "│"
-        case [.west, .east]:                   return "─"
-        case [.south, .east]:                  return "┌"
-        case [.south, .west]:                  return "┐"
-        case [.north, .east]:                  return "└"
-        case [.north, .west]:                  return "┘"
+        case [.north, .south, .west, .east]: return "┼"
+        case [.south, .west, .east]: return "┬"
+        case [.north, .west, .east]: return "┴"
+        case [.north, .south, .east]: return "├"
+        case [.north, .south, .west]: return "┤"
+        case [.north, .south]: return "│"
+        case [.west, .east]: return "─"
+        case [.south, .east]: return "┌"
+        case [.south, .west]: return "┐"
+        case [.north, .east]: return "└"
+        case [.north, .west]: return "┘"
         default:
             return mask.isDisjoint(with: [.north, .south]) ? "─" : "│"
         }
@@ -319,12 +326,12 @@ private struct BorderMask: OptionSet {
             let maxLen = max(0, region.width - 2)
             var titleText: String?
             if let title = widget.title {
-                if widget.isUserInteractive && index == focusIndex {
+                if widget.isUserInteractive, index == focusIndex {
                     titleText = "[\(title)]"
                 } else {
                     titleText = " \(title) "
                 }
-            } else if widget.isUserInteractive && index == focusIndex {
+            } else if widget.isUserInteractive, index == focusIndex {
                 titleText = "[*]"
             }
             if let text = titleText {
