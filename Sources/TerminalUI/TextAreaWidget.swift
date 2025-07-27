@@ -58,17 +58,17 @@ public class TextAreaWidget: Widget {
         let maxOffset = max(0, lines.count - region.height)
         scrollOffset = min(scrollOffset, maxOffset)
         // Clear region to spaces
-        for y in 0..<region.height {
-            for x in 0..<region.width {
-                renderer.setCell(row: region.top + y, col: region.left + x, char: " ")
+        for rowOffset in 0..<region.height {
+            for colOffset in 0..<region.width {
+                renderer.setCell(row: region.top + rowOffset, col: region.left + colOffset, char: " ")
             }
         }
         // Draw visible lines
         let endLine = min(scrollOffset + region.height, lines.count)
-        for (i, line) in lines[scrollOffset..<endLine].enumerated() {
+        for (lineIndex, line) in lines[scrollOffset..<endLine].enumerated() {
             let cleaned = line.replacingTabs()
-            for (j, ch) in cleaned.prefix(region.width).enumerated() {
-                renderer.setCell(row: region.top + i, col: region.left + j, char: ch)
+            for (charIndex, char) in cleaned.prefix(region.width).enumerated() {
+                renderer.setCell(row: region.top + lineIndex, col: region.left + charIndex, char: char)
             }
         }
     }

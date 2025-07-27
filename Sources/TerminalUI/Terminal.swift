@@ -92,9 +92,9 @@ public enum Terminal {
 
     /// Query the current terminal size (rows, columns).
     public static func getTerminalSize() -> (rows: Int, cols: Int) {
-        var ws = winsize()
-        if ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws) == 0 {
-            return (rows: Int(ws.ws_row), cols: Int(ws.ws_col))
+        var windowSize = winsize()
+        if ioctl(STDOUT_FILENO, TIOCGWINSZ, &windowSize) == 0 {
+            return (rows: Int(windowSize.ws_row), cols: Int(windowSize.ws_col))
         }
         return (rows: 24, cols: 80)
     }
@@ -104,9 +104,9 @@ public enum Terminal {
 
     // C signal handler for SIGWINCH
     private static let _resizeHandler: @convention(c) (Int32) -> Void = { _ in
-        if let cb = Terminal.onResize {
+        if let resizeCallback = Terminal.onResize {
             let size = Terminal.getTerminalSize()
-            cb(size.rows, size.cols)
+            resizeCallback(size.rows, size.cols)
         }
     }
 }

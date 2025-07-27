@@ -20,8 +20,8 @@ public class TextInputWidget: Widget {
     @discardableResult
     public func handle(event: InputEvent) -> String? {
         switch event {
-        case .char(let c):
-            buffer.append(c)
+        case .char(let character):
+            buffer.append(character)
             return nil
         case .backspace:
             if !buffer.isEmpty {
@@ -47,18 +47,18 @@ public class TextInputWidget: Widget {
         // Split buffer into lines (preserve empty final line)
         let lines = buffer.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
         // Clear full region
-        for y in 0..<region.height {
-            for x in 0..<region.width {
-                renderer.setCell(row: region.top + y, col: region.left + x, char: " ")
+        for rowOffset in 0..<region.height {
+            for colOffset in 0..<region.width {
+                renderer.setCell(row: region.top + rowOffset, col: region.left + colOffset, char: " ")
             }
         }
         // Draw each line (prefix prompt on first line)
-        for (i, line) in lines.enumerated() {
-            guard i < region.height else { break }
+        for (lineIndex, line) in lines.enumerated() {
+            guard lineIndex < region.height else { break }
             let cleaned = line.replacingTabs()
-            let text = (i == 0 ? prompt + cleaned : cleaned)
-            for (j, ch) in text.prefix(region.width).enumerated() {
-                renderer.setCell(row: region.top + i, col: region.left + j, char: ch)
+            let text = (lineIndex == 0 ? prompt + cleaned : cleaned)
+            for (charIndex, char) in text.prefix(region.width).enumerated() {
+                renderer.setCell(row: region.top + lineIndex, col: region.left + charIndex, char: char)
             }
         }
     }

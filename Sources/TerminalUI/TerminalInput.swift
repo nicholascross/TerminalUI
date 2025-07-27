@@ -34,13 +34,13 @@ public final class TerminalInput {
     public func readEvent() throws -> InputEvent {
         while true {
             guard let raw = try readByte() else {
-                if let ev = parser.flushEOF() {
-                    return ev
+                if let parsedEvent = parser.flushEOF() {
+                    return parsedEvent
                 }
                 return .eof
             }
-            if let ev = parser.consume(raw) {
-                return ev
+            if let parsedEvent = parser.consume(raw) {
+                return parsedEvent
             }
         }
     }
@@ -49,11 +49,11 @@ public final class TerminalInput {
     private func readByte() throws -> UInt8? {
         var byte: UInt8 = 0
         while true {
-            let n = read(STDIN_FILENO, &byte, 1)
-            if n == 1 {
+            let bytesRead = read(STDIN_FILENO, &byte, 1)
+            if bytesRead == 1 {
                 return byte
             }
-            if n == 0 {
+            if bytesRead == 0 {
                 return nil
             }
             if errno == EINTR {
