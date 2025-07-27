@@ -47,59 +47,65 @@ public struct Stack: LayoutNode {
 
     public func regions(for widgetCount: Int) -> [Region] {
         guard !children.isEmpty else { return [] }
-
-        let totalSpacing = spacing * max(0, children.count - 1)
-        // determine fixed and flexible portions, and extra remainder to align trailing edge
-        let fixedTotal: Int
-        let flexibleCount: Int
-        let availFlex: Int
-        var baseFlex = 0, extraFlex = 0, remainingFlex = 0
-        var baseFlexV = 0, extraFlexV = 0, remainingFlexV = 0
         switch axis {
         case .horizontal:
-            fixedTotal = children.compactMap { $0.desiredWidth }.reduce(0, +)
-            flexibleCount = children.filter { $0.desiredWidth == nil }.count
-            availFlex = max(cols - totalSpacing - fixedTotal, 0)
-            baseFlex = flexibleCount > 0 ? availFlex / flexibleCount : 0
-            extraFlex = flexibleCount > 0 ? availFlex % flexibleCount : 0
-            remainingFlex = flexibleCount
+            return computeRegionsHorizontal(widgetCount: widgetCount)
         case .vertical:
-            fixedTotal = children.compactMap { $0.desiredHeight }.reduce(0, +)
-            flexibleCount = children.filter { $0.desiredHeight == nil }.count
-            availFlex = max(rows - totalSpacing - fixedTotal, 0)
-            baseFlexV = flexibleCount > 0 ? availFlex / flexibleCount : 0
-            extraFlexV = flexibleCount > 0 ? availFlex % flexibleCount : 0
-            remainingFlexV = flexibleCount
+            return computeRegionsVertical(widgetCount: widgetCount)
         }
+    }
+}
+
+private extension Stack {
+    func computeRegionsHorizontal(widgetCount: Int) -> [Region] {
+        let totalSpacing = spacing * max(0, children.count - 1)
+        let fixedTotal = children.compactMap { $0.desiredWidth }.reduce(0, +)
+        let flexibleCount = children.filter { $0.desiredWidth == nil }.count
+        let availFlex = max(cols - totalSpacing - fixedTotal, 0)
+        let baseFlex = flexibleCount > 0 ? availFlex / flexibleCount : 0
+        let extraFlex = flexibleCount > 0 ? availFlex % flexibleCount : 0
+        var remainingFlex = flexibleCount
 
         var offsetPrimary = 0
         var out: [Region] = []
         for child in children {
             let childSize: Int
-            let outer: Region
-            switch axis {
-            case .horizontal:
-                if let w = child.desiredWidth {
-                    childSize = w
-                } else {
-                    // assign extra remainder to the last flexible pane for trailing alignment
-                    let add = remainingFlex == 1 ? baseFlex + extraFlex : baseFlex
-                    childSize = add
-                    remainingFlex -= 1
-                }
-                outer = Region(top: 0, left: offsetPrimary, width: childSize, height: rows)
-            case .vertical:
-                if let h = child.desiredHeight {
-                    childSize = h
-                } else {
-                    let add = remainingFlexV == 1 ? baseFlexV + extraFlexV : baseFlexV
-                    childSize = add
-                    remainingFlexV -= 1
-                }
-                outer = Region(top: offsetPrimary, left: 0, width: cols, height: childSize)
+            if let width = child.desiredWidth {
+                childSize = width
+            } else {
+                let add = remainingFlex == 1 ? baseFlex + extraFlex : baseFlex
+                childSize = add
+                remainingFlex -= 1
             }
-            let inner = outer
-            out += child.regions(for: widgetCount, in: inner)
+            let outer = Region(top: 0, left: offsetPrimary, width: childSize, height: rows)
+            out += child.regions(for: widgetCount, in: outer)
+            offsetPrimary += childSize + spacing
+        }
+        return out
+    }
+
+    func computeRegionsVertical(widgetCount: Int) -> [Region] {
+        let totalSpacing = spacing * max(0, children.count - 1)
+        let fixedTotal = children.compactMap { $0.desiredHeight }.reduce(0, +)
+        let flexibleCount = children.filter { $0.desiredHeight == nil }.count
+        let availFlex = max(rows - totalSpacing - fixedTotal, 0)
+        let baseFlex = flexibleCount > 0 ? availFlex / flexibleCount : 0
+        let extraFlex = flexibleCount > 0 ? availFlex % flexibleCount : 0
+        var remainingFlex = flexibleCount
+
+        var offsetPrimary = 0
+        var out: [Region] = []
+        for child in children {
+            let childSize: Int
+            if let height = child.desiredHeight {
+                childSize = height
+            } else {
+                let add = remainingFlex == 1 ? baseFlex + extraFlex : baseFlex
+                childSize = add
+                remainingFlex -= 1
+            }
+            let outer = Region(top: offsetPrimary, left: 0, width: cols, height: childSize)
+            out += child.regions(for: widgetCount, in: outer)
             offsetPrimary += childSize + spacing
         }
         return out
@@ -223,8 +229,8 @@ extension Sized {
     /// Minimal size honors fixed width/height or defers to wrapped child.
     public func minimalSize(widgetCount: Int) -> (width: Int, height: Int) {
         let childSize = wrapped.minimalSize(widgetCount: widgetCount)
-        let w = desiredWidth ?? childSize.width
-        let h = desiredHeight ?? childSize.height
-        return (w, h)
+        let width = desiredWidth ?? childSize.width
+        let height = desiredHeight ?? childSize.height
+        return (width, height)
     }
 }
