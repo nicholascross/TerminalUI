@@ -1,20 +1,6 @@
 import Darwin.C
 import Foundation
 
-/// Which style of box‑drawing characters to use for borders.
-public enum BorderStyle {
-    /// Unicode box‑drawing (─│┌┐└┘)
-    case unicode
-    /// ASCII fallback (+, -, |)
-    case ascii
-}
-
-/// A styled cell in the screen buffer.
-public struct Cell: Equatable {
-    public let char: Character
-    public let style: Style
-}
-
 /// Manages a virtual screen buffer and rendering to terminal.
 public class Renderer {
     private var buffer: [[Cell]]
