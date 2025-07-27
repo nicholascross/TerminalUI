@@ -55,7 +55,8 @@ public class TextInputWidget: Widget {
         // Draw each line (prefix prompt on first line)
         for (i, line) in lines.enumerated() {
             guard i < region.height else { break }
-            let text = (i == 0 ? prompt + line : line)
+            let cleaned = line.replacingTabs()
+            let text = (i == 0 ? prompt + cleaned : cleaned)
             for (j, ch) in text.prefix(region.width).enumerated() {
                 renderer.setCell(row: region.top + i, col: region.left + j, char: ch)
             }

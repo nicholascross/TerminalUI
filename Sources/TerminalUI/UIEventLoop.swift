@@ -206,10 +206,13 @@ public class UIEventLoop {
             // Determine current line index and buffer lines
             let lines = textInputWidget.buffer.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
             let lineIndex = min(lines.count - 1, contentRegion.height - 1)
+            // Compute cleaned line (tabs → spaces) to position cursor correctly
+            let rawLine = lines[lineIndex]
+            let cleanedLine = rawLine.replacingTabs()
             // Row and column within content region (plus legacy offset)
             let row = contentRegion.top + lineIndex + 1
             let prefix = lineIndex == 0 ? textInputWidget.prompt.count : 0
-            let col = contentRegion.left + prefix + lines[lineIndex].count + 1
+            let col = contentRegion.left + prefix + cleanedLine.count + 1
             Terminal.moveCursor(row: row, col: col)
             Terminal.showCursor()
         }

@@ -51,7 +51,10 @@ public class ListWidget: Widget {
         // Draw items.
         for i in 0..<count {
             let prefix = (i == selectedIndex ? "▶ " : "  ")
-            let text = prefix + items[i].replacingOccurrences(of: "\n", with: "")
+            let cleaned = items[i]
+                .replacingOccurrences(of: "\n", with: "")
+                .replacingTabs()
+            let text = prefix + cleaned
             for (j, ch) in text.prefix(region.width).enumerated() {
                 renderer.setCell(row: region.top + i, col: region.left + j, char: ch)
             }
