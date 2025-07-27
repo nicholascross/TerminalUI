@@ -292,6 +292,7 @@ private struct BorderMask: OptionSet {
         }
     }
 
+    // swiftlint:disable:next cyclomatic_complexity
     private func boxCharacter(for mask: BorderMask) -> Character {
         switch mask {
         case [.north, .south, .west, .east]:   return "┼"
@@ -306,7 +307,7 @@ private struct BorderMask: OptionSet {
         case [.north, .east]:                  return "└"
         case [.north, .west]:                  return "┘"
         default:
-            return mask.intersection([.north, .south]).isEmpty ? "─" : "│"
+            return mask.isDisjoint(with: [.north, .south]) ? "─" : "│"
         }
     }
 
@@ -324,7 +325,7 @@ private struct BorderMask: OptionSet {
                     titleText = " \(title) "
                 }
             } else if widget.isUserInteractive && index == focusIndex {
-                titleText = "*"
+                titleText = "[*]"
             }
             if let text = titleText {
                 let textToDraw = String(text.prefix(maxLen))
