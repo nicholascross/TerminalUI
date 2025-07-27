@@ -15,118 +15,151 @@ public struct InputParser: Sendable {
     public mutating func consume(_ byte: UInt8) -> InputEvent? {
         switch state {
         case .normal:
-            // Handle pending UTF-8 sequence continuation or invalidation.
-            if utf8Need > 0 {
-                // valid continuation bytes are 10xxxxxx
-                if byte & 0xC0 == 0x80 {
-                    utf8Buf.append(byte)
-                    if utf8Buf.count == utf8Need {
-                        let event: InputEvent
-                        if let scalar = String(bytes: utf8Buf, encoding: .utf8)?.first {
-                            event = .char(scalar)
-                        } else {
-                            event = .unknown
-                        }
-                        utf8Buf.removeAll()
-                        utf8Need = 0
-                        return event
-                    }
-                    return nil
-                } else {
-                    utf8Buf.removeAll()
-                    utf8Need = 0
-                    return .unknown
-                }
-            }
-            if byte == escapeCode {
-                state = .esc
-                return nil
-            }
-            if byte == 3 {
-                return .ctrlC
-            }
-            if byte == 4 {
-                return .submit
-            }
-            let byteValue = byte
-            if byteValue == carriageReturn || byteValue == lineFeed {
-                return .enter
-            }
-            if byteValue == deleteCode || byteValue == backspaceCode {
-                return .backspace
-            }
-            if byteValue == tabCode {
-                return inPasteMode ? .char("\t") : .tab
-            }
-            // UTF-8 lead byte
-            if byteValue & 0x80 != 0 {
-                let need: Int
-                if byteValue & 0xE0 == 0xC0 {
-                    need = 2
-                } else if byteValue & 0xF0 == 0xE0 {
-                    need = 3
-                } else if byteValue & 0xF8 == 0xF0 {
-                    need = 4
-                } else {
-                    return .unknown
-                }
-                utf8Buf = [byteValue]
-                utf8Need = need
-                return nil
-            }
-            if byteValue >= 0x20 && byteValue <= 0x7E {
-                return .char(Character(UnicodeScalar(byteValue)))
-            }
-            return .unknown
-
+            return consumeNormal(byte)
         case .esc:
-            state = .normal
-            switch byte {
-            case UInt8(ascii: "["):
-                state = .csi(buf: [])
-                return nil
-            case UInt8(ascii: "O"):
-                state = .ss3
-                return nil
-            default:
-                return .unknown
-            }
-
-        case .csi(var buf):
-            buf.append(byte)
-            if buf.count > maxCSILength {
-                state = .normal
-                return .unknown
-            }
-            // final byte: paste or arrow
-            if byte == UInt8(ascii: "~") {
-                state = .normal
-                let body = String(bytes: buf.dropLast(), encoding: .ascii) ?? ""
-                if body == "200" {
-                    inPasteMode = true
-                    return .pasteStart
-                }
-                if body == "201" {
-                    inPasteMode = false
-                    return .pasteEnd
-                }
-                return .unknown
-            }
-            if let event = arrowMap[byte] {
-                state = .normal
-                return event
-            }
-            // continue accumulating intermediate/parameter bytes
-            state = .csi(buf: buf)
-            return nil
-
+            return consumeEsc(byte)
+        case .csi(let buf):
+            return consumeCSI(byte, buf: buf)
         case .ss3:
-            state = .normal
-            if let event = arrowMap[byte] {
+            return consumeSS3(byte)
+        }
+    }
+
+    private mutating func consumeNormal(_ byte: UInt8) -> InputEvent? {
+        if utf8Need > 0 {
+            return consumeUtf8Continuation(byte)
+        }
+        if byte == escapeCode {
+            state = .esc
+            return nil
+        }
+        if let event = controlEvent(for: byte) {
+            return event
+        }
+        if let event = consumeUtf8LeadByte(byte) {
+            return event
+        }
+        if utf8Need > 0 {
+            return nil
+        }
+        if let event = consumePrintableAscii(byte) {
+            return event
+        }
+        return .unknown
+    }
+
+    private mutating func consumeUtf8Continuation(_ byte: UInt8) -> InputEvent? {
+        // valid continuation bytes are 10xxxxxx
+        if byte & 0xC0 == 0x80 {
+            utf8Buf.append(byte)
+            if utf8Buf.count == utf8Need {
+                let event: InputEvent
+                if let scalar = String(bytes: utf8Buf, encoding: .utf8)?.first {
+                    event = .char(scalar)
+                } else {
+                    event = .unknown
+                }
+                utf8Buf.removeAll()
+                utf8Need = 0
                 return event
+            }
+            return nil
+        } else {
+            utf8Buf.removeAll()
+            utf8Need = 0
+            return .unknown
+        }
+    }
+
+    private func controlEvent(for byte: UInt8) -> InputEvent? {
+        switch byte {
+        case 3:
+            return .ctrlC
+        case 4:
+            return .submit
+        case carriageReturn, lineFeed:
+            return .enter
+        case deleteCode, backspaceCode:
+            return .backspace
+        case tabCode:
+            return inPasteMode ? .char("\t") : .tab
+        default:
+            return nil
+        }
+    }
+
+    private mutating func consumeUtf8LeadByte(_ byte: UInt8) -> InputEvent? {
+        guard byte & 0x80 != 0 else { return nil }
+        let need: Int
+        if byte & 0xE0 == 0xC0 {
+            need = 2
+        } else if byte & 0xF0 == 0xE0 {
+            need = 3
+        } else if byte & 0xF8 == 0xF0 {
+            need = 4
+        } else {
+            return .unknown
+        }
+        utf8Buf = [byte]
+        utf8Need = need
+        return nil
+    }
+
+    private func consumePrintableAscii(_ byte: UInt8) -> InputEvent? {
+        guard byte >= 0x20 && byte <= 0x7E else { return nil }
+        return .char(Character(UnicodeScalar(byte)))
+    }
+
+    private mutating func consumeEsc(_ byte: UInt8) -> InputEvent? {
+        state = .normal
+        switch byte {
+        case UInt8(ascii: "["):
+            state = .csi(buf: [])
+            return nil
+        case UInt8(ascii: "O"):
+            state = .ss3
+            return nil
+        default:
+            return .unknown
+        }
+    }
+
+    private mutating func consumeCSI(_ byte: UInt8, buf: [UInt8]) -> InputEvent? {
+        var buf = buf
+        buf.append(byte)
+        if buf.count > maxCSILength {
+            state = .normal
+            return .unknown
+        }
+        // final byte: paste or arrow
+        if byte == UInt8(ascii: "~") {
+            state = .normal
+            let body = String(bytes: buf.dropLast(), encoding: .ascii) ?? ""
+            if body == "200" {
+                inPasteMode = true
+                return .pasteStart
+            }
+            if body == "201" {
+                inPasteMode = false
+                return .pasteEnd
             }
             return .unknown
         }
+        if let event = arrowMap[byte] {
+            state = .normal
+            return event
+        }
+        // continue accumulating intermediate/parameter bytes
+        state = .csi(buf: buf)
+        return nil
+    }
+
+    private mutating func consumeSS3(_ byte: UInt8) -> InputEvent? {
+        state = .normal
+        if let event = arrowMap[byte] {
+            return event
+        }
+        return .unknown
     }
 
     /// Signal end-of-stream to flush partial state (if any). Returns a final event or nil.
