@@ -29,9 +29,9 @@ public class TextInputWidget: Widget {
             }
             return nil
         case .enter:
-            // Insert a newline for multi-line editing rather than submitting immediately
-            buffer.append("\n")
-            return nil
+            let text = buffer
+            buffer = ""
+            return text
         case .submit:
             // Submit the entire buffer (e.g. on Ctrl-D)
             let text = buffer

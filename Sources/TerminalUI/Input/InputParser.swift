@@ -70,8 +70,10 @@ public struct InputParser: Sendable {
             return .ctrlC
         case 4:
             return .submit
-        case carriageReturn, lineFeed:
-            return .enter
+        case carriageReturn:
+            return inPasteMode ? .char("\n") : .enter
+        case lineFeed:
+            return .char("\n")
         case deleteCode, backspaceCode:
             return .backspace
         case tabCode:

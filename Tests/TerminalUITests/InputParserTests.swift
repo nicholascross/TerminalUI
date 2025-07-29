@@ -27,7 +27,7 @@ struct InputParserTests {
     @Test
     func enterCRLF() {
         #expect(feed([13]) == [.enter])
-        #expect(feed([10]) == [.enter])
+        #expect(feed([10]) == [.char("\n")])
     }
 
     @Test
