@@ -11,10 +11,11 @@ private struct StdoutStream: TextOutputStream {
 /// Low-level control over terminal: raw mode, cursor control, styling, and size.
 /// Global terminal control and styling utilities.
 public final class Terminal {
-    /// Shared singleton for global terminal control.
-    public static let shared = Terminal()
+    /// Called internally to dispatch resize signals to the active terminal instance.
+    private static weak var activeResizeListener: Terminal?
 
-    private init() {}
+    /// Create a new Terminal instance for controlling terminal I/O.
+    public init() {}
     /// The output stream to use for terminal control sequences and text.
     public var output: TextOutputStream = StdoutStream()
     /// Called on terminal resize with new (rows, cols).
@@ -40,7 +41,8 @@ public final class Terminal {
         }
         _rawModeEnabled = true
         // Install SIGWINCH handler for window resize events
-        signal(SIGWINCH, _resizeHandler)
+        Terminal.activeResizeListener = self
+        signal(SIGWINCH, Terminal._resizeHandler)
         // Enable bracketed paste mode
         output.write("\u{1B}[?2004h")
         fflush(stdout)
@@ -106,13 +108,14 @@ public final class Terminal {
     private var _originalTermios: termios?
     private var _rawModeEnabled = false
 
-    // C signal handler for SIGWINCH
-    private let _resizeHandler: @convention(c) (Int32) -> Void = { _ in
-        if let resizeCallback = Terminal.shared.onResize {
-            let size = Terminal.shared.getTerminalSize()
-            resizeCallback(size.rows, size.cols)
-        }
+/// C signal handler for SIGWINCH.
+private static let _resizeHandler: @convention(c) (Int32) -> Void = { _ in
+    if let listener = Terminal.activeResizeListener,
+       let callback = listener.onResize {
+        let size = listener.getTerminalSize()
+        callback(size.rows, size.cols)
     }
+}
 }
 
 /// Styling options for text output.

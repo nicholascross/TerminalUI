@@ -1,14 +1,15 @@
 import TerminalUI
 
-Terminal.shared.clearScreen()
+let terminal = Terminal()
+terminal.clearScreen()
 defer {
-    Terminal.shared.showCursor()
-    Terminal.shared.clearScreen()
+    terminal.showCursor()
+    terminal.clearScreen()
 }
 
 // Print resize events
-Terminal.shared.onResize = { _, _ in
-    Terminal.shared.clearScreen()
+terminal.onResize = { _, _ in
+    terminal.clearScreen()
 }
 
 // Build UI inline: widgets are collected and laid out in-place
@@ -29,7 +30,7 @@ list.onSelect = { _, item in
     details.text = item
 }
 
-let loop = UIEventLoop {
+let loop = UIEventLoop(terminal: terminal) {
     Stack(axis: .vertical, spacing: 0) {
         TextAreaWidget(
             text: " TerminalUI Example ",

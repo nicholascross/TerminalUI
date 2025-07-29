@@ -13,11 +13,11 @@ struct RendererTests {
     }
 
     /// Capture terminal output during the block using the TextOutputStream abstraction.
-    private func captureOutput(_ block: () -> Void) -> String {
+    private func captureOutput(renderer: Renderer, _ block: () -> Void) -> String {
         let stream = StringStream()
-        let original = Terminal.shared.output
-        Terminal.shared.output = stream
-        defer { Terminal.shared.output = original }
+        let original = renderer.terminal.output
+        renderer.terminal.output = stream
+        defer { renderer.terminal.output = original }
 
         block()
         return stream.content
@@ -29,7 +29,7 @@ struct RendererTests {
         renderer.setCell(row: 0, col: 0, char: "a")
         renderer.setCell(row: 0, col: 1, char: "b")
         renderer.setCell(row: 0, col: 2, char: "c")
-        let output = captureOutput { renderer.blit() }
+        let output = captureOutput(renderer: renderer) { renderer.blit() }
         // Strip ANSI escape sequences (cursor moves and styles)
         let cleaned = output.replacingOccurrences(
             of: "\u{1B}\\[[0-9;]*[A-Za-z]", with: "",
@@ -44,7 +44,7 @@ struct RendererTests {
         renderer.setCell(row: 0, col: 0, char: "x")
         renderer.setCell(row: 0, col: 1, char: "👍")
         renderer.setCell(row: 0, col: 2, char: "y")
-        let output = captureOutput { renderer.blit() }
+        let output = captureOutput(renderer: renderer) { renderer.blit() }
         let cleaned = output.replacingOccurrences(
             of: "\u{1B}\\[[0-9;]*[A-Za-z]", with: "",
             options: .regularExpression

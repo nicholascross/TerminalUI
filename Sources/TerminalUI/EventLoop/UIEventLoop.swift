@@ -3,6 +3,7 @@ import Foundation
 
 /// Main event loop to drive UI based on input and state.
 public class UIEventLoop {
+    private let terminal: Terminal
     private let input = TerminalInput()
     private var layout: LayoutNode
     private var widgets: [Widget]
@@ -26,6 +27,7 @@ public class UIEventLoop {
     /// try loop.run()
     /// ```
     public convenience init(
+        terminal: Terminal = Terminal(),
         @UIBuilder _ build: () -> [any LayoutNode]
     ) {
         // Collect inline widgets in declaration order
@@ -35,8 +37,8 @@ public class UIEventLoop {
         guard let root = roots.first else {
             fatalError("UIBuilder must produce at least one root layout node")
         }
-        let (rows, columns) = Terminal.shared.getTerminalSize()
-        self.init(rows: rows, columns: columns, widgets: widgets, layout: root)
+        let (rows, columns) = terminal.getTerminalSize()
+        self.init(rows: rows, columns: columns, widgets: widgets, layout: root, terminal: terminal)
     }
 
     /// Initialize the event loop with a custom layout strategy.
@@ -44,8 +46,10 @@ public class UIEventLoop {
         rows: Int,
         columns: Int,
         widgets: [Widget],
-        layout: LayoutNode
+        layout: LayoutNode,
+        terminal: Terminal
     ) {
+        self.terminal = terminal
         self.rows = rows
         self.columns = columns
         self.layout = layout
@@ -53,16 +57,16 @@ public class UIEventLoop {
         self.widgets = widgets
         // Start focus on the first interactive widget, if any
         focusIndex = widgets.firstIndex(where: { $0.isUserInteractive }) ?? 0
-        renderer = Renderer(rows: rows, cols: columns)
+        renderer = Renderer(rows: rows, cols: columns, terminal: terminal)
         // On resize, update layout and renderer, then redraw
-        Terminal.shared.onResize = { [weak self] rows, columns in
+        terminal.onResize = { [weak self] rows, columns in
             guard let self = self else { return }
             self.rows = rows
             self.columns = columns
             self.layout.update(rows: rows, cols: columns)
-            self.renderer = Renderer(rows: rows, cols: columns)
+            self.renderer = Renderer(rows: rows, cols: columns, terminal: terminal)
             // Clear screen on resize to avoid leftover artifacts
-            Terminal.shared.clearScreen()
+            terminal.clearScreen()
             self.redraw()
         }
     }
@@ -70,14 +74,14 @@ public class UIEventLoop {
     /// Start processing input events and updating the UI.
     public func run() throws {
         running = true
-        try Terminal.shared.enableRawMode()
+        try terminal.enableRawMode()
         defer {
-            try? Terminal.shared.disableRawMode()
-            Terminal.shared.showCursor()
+            try? terminal.disableRawMode()
+            terminal.showCursor()
         }
 
         // Clear screen and perform initial draw
-        Terminal.shared.clearScreen()
+        terminal.clearScreen()
         redraw()
         var inPaste = false
         do {
@@ -149,15 +153,15 @@ public class UIEventLoop {
     }
 
     private func redraw() {
-        Terminal.shared.hideCursor()
+        terminal.hideCursor()
         renderer.clearBuffer()
         let container = Region(top: 0, left: 0, width: columns, height: rows)
         let regions = layout.regions(for: widgets.count, in: container)
         // If the available terminal is too small for fixed frames, show warning
         let (minWidth, minHeight) = layout.minimalSize(widgetCount: widgets.count)
         if columns < minWidth || rows < minHeight {
-            Terminal.shared.clearScreen()
-            Terminal.shared.moveCursor(row: 1, col: 1)
+            terminal.clearScreen()
+            terminal.moveCursor(row: 1, col: 1)
             print("Screen too small: current=\(columns)x\(rows), minimum=\(minWidth)x\(minHeight)")
             fflush(stdout)
             return
@@ -166,8 +170,8 @@ public class UIEventLoop {
         for (idx, region) in regions.enumerated() {
             let contentRegion = region.inset(by: 1)
             if contentRegion.width <= 0 || contentRegion.height <= 0 {
-                Terminal.shared.clearScreen()
-                Terminal.shared.moveCursor(row: 1, col: 1)
+                terminal.clearScreen()
+                terminal.moveCursor(row: 1, col: 1)
                 let sizeInfo = "(got \(contentRegion.width)x\(contentRegion.height))"
                 print(
                     "Screen too small: widget #\(idx) needs at least 1×1 content area \(sizeInfo)"
@@ -200,8 +204,8 @@ public class UIEventLoop {
             let row = contentRegion.top + lineIndex + 1
             let prefix = lineIndex == 0 ? textInputWidget.prompt.count : 0
             let col = contentRegion.left + prefix + cleanedLine.count + 1
-            Terminal.shared.moveCursor(row: row, col: col)
-            Terminal.shared.showCursor()
+        terminal.moveCursor(row: row, col: col)
+        terminal.showCursor()
         }
         fflush(stdout)
     }

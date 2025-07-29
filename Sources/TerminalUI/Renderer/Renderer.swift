@@ -7,8 +7,11 @@ public class Renderer {
     /// Last drawn buffer state used for diff redraws.
     private var lastBuffer: [[Cell]]
 
-    /// Initialize renderer with given dimensions.
-    public init(rows: Int, cols: Int) {
+    /// Initialize renderer with given dimensions and terminal.
+    public let terminal: Terminal
+
+    public init(rows: Int, cols: Int, terminal: Terminal = Terminal()) {
+        self.terminal = terminal
         let emptyCell = Cell(char: " ", style: [])
         buffer = Array(
             repeating: Array(repeating: emptyCell, count: cols),
@@ -102,21 +105,21 @@ public class Renderer {
         // Only redraw rows that have changed since last blit.
         for (rowIndex, row) in buffer.enumerated() {
             guard rowIndex < lastBuffer.count, row == lastBuffer[rowIndex] else {
-                Terminal.shared.moveCursor(row: rowIndex + 1, col: 1)
+                terminal.moveCursor(row: rowIndex + 1, col: 1)
                 var skip = 0
                 for cell in row {
                     if skip > 0 {
                         skip -= 1
                         continue
                     }
-                    Terminal.shared.setStyle(cell.style)
-                    Terminal.shared.output.write(String(cell.char))
+                    terminal.setStyle(cell.style)
+                    terminal.output.write(String(cell.char))
                     let width = cell.char.terminalColumnWidth
                     if width > 1 {
                         skip = width - 1
                     }
                 }
-                Terminal.shared.resetStyle()
+                terminal.resetStyle()
                 continue
             }
         }
