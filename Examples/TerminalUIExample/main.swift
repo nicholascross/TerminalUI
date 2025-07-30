@@ -7,21 +7,14 @@ defer {
     terminal.clearScreen()
 }
 
-// Print resize events
-terminal.onResize = { _, _ in
-    terminal.clearScreen()
-}
-
-// Build UI inline: widgets are collected and laid out in-place
-// Prepare list and details for selection updates
+// Define the UI layout using stacks for flexible arrangement
+// Prepare list and detail view for selection updates
 let details = TextAreaWidget(
     text: """
-            Line 1: Hello, World!
-            Line 2: This is a text area.
-            Line 3: Use ↑/↓ to scroll.
-            Line 4: Swift TerminalUI
-            Line 5: Enjoy!
-            """,
+    Use TAB to focus the list, details, and input areas.
+    Select an item in the list; its details will appear here.
+    Scroll within this pane using ↑ and ↓ if content exceeds view.
+    """,
     title: "Details"
 )
 
@@ -32,11 +25,18 @@ list.onSelect = { _, item in
 
 let loop = UIEventLoop(terminal: terminal) {
     Stack(axis: .vertical, spacing: 0) {
+        // Top banner with usage instructions (non-interactive)
         TextAreaWidget(
-            text: " TerminalUI Example ",
+            text: """
+            TerminalUI Example
+
+            • Press TAB to switch focus between widgets.
+            • Use ↑/↓ to navigate lists and scroll text areas.
+            • In the input box below, type and press Enter to submit.
+            """,
             isUserInteractive: false
         )
-        .frame(height: 3)
+        .frame(height: 6)
 
         Stack(axis: .horizontal, spacing: 1) {
             list.frame(width: 20)
@@ -44,10 +44,12 @@ let loop = UIEventLoop(terminal: terminal) {
                 details
                 TextAreaWidget(
                     text: """
-                            Line 1: Hello, World!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-                            Line 2: This is a text area.
-                            Line 3: Use ↑/↓ to scroll.
-                            """,
+                    Use TAB to focus the list, details, and input areas.
+                    Inspect additional information about the selected item here.
+                    Use ↑ and ↓ to scroll through this content if needed.
+
+                    The text input box below allows you to enter text that will appear in the list.
+                    """,
                     title: "More Details"
                 )
             }
