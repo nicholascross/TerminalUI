@@ -12,6 +12,8 @@ public class UIEventLoop {
     private var rows: Int
     private var columns: Int
     private var running = false
+    /// Called when a text-input widget submits text (e.g. Ctrl-D).
+    public var onInput: ((String) -> Void)?
 
     /// Build a UIEventLoop by declaring widgets inline in the layout DSL.
     ///
@@ -126,10 +128,8 @@ public class UIEventLoop {
     private func dispatchEventToCurrentWidget(_ event: InputEvent, inPaste: Bool) {
         let widget = widgets[focusIndex]
         if let textInput = widget as? TextInputWidget {
-            if
-                let line = textInput.handle(event: event),
-                let list = widgets.first(where: { $0 is ListWidget }) as? ListWidget {
-                list.items.append(line)
+            if let line = textInput.handle(event: event) {
+                onInput?(line)
             }
         } else {
             _ = widget.handle(event: event)

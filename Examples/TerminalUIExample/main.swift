@@ -23,6 +23,8 @@ list.onSelect = { _, item in
     details.text = item
 }
 
+// Create a text-input widget and hook its submissions into the list
+let input = TextInputWidget(prompt: "> ", title: "Input")
 let loop = UIEventLoop(terminal: terminal) {
     Stack(axis: .vertical, spacing: 0) {
         // Top banner with usage instructions (non-interactive)
@@ -55,9 +57,13 @@ let loop = UIEventLoop(terminal: terminal) {
             }
         }
 
-        TextInputWidget(prompt: "> ", title: "Input")
-            .frame(height: 3)
+        input.frame(height: 3)
     }
+}
+
+// Route submitted text into the demo list
+loop.onInput = { text in
+    list.items.append(text)
 }
 
 try loop.run()
