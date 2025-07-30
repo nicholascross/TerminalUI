@@ -73,7 +73,8 @@ public struct InputParser: Sendable {
         case carriageReturn:
             return inPasteMode ? .char("\n") : .enter
         case lineFeed:
-            return .char("\n")
+            // ^J (line feed) acts as Enter unless in paste mode
+            return inPasteMode ? .char("\n") : .enter
         case deleteCode, backspaceCode:
             return .backspace
         case tabCode:

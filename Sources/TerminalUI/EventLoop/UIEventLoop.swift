@@ -191,21 +191,28 @@ public class UIEventLoop {
         // Position cursor for focused multi-line text-input widget
         if let textInputWidget = widgets[focusIndex] as? TextInputWidget {
             let contentRegion = regions[focusIndex].inset(by: 1)
-            // Determine current line index and buffer lines
-            let lines = textInputWidget.buffer.split(
-                separator: "\n",
-                omittingEmptySubsequences: false
+            // Compute visible window based on scroll offset
+            var offset = textInputWidget.scrollOffset
+            if textInputWidget.cursorRow < offset {
+                offset = textInputWidget.cursorRow
+            }
+            if textInputWidget.cursorRow >= offset + contentRegion.height {
+                offset = textInputWidget.cursorRow - contentRegion.height + 1
+            }
+            // Compute row position
+            let visRow = textInputWidget.cursorRow - offset
+            let row = contentRegion.top + visRow + 1
+            // Compute column position (account for prompt on first buffer line)
+            let fullLines = textInputWidget.buffer.split(
+                separator: "\n", omittingEmptySubsequences: false
             ).map(String.init)
-            let lineIndex = min(lines.count - 1, contentRegion.height - 1)
-            // Compute cleaned line (tabs → spaces) to position cursor correctly
-            let rawLine = lines[lineIndex]
-            let cleanedLine = rawLine.replacingTabs()
-            // Row and column within content region (plus legacy offset)
-            let row = contentRegion.top + lineIndex + 1
-            let prefix = lineIndex == 0 ? textInputWidget.prompt.count : 0
-            let col = contentRegion.left + prefix + cleanedLine.count + 1
-        terminal.moveCursor(row: row, col: col)
-        terminal.showCursor()
+            let rawLine = fullLines[textInputWidget.cursorRow]
+            let beforeCursor = String(rawLine.prefix(textInputWidget.cursorCol))
+            let cleaned = beforeCursor.replacingTabs()
+            let prefix = textInputWidget.cursorRow == 0 ? textInputWidget.prompt.count : 0
+            let col = contentRegion.left + prefix + cleaned.count + 1
+            terminal.moveCursor(row: row, col: col)
+            terminal.showCursor()
         }
         fflush(stdout)
     }
