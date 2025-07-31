@@ -88,3 +88,7 @@ Run the interactive example (press 'q' or Ctrl-C to quit):
 ```sh
 swift run TerminalUIExample
 ```
+
+## Acknowledgements
+
+This project has utilized generative AI tools in various aspects of its development, including coding assistance, testing, and documentation enhancement. The use of these tools has contributed to the efficiency and effectiveness of the development process.
