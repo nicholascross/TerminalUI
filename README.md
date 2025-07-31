@@ -2,6 +2,8 @@
 
 Minimal terminal UI toolkit in Swift.
 
+<img width="684" height="364" alt="screenshot" src="https://github.com/user-attachments/assets/7d41f87b-d945-4a9f-a1bc-79217e77192f" />
+
 ## Features
 
 - Terminal control: raw mode, cursor, styling, size detection
