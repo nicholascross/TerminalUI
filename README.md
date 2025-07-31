@@ -5,10 +5,10 @@ Minimal terminal UI toolkit in Swift.
 ## Features
 
 - Terminal control: raw mode, cursor, styling, size detection
-- Input parsing: keys, arrows, paste events, Unicode
+- Input parsing: character keys, arrow keys, backspace/delete, paste events (with bracketed-paste support), Unicode
 - Layout: Stack, frames, regions
 - Rendering: cell buffer, borders, styles
-- Widgets: ListWidget, TextAreaWidget, TextInputWidget
+- Widgets: ListWidget, TextAreaWidget, TextInputWidget (multi-line prompt with editing, arrow-key navigation, line splitting, and submit on Ctrl-D)
 - UTF-8 and bracketed-paste support, SIGWINCH resize handling
 
 ## Quick Start
@@ -31,7 +31,7 @@ defer {
 }
 
 // Build an interactive UI with a list, detail view, and text input
-// Press 'q' or Ctrl-C to quit
+// Press Ctrl-D to submit input, or 'q'/Ctrl-C to quit
 let details = TextAreaWidget(
     text: """
         Select an item from the list on the left.
@@ -46,7 +46,6 @@ list.onSelect = { _, selection in
 }
 
 let input = TextInputWidget(prompt: "> ", title: "Command")
-
 let loop = UIEventLoop(terminal: terminal) {
     Stack(axis: .vertical, spacing: 0) {
         TextAreaWidget(
@@ -63,8 +62,24 @@ let loop = UIEventLoop(terminal: terminal) {
         input.frame(height: 3)
     }
 }
+
+// Handle submitted text (Ctrl-D)
+loop.onInput = { text in
+    details.text = "You entered: \(text)"
+}
+
 try loop.run()
 ```
+
+## Text Input Handling
+
+The `TextInputWidget` supports:
+
+- Multi-line text entry with Enter splitting lines.
+- Character insertion and deletion (Backspace/Delete).
+- Arrow-key navigation (←, →, ↑, ↓) across and within lines.
+- Bracketed-paste support: pasted text (including multi-line) is inserted seamlessly.
+- Submit buffer with Ctrl-D (`.submit`), which returns the full input and clears the widget.
 
 ## Example
 
