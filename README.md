@@ -90,7 +90,7 @@ let loop = UIEventLoop(terminal: terminal) {
     }
 }
 
-try loop.run()
+try await loop.run()
 ```
 
 ## Text Input Handling

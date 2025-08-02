@@ -2,6 +2,7 @@ import Darwin.C
 import Foundation
 
 /// Main event loop to drive UI based on input and state.
+@MainActor
 public class UIEventLoop {
     private let terminal: Terminal
     private let input = TerminalInput()
@@ -13,9 +14,67 @@ public class UIEventLoop {
     private var columns: Int
     private var running = false
 
+    /// Flag to coalesce redraw requests.
+    private var drawScheduled = false
+
+    /// Pending resize task to debounce terminal resize events.
+    private var resizeTask: Task<Void, Never>?
+
+    /// Schedule a redraw asynchronously, coalescing multiple calls.
+    private func invalidate() {
+        guard !drawScheduled else { return }
+        drawScheduled = true
+        Task { @MainActor [weak self] in
+            guard let self = self else { return }
+            self.drawScheduled = false
+            self.redraw()
+        }
+    }
+
     /// Closure invoked when an event is not handled by the focused widget.
     /// Use this to provide global handling of unhandled events.
     public var onUnhandledEvent: ((InputEvent) -> Void)?
+
+    /// Async task driving periodic ticks via ContinuousClock.sleep.
+    private var tickTask: Task<Void, Never>?
+    private let clock = ContinuousClock()
+    private var tickInterval: Duration = .milliseconds(100)
+    private var inPaste = false // make it a stored property, not a local var
+
+    /// Start the async task driving periodic ticks via ContinuousClock.sleep.
+    private func startTicks() {
+        tickTask?.cancel()
+        tickTask = Task { [weak self] in
+            guard let self = self else { return }
+            var last = self.clock.now
+            while !Task.isCancelled && self.running {
+                // --- tick work ---
+                let now = self.clock.now
+                let delta = now - last
+                last = now
+                var invalidated = false
+                for widget in self.widgets {
+                    if widget.handle(event: .tick(dt: delta)) { invalidated = true }
+                }
+                if invalidated {
+                    await MainActor.run { self.invalidate() }
+                }
+
+                // --- schedule next ---
+                let interval = self.inPaste ? self.tickInterval * 2 : self.tickInterval
+                try? await self.clock.sleep(
+                    until: now.advanced(by: interval),
+                    tolerance: .milliseconds(8)
+                )
+            }
+        }
+    }
+
+    /// Cancel the tick-driving async task.
+    private func stopTicks() {
+        tickTask?.cancel()
+        tickTask = nil
+    }
 
     /// Build a UIEventLoop by declaring widgets inline in the layout DSL.
     ///
@@ -28,7 +87,7 @@ public class UIEventLoop {
     ///     // inline widgets automatically collected
     ///   }
     /// }
-    /// try loop.run()
+    /// try await loop.run()
     /// ```
     public convenience init(
         terminal: Terminal = Terminal(),
@@ -62,21 +121,26 @@ public class UIEventLoop {
         // Start focus on the first interactive widget, if any
         focusIndex = widgets.firstIndex(where: { $0.isUserInteractive }) ?? 0
         renderer = Renderer(rows: rows, cols: columns, terminal: terminal)
-        // On resize, update layout and renderer, then redraw
+        // On resize, debounce bursts and update layout and renderer without reallocating
         terminal.onResize = { [weak self] rows, columns in
             guard let self = self else { return }
-            self.rows = rows
-            self.columns = columns
-            self.layout.update(rows: rows, cols: columns)
-            self.renderer = Renderer(rows: rows, cols: columns, terminal: terminal)
-            // Clear screen on resize to avoid leftover artifacts
-            terminal.clearScreen()
-            self.redraw()
+            self.resizeTask?.cancel()
+            self.resizeTask = Task { @MainActor in
+                try? await Task.sleep(nanoseconds: 33_000_000)
+                guard !Task.isCancelled else { return }
+                self.rows = rows
+                self.columns = columns
+                self.layout.update(rows: rows, cols: columns)
+                self.renderer.resize(rows: rows, cols: columns)
+                self.terminal.clearScreen()
+                self.invalidate()
+            }
         }
     }
 
-    /// Start processing input events and updating the UI.
-    public func run() throws {
+    /// Start processing input events, driving animation ticks and updating the UI.
+    /// Start processing input events, driving animation ticks and updating the UI.
+    public func run() async throws {
         running = true
         try terminal.enableRawMode()
         defer {
@@ -84,38 +148,40 @@ public class UIEventLoop {
             terminal.showCursor()
         }
 
-        // Clear screen and perform initial draw
+        // Initial draw
         terminal.clearScreen()
         redraw()
-        var inPaste = false
-        do {
-            while running {
-                let event = try input.readEvent()
-                handle(event: event, inPaste: &inPaste)
-            }
-        } catch {
-            fputs("Input error: \(error)\n", stderr)
+
+        // Drive periodic ticks asynchronously
+        startTicks()
+
+        // Read input events asynchronously
+        for try await event in input.events() {
+            handle(event: event)
+            if !running { break }
         }
+
+        stopTicks()
     }
 
-    private func handle(event: InputEvent, inPaste: inout Bool) {
+    private func handle(event: InputEvent) {
         switch event {
         case .pasteStart:
             inPaste = true
 
         case .pasteEnd:
             inPaste = false
-            redraw()
+            invalidate()
 
         case .char("q") where !inPaste, .ctrlC:
             running = false
 
         case .tab:
             focusNextWidget()
-            if !inPaste { redraw() }
+            if !inPaste { invalidate() }
 
         default:
-            dispatchEventToCurrentWidget(event, inPaste: inPaste)
+            dispatchEventToCurrentWidget(event)
         }
     }
 
@@ -127,13 +193,16 @@ public class UIEventLoop {
         focusIndex = next
     }
 
-    private func dispatchEventToCurrentWidget(_ event: InputEvent, inPaste: Bool) {
+    private func dispatchEventToCurrentWidget(_ event: InputEvent) {
         let widget = widgets[focusIndex]
-        if widget.isDisabled || !widget.handle(event: event) {
+        // Only treat the event as handled if widget.handle(event:) returns true
+        let didHandle = !widget.isDisabled && widget.handle(event: event)
+        if !didHandle {
             onUnhandledEvent?(event)
         }
-        if !inPaste {
-            redraw()
+        // Redraw only when widget state changed (e.g. spinner advanced)
+        if didHandle, !inPaste {
+            invalidate()
         }
     }
 
@@ -231,7 +300,12 @@ public class UIEventLoop {
             let hidden = widgets[index].isBorderHidden
             if hidden { continue }
             if region.width == 1, region.height > 1 {
-                markVerticalDivider(region, disabled: disabled, in: &masks, disabledKeys: &disabledKeys)
+                markVerticalDivider(
+                    region,
+                    disabled: disabled,
+                    in: &masks,
+                    disabledKeys: &disabledKeys
+                )
             } else if region.width > 1, region.height > 0 {
                 markPaneBorder(region, disabled: disabled, in: &masks, disabledKeys: &disabledKeys)
             }

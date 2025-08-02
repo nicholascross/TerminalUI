@@ -16,6 +16,10 @@ public enum InputEvent: Equatable, Hashable, Sendable {
     case eof
     /// Bracketed‐paste start/end markers.
     case pasteStart, pasteEnd
+    /// Fired periodically by the UIEventLoop to drive animations (e.g. spinners).
+    ///
+    /// The delta time since the last tick is provided for frame-rate–independent updates.
+    case tick(dt: Duration)
     /// Unrecognized or invalid sequence.
     case unknown
 }

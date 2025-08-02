@@ -43,4 +43,22 @@ public final class TerminalInput {
         }
     }
 
+    /// Async sequence of discrete `InputEvent`s from stdin, ending on EOF or error.
+    public func events() -> AsyncThrowingStream<InputEvent, Error> {
+        AsyncThrowingStream { continuation in
+            Task.detached {
+                do {
+                    while true {
+                        let event = try self.readEvent()
+                        continuation.yield(event)
+                        if event == .eof { break }
+                    }
+                    continuation.finish()
+                } catch {
+                    continuation.finish(throwing: error)
+                }
+            }
+        }
+    }
+
 }

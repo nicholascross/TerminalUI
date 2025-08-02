@@ -126,4 +126,14 @@ public class Renderer {
         fflush(stdout)
         lastBuffer = buffer
     }
+
+    /// Resize the renderer buffer to the given dimensions, resetting contents.
+    public func resize(rows: Int, cols: Int) {
+        let empty = Cell(char: " ", style: [])
+        buffer = Array(
+            repeating: Array(repeating: empty, count: cols),
+            count: rows
+        )
+        lastBuffer = buffer
+    }
 }
