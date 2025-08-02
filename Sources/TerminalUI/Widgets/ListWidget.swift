@@ -8,6 +8,8 @@ public class ListWidget: Widget {
     public var isUserInteractive: Bool { return true }
     /// When disabled, the widget remains focusable but ignores input events.
     public var isDisabled: Bool = false
+    /// When true, the widget's border is hidden (space reserved but not drawn).
+    public var isBorderHidden: Bool = false
     /// Items to display in the list.
     /// Orientation of the list: vertical (default) or horizontal.
     public var orientation: Axis = .vertical

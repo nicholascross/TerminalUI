@@ -8,6 +8,8 @@ public class TextAreaWidget: Widget {
     public let isUserInteractive: Bool
     /// When disabled, the widget remains focusable but ignores input events.
     public var isDisabled: Bool = false
+    /// When true, the widget's border is hidden (space reserved but not drawn).
+    public var isBorderHidden: Bool
     /// Lines of text to display in the area.
     public var lines: [String] {
         didSet {
@@ -20,11 +22,13 @@ public class TextAreaWidget: Widget {
     public init(
         lines: [String],
         title: String? = nil,
-        isUserInteractive: Bool = true
+        isUserInteractive: Bool = true,
+        isBorderHidden: Bool = false
     ) {
         self.lines = lines
         self.title = title
         self.isUserInteractive = isUserInteractive
+        self.isBorderHidden = isBorderHidden
     }
 
     /// Full text content: joined lines separated by newlines.
@@ -37,10 +41,11 @@ public class TextAreaWidget: Widget {
     public convenience init(
         text: String,
         title: String? = nil,
-        isUserInteractive: Bool = true
+        isUserInteractive: Bool = true,
+        isBorderHidden: Bool = false
     ) {
         let lines = text.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
-        self.init(lines: lines, title: title, isUserInteractive: isUserInteractive)
+        self.init(lines: lines, title: title, isUserInteractive: isUserInteractive, isBorderHidden: isBorderHidden)
     }
 
     /// Handle scrolling events (up/down arrows). Returns true if event consumed.

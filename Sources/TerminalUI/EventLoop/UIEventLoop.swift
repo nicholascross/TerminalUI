@@ -228,6 +228,8 @@ public class UIEventLoop {
         var disabledKeys = Set<MaskKey>()
         for (index, region) in regions.enumerated() {
             let disabled = widgets[index].isDisabled
+            let hidden = widgets[index].isBorderHidden
+            if hidden { continue }
             if region.width == 1, region.height > 1 {
                 markVerticalDivider(region, disabled: disabled, in: &masks, disabledKeys: &disabledKeys)
             } else if region.width > 1, region.height > 0 {

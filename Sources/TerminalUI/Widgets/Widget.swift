@@ -13,6 +13,8 @@ public protocol Widget {
     func handle(event: InputEvent) -> Bool
     /// Indicates whether the widget is disabled (focusable but does not receive input events).
     var isDisabled: Bool { get set }
+    /// Indicates whether the widget's border should be hidden (space reserved but not drawn).
+    var isBorderHidden: Bool { get set }
 }
 
 public extension Widget {
@@ -20,4 +22,6 @@ public extension Widget {
     var isUserInteractive: Bool { return false }
     /// Default disabled state (widgets are enabled by default).
     var isDisabled: Bool { get { false } set { } }
+    /// Default hidden-border state (borders are shown by default).
+    var isBorderHidden: Bool { get { false } set { } }
 }

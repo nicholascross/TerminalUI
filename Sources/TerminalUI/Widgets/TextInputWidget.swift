@@ -8,6 +8,8 @@ public class TextInputWidget: Widget {
     public var isUserInteractive: Bool { true }
     /// When disabled, the widget remains focusable but ignores input events.
     public var isDisabled: Bool = false
+    /// When true, the widget's border is hidden (space reserved but not drawn).
+    public var isBorderHidden: Bool
     /// Prompt shown before input.
     public let prompt: String
     /// Called when this widget submits text (e.g. Ctrl-D).
@@ -24,9 +26,10 @@ public class TextInputWidget: Widget {
     /// Combined buffer as a single string with newlines.
     public var buffer: String { lines.joined(separator: "\n") }
 
-    public init(prompt: String = "> ", title: String? = nil) {
+    public init(prompt: String = "> ", title: String? = nil, isBorderHidden: Bool = false) {
         self.prompt = prompt
         self.title = title
+        self.isBorderHidden = isBorderHidden
     }
 
     /// Handle character and control events; returns full buffer on submit (Ctrl-D).

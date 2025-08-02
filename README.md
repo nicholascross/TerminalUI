@@ -15,6 +15,7 @@ Minimal terminal UI toolkit in Swift.
   - **TextAreaWidget**: read-only or interactive multi-line text area with scrolling (↑/↓) and optional title. Ideal for displaying details or logs.
   - **TextInputWidget**: single-line or multi-line input prompt with editing (insertion, deletion), arrow-key navigation (←/→/↑/↓), bracketed-paste support, and submit on Ctrl-D via the `onSubmit` callback.
 - Ability to disable widgets via `isDisabled` property (widgets remain focusable but ignore events; border styling can indicate disabled state)
+- Ability to hide widget borders via `isBorderHidden` property (widgets remain focusable and layout unchanged; border space reserved but not drawn)
 - UTF-8 and bracketed-paste support, SIGWINCH resize handling
 
 ## Quick Start

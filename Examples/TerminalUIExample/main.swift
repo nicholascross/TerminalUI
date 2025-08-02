@@ -46,7 +46,8 @@ let loop = UIEventLoop(terminal: terminal) {
     Stack(axis: .vertical, spacing: 0) {
         TextAreaWidget(
             text: " TerminalUI Demo ",
-            isUserInteractive: false
+            isUserInteractive: false,
+            isBorderHidden: true
         )
         .frame(height: 3)
 
@@ -60,6 +61,5 @@ let loop = UIEventLoop(terminal: terminal) {
         input.frame(height: 3)
     }
 }
-
 
 try loop.run()
