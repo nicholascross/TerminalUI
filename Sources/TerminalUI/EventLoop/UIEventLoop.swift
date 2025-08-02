@@ -13,6 +13,10 @@ public class UIEventLoop {
     private var columns: Int
     private var running = false
 
+    /// Closure invoked when an event is not handled by the focused widget.
+    /// Use this to provide global handling of unhandled events.
+    public var onUnhandledEvent: ((InputEvent) -> Void)?
+
     /// Build a UIEventLoop by declaring widgets inline in the layout DSL.
     ///
     /// Example:
@@ -125,10 +129,12 @@ public class UIEventLoop {
 
     private func dispatchEventToCurrentWidget(_ event: InputEvent, inPaste: Bool) {
         let widget = widgets[focusIndex]
-        // Skip handling for disabled widgets (remain focusable but ignore events).
-        guard !widget.isDisabled else { return }
-        _ = widget.handle(event: event)
-        if !inPaste { redraw() }
+        if widget.isDisabled || !widget.handle(event: event) {
+            onUnhandledEvent?(event)
+        }
+        if !inPaste {
+            redraw()
+        }
     }
 
     /// A hashable key for accumulating border-edge masks.
