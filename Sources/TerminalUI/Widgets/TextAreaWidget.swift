@@ -9,7 +9,11 @@ public class TextAreaWidget: Widget {
     /// When disabled, the widget remains focusable but ignores input events.
     public var isDisabled: Bool = false
     /// Lines of text to display in the area.
-    public var lines: [String]
+    public var lines: [String] {
+        didSet {
+            scrollOffset = lines.count
+        }
+    }
     /// Current scroll offset (index of the topmost displayed line).
     public var scrollOffset: Int = 0
 

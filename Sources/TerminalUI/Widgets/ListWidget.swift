@@ -25,6 +25,10 @@ public class ListWidget: Widget {
 
     /// Set of indices corresponding to items currently selected when multiple selection is enabled.
     public var selectedItems: Set<Int> = []
+    /// Offset of the first visible item in vertical orientation (for scrolling).
+    public var scrollOffset: Int = 0
+    /// Horizontal scroll offset (in columns) for horizontal orientation (for scrolling).
+    public var horizontalScrollOffset: Int = 0
 
     public init(items: [String], title: String? = nil) {
         self.items = items
@@ -95,55 +99,82 @@ public class ListWidget: Widget {
         }
         switch orientation {
         case .vertical:
-            let count = min(region.height, items.count)
-            for rowIndex in 0..<count {
-                let prefix = (rowIndex == selectedIndex ? "▶ " : "  ")
-                let cleaned = items[rowIndex]
+            // Adjust scrollOffset to ensure selected item is visible and within valid range
+            let maxOffset = max(0, items.count - region.height)
+            if scrollOffset > maxOffset { scrollOffset = maxOffset }
+            if selectedIndex < scrollOffset { scrollOffset = selectedIndex }
+            if selectedIndex >= scrollOffset + region.height {
+                scrollOffset = selectedIndex - region.height + 1
+            }
+            let start = scrollOffset
+            let end = min(items.count, scrollOffset + region.height)
+            for (rowOffset, idx) in (start..<end).enumerated() {
+                let prefix = (idx == selectedIndex ? "▶ " : "  ")
+                let cleaned = items[idx]
                     .replacingOccurrences(of: "\n", with: "")
                     .replacingTabs()
                 let text = prefix + cleaned
                 let prefixLen = prefix.count
                 for (colIndex, character) in text.prefix(region.width).enumerated() {
-                    let cellStyle: Style = selectedItems.contains(rowIndex) && colIndex >= prefixLen
+                    let cellStyle: Style = selectedItems.contains(idx) && colIndex >= prefixLen
                         ? .underline
                         : []
-                    renderer.setCell(row: region.top + rowIndex,
+                    renderer.setCell(row: region.top + rowOffset,
                                      col: region.left + colIndex,
                                      char: character,
                                      style: cellStyle)
                 }
             }
         case .horizontal:
-            var colOffset = 0
+            // Construct full line segments and style array
+            var segments: [String] = []
+            var cleanedLens: [Int] = []
             for idx in items.indices {
                 let cleaned = items[idx]
                     .replacingOccurrences(of: "\n", with: "")
                     .replacingTabs()
-                // Build fixed-width segment so focus brackets don't shift other items
-                let segment: String
-                if idx == selectedIndex {
-                    segment = "[\(cleaned)]"
-                } else {
-                    segment = " \(cleaned) "
-                }
-                let text = (idx == 0 ? segment : " " + segment)
-                let maxChars = max(region.width - colOffset, 0)
-                // Only underline the cleaned text portion for multi-selection
-                let cleanedLen = cleaned.count
-                // In segment: prefix of 1 (bracket or space), plus an extra space for non-first items
+                let segment = (idx == selectedIndex ? "[\(cleaned)]" : " \(cleaned) ")
+                let textSegment = (idx == 0 ? segment : " " + segment)
+                segments.append(textSegment)
+                cleanedLens.append(cleaned.count)
+            }
+            let fullText = segments.joined()
+            let chars = Array(fullText)
+            var styleArray = Array<Style>(repeating: [], count: chars.count)
+            var pos = 0
+            for (idx, segment) in segments.enumerated() {
+                let cleanedLen = cleanedLens[idx]
                 let baseOffset = (idx == 0 ? 1 : 2)
-                for (i, character) in text.prefix(maxChars).enumerated() {
-                    let cellStyle: Style = selectedItems.contains(idx)
-                        && i >= baseOffset && i < baseOffset + cleanedLen
-                        ? .underline
-                        : []
-                    renderer.setCell(row: region.top,
-                                     col: region.left + colOffset + i,
-                                     char: character,
-                                     style: cellStyle)
+                if selectedItems.contains(idx) {
+                    for i in baseOffset..<baseOffset + cleanedLen where pos + i < styleArray.count {
+                        styleArray[pos + i] = .underline
+                    }
                 }
-                colOffset += text.count
-                if colOffset >= region.width { break }
+                pos += segment.count
+            }
+            // Adjust horizontalScrollOffset to ensure selected segment is visible
+            let maxHOffset = max(0, chars.count - region.width)
+            if horizontalScrollOffset > maxHOffset { horizontalScrollOffset = maxHOffset }
+            let selStart = segments.prefix(selectedIndex).reduce(0) { $0 + $1.count }
+            let selEnd = selStart + segments[selectedIndex].count
+            if selStart < horizontalScrollOffset {
+                horizontalScrollOffset = selStart
+            }
+            if selEnd > horizontalScrollOffset + region.width {
+                horizontalScrollOffset = selEnd - region.width
+            }
+            // Render visible slice
+            let sliceStart = horizontalScrollOffset
+            for colIndex in 0..<region.width {
+                let textIndex = sliceStart + colIndex
+                let (char, cellStyle): (Character, Style) =
+                    textIndex < chars.count
+                        ? (chars[textIndex], styleArray[textIndex])
+                        : (" ", [])
+                renderer.setCell(row: region.top,
+                                 col: region.left + colIndex,
+                                 char: char,
+                                 style: cellStyle)
             }
         }
     }
