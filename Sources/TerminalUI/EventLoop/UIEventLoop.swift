@@ -12,8 +12,6 @@ public class UIEventLoop {
     private var rows: Int
     private var columns: Int
     private var running = false
-    /// Called when a text-input widget submits text (e.g. Ctrl-D).
-    public var onInput: ((String) -> Void)?
 
     /// Build a UIEventLoop by declaring widgets inline in the layout DSL.
     ///
@@ -129,13 +127,7 @@ public class UIEventLoop {
         let widget = widgets[focusIndex]
         // Skip handling for disabled widgets (remain focusable but ignore events).
         guard !widget.isDisabled else { return }
-        if let textInput = widget as? TextInputWidget {
-            if let line = textInput.handle(event: event) {
-                onInput?(line)
-            }
-        } else {
-            _ = widget.handle(event: event)
-        }
+        _ = widget.handle(event: event)
         if !inPaste { redraw() }
     }
 

@@ -10,6 +10,8 @@ public class TextInputWidget: Widget {
     public var isDisabled: Bool = false
     /// Prompt shown before input.
     public let prompt: String
+    /// Called when this widget submits text (e.g. Ctrl-D).
+    public var onSubmit: ((String) -> Void)?
 
     /// Current input as a multi-line buffer.
     private var lines: [String] = [""]
@@ -119,6 +121,7 @@ public class TextInputWidget: Widget {
             cursorRow = 0
             cursorCol = 0
             scrollOffset = 0
+            onSubmit?(text)
             return text
 
         default:

@@ -49,6 +49,11 @@ list.onSelect = { _, selection in
 }
 
 let input = TextInputWidget(prompt: "> ", title: "Command")
+// Handle submitted text (Ctrl-D)
+input.onSubmit = { text in
+    details.text = "You entered: \(text)"
+}
+
 let loop = UIEventLoop(terminal: terminal) {
     Stack(axis: .vertical, spacing: 0) {
         TextAreaWidget(
@@ -66,10 +71,6 @@ let loop = UIEventLoop(terminal: terminal) {
     }
 }
 
-// Handle submitted text (Ctrl-D)
-loop.onInput = { text in
-    details.text = "You entered: \(text)"
-}
 
 try loop.run()
 ```
