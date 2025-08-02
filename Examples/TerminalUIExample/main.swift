@@ -6,7 +6,7 @@ defer {
     terminal.clearScreen()
 }
 
-// Build an interactive UI with a list, detail view, and text input
+// Build an interactive UI with a horizontal menu, a list, detail view, and text input
 // Press Ctrl-D to submit input, or 'q'/Ctrl-C to quit
 let details = TextAreaWidget(
     text: """
@@ -15,8 +15,14 @@ let details = TextAreaWidget(
         """,
     title: "Details"
 )
-
 details.isDisabled = true
+
+// Horizontal menu bar
+let menu = ListWidget(items: ["File", "Edit", "View", "Help"], title: "Menu")
+menu.orientation = .horizontal
+menu.onSelect = { idx, sel in
+    details.text = "Menu selected: \(sel)"
+}
 
 let list = ListWidget(items: ["Apple", "Banana", "Cherry"], title: "Fruits")
 list.onSelect = { _, selection in
@@ -31,6 +37,8 @@ let loop = UIEventLoop(terminal: terminal) {
             isUserInteractive: false
         )
         .frame(height: 3)
+
+        menu.frame(height: 3)
 
         Stack(axis: .horizontal, spacing: 1) {
             list.frame(width: 20)
