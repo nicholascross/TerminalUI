@@ -16,6 +16,8 @@ let details = TextAreaWidget(
     title: "Details"
 )
 
+details.isDisabled = true
+
 let list = ListWidget(items: ["Apple", "Banana", "Cherry"], title: "Fruits")
 list.onSelect = { _, selection in
     details.text = "You selected: \(selection)"

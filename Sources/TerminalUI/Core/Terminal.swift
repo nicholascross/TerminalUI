@@ -87,6 +87,7 @@ public final class Terminal {
         if style.contains(.bold) { codes.append(1) }
         if style.contains(.underline) { codes.append(4) }
         if style.contains(.reverse) { codes.append(7) }
+        if style.contains(.gray)    { codes.append(90) }
         let seq = codes.map(String.init).joined(separator: ";")
         output.write("\u{1B}[\(seq)m")
     }
@@ -126,5 +127,7 @@ public struct Style: OptionSet {
     public static let bold      = Style(rawValue: 1 << 0)
     public static let underline = Style(rawValue: 1 << 1)
     public static let reverse   = Style(rawValue: 1 << 2)
-    // Add color options as needed.
+    /// Gray foreground color (bright black).
+    public static let gray      = Style(rawValue: 1 << 3)
+    // Add other color options as needed.
 }

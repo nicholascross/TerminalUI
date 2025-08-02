@@ -127,6 +127,8 @@ public class UIEventLoop {
 
     private func dispatchEventToCurrentWidget(_ event: InputEvent, inPaste: Bool) {
         let widget = widgets[focusIndex]
+        // Skip handling for disabled widgets (remain focusable but ignore events).
+        guard !widget.isDisabled else { return }
         if let textInput = widget as? TextInputWidget {
             if let line = textInput.handle(event: event) {
                 onInput?(line)
@@ -219,53 +221,85 @@ public class UIEventLoop {
 
     /// Renders borders around widget regions with correct box-drawing characters.
     private func renderBorders(regions: [Region]) {
-        let masks = buildBorderMasks(for: regions)
-        drawBorders(from: masks)
+        let (masks, disabledKeys) = buildBorderMasks(for: regions)
+        drawBorders(from: masks, disabledKeys: disabledKeys)
     }
 
-    private func buildBorderMasks(for regions: [Region]) -> [MaskKey: BorderMask] {
+    private func buildBorderMasks(for regions: [Region]) -> ([MaskKey: BorderMask], Set<MaskKey>) {
         var masks = [MaskKey: BorderMask]()
-
-        for region in regions {
+        var disabledKeys = Set<MaskKey>()
+        for (index, region) in regions.enumerated() {
+            let disabled = widgets[index].isDisabled
             if region.width == 1, region.height > 1 {
-                markVerticalDivider(region, in: &masks)
+                markVerticalDivider(region, disabled: disabled, in: &masks, disabledKeys: &disabledKeys)
             } else if region.width > 1, region.height > 0 {
-                markPaneBorder(region, in: &masks)
+                markPaneBorder(region, disabled: disabled, in: &masks, disabledKeys: &disabledKeys)
             }
         }
-        return masks
+        return (masks, disabledKeys)
     }
 
-    private func markVerticalDivider(_ region: Region, in masks: inout [MaskKey: BorderMask]) {
+    private func markVerticalDivider(
+        _ region: Region,
+        disabled: Bool,
+        in masks: inout [MaskKey: BorderMask],
+        disabledKeys: inout Set<MaskKey>
+    ) {
         for row in region.top ..< region.top + region.height {
-            masks[MaskKey(row: row, col: region.left), default: []].insert([.north, .south])
+            let key = MaskKey(row: row, col: region.left)
+            masks[key, default: []].insert([.north, .south])
+            if disabled { disabledKeys.insert(key) }
         }
     }
 
-    private func markPaneBorder(_ region: Region, in masks: inout [MaskKey: BorderMask]) {
+    private func markPaneBorder(
+        _ region: Region,
+        disabled: Bool,
+        in masks: inout [MaskKey: BorderMask],
+        disabledKeys: inout Set<MaskKey>
+    ) {
         let top = region.top
-        let bottom = region.top + region.height - 1
+        let bottom = top + region.height - 1
         let left = region.left
-        let right = region.left + region.width - 1
+        let right = left + region.width - 1
 
         for col in (left + 1) ..< right {
-            masks[MaskKey(row: top, col: col), default: []].insert([.east, .west])
-            masks[MaskKey(row: bottom, col: col), default: []].insert([.east, .west])
+            let topKey = MaskKey(row: top, col: col)
+            masks[topKey, default: []].insert([.east, .west])
+            if disabled { disabledKeys.insert(topKey) }
+            let bottomKey = MaskKey(row: bottom, col: col)
+            masks[bottomKey, default: []].insert([.east, .west])
+            if disabled { disabledKeys.insert(bottomKey) }
         }
         for row in (top + 1) ..< bottom {
-            masks[MaskKey(row: row, col: left), default: []].insert([.north, .south])
-            masks[MaskKey(row: row, col: right), default: []].insert([.north, .south])
+            let leftKey = MaskKey(row: row, col: left)
+            masks[leftKey, default: []].insert([.north, .south])
+            if disabled { disabledKeys.insert(leftKey) }
+            let rightKey = MaskKey(row: row, col: right)
+            masks[rightKey, default: []].insert([.north, .south])
+            if disabled { disabledKeys.insert(rightKey) }
         }
-        masks[MaskKey(row: top, col: left), default: []].insert([.south, .east])
-        masks[MaskKey(row: top, col: right), default: []].insert([.south, .west])
-        masks[MaskKey(row: bottom, col: left), default: []].insert([.north, .east])
-        masks[MaskKey(row: bottom, col: right), default: []].insert([.north, .west])
+        let tl = MaskKey(row: top, col: left)
+        masks[tl, default: []].insert([.south, .east]); if disabled { disabledKeys.insert(tl) }
+
+        let tr = MaskKey(row: top, col: right)
+        masks[tr, default: []].insert([.south, .west]); if disabled { disabledKeys.insert(tr) }
+
+        let bl = MaskKey(row: bottom, col: left)
+        masks[bl, default: []].insert([.north, .east]); if disabled { disabledKeys.insert(bl) }
+
+        let br = MaskKey(row: bottom, col: right)
+        masks[br, default: []].insert([.north, .west]); if disabled { disabledKeys.insert(br) }
     }
 
-    private func drawBorders(from masks: [MaskKey: BorderMask]) {
+    private func drawBorders(
+        from masks: [MaskKey: BorderMask],
+        disabledKeys: Set<MaskKey>
+    ) {
         for (key, mask) in masks {
             let char = boxCharacter(for: mask)
-            renderer.setCell(row: key.row, col: key.col, char: char)
+            let style: Style = disabledKeys.contains(key) ? .gray : []
+            renderer.setCell(row: key.row, col: key.col, char: char, style: style)
         }
     }
 

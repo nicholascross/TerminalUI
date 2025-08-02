@@ -6,6 +6,8 @@ public class TextAreaWidget: Widget {
     public var title: String?
     /// Determines whether the text area accepts scroll input and can receive focus.
     public let isUserInteractive: Bool
+    /// When disabled, the widget remains focusable but ignores input events.
+    public var isDisabled: Bool = false
     /// Lines of text to display in the area.
     public var lines: [String]
     /// Current scroll offset (index of the topmost displayed line).

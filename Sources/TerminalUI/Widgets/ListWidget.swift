@@ -6,6 +6,8 @@ public class ListWidget: Widget {
     public var title: String?
     /// This widget handles user input and can be focused.
     public var isUserInteractive: Bool { return true }
+    /// When disabled, the widget remains focusable but ignores input events.
+    public var isDisabled: Bool = false
     /// Items to display in the list.
     public var items: [String]
     /// Currently selected index.

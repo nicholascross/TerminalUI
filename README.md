@@ -11,6 +11,7 @@ Minimal terminal UI toolkit in Swift.
 - Layout: Stack, frames, regions
 - Rendering: cell buffer, borders, styles
 - Widgets: ListWidget, TextAreaWidget, TextInputWidget (multi-line prompt with editing, arrow-key navigation, line splitting, and submit on Ctrl-D)
+- Ability to disable widgets via `isDisabled` property (widgets remain focusable but ignore events; border styling can indicate disabled state)
 - UTF-8 and bracketed-paste support, SIGWINCH resize handling
 
 ## Quick Start

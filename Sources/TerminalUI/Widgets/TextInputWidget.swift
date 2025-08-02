@@ -6,6 +6,8 @@ public class TextInputWidget: Widget {
     public var title: String?
     /// This widget handles user input and can be focused.
     public var isUserInteractive: Bool { true }
+    /// When disabled, the widget remains focusable but ignores input events.
+    public var isDisabled: Bool = false
     /// Prompt shown before input.
     public let prompt: String
 
