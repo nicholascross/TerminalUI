@@ -2,7 +2,7 @@
 
 Minimal terminal UI toolkit in Swift.
 
-<img width="617" height="359" alt="screenshot2" src="https://github.com/user-attachments/assets/b8dc4d03-d9d9-49ea-a6b9-4d426598c99e" />
+<img width="810" height="530" alt="Example UI render" src="https://github.com/user-attachments/assets/5eb4e7d7-b437-451e-84c7-2fbdbf746ac8" />
 
 ## Features
 
