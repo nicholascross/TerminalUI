@@ -14,9 +14,17 @@ public class ListWidget: Widget {
     public var items: [String]
     /// Currently selected index.
     public var selectedIndex: Int = 0
-    /// Closure invoked when the user presses Enter on the current selection.
-    /// Parameters are the selected index and corresponding item string.
-    public var onSelect: ((Int, String) -> Void)?
+    /// Closure invoked when the user confirms or toggles selection.
+    /// In single-selection mode, triggered on Enter.
+    /// In multiple-selection mode, triggered on Space when toggling items and on Enter.
+    /// Parameters are the selected indices and corresponding item strings.
+    public var onSelect: (([Int], [String]) -> Void)?
+
+    /// When true, the widget allows selecting multiple items via the space key.
+    public var allowsMultipleSelection: Bool = false
+
+    /// Set of indices corresponding to items currently selected when multiple selection is enabled.
+    public var selectedItems: Set<Int> = []
 
     public init(items: [String], title: String? = nil) {
         self.items = items
@@ -26,6 +34,24 @@ public class ListWidget: Widget {
     /// Handle navigation keys; returns true if event consumed.
     @discardableResult
     public func handle(event: InputEvent) -> Bool {
+        // Ignore input when disabled.
+        guard !isDisabled else {
+            return false
+        }
+        // Toggle selection for multiple selection on space.
+        if allowsMultipleSelection, case .char(" ") = event {
+            if selectedItems.contains(selectedIndex) {
+                selectedItems.remove(selectedIndex)
+            } else {
+                selectedItems.insert(selectedIndex)
+            }
+            if !items.isEmpty {
+                let ids = selectedItems.sorted()
+                let sels = ids.map { items[$0] }
+                onSelect?(ids, sels)
+            }
+            return true
+        }
         switch (orientation, event) {
         case (.vertical, .upArrow):
             selectedIndex = max(0, selectedIndex - 1)
@@ -41,7 +67,15 @@ public class ListWidget: Widget {
             return true
         case (_, .enter):
             if !items.isEmpty {
-                onSelect?(selectedIndex, items[selectedIndex])
+                if allowsMultipleSelection {
+                    let ids = selectedItems.sorted()
+                    let sels = ids.map { items[$0] }
+                    onSelect?(ids, sels)
+                } else {
+                    // In single-selection mode, record the selected index
+                    selectedItems = [selectedIndex]
+                    onSelect?([selectedIndex], [items[selectedIndex]])
+                }
             }
             return true
         default:
@@ -68,10 +102,15 @@ public class ListWidget: Widget {
                     .replacingOccurrences(of: "\n", with: "")
                     .replacingTabs()
                 let text = prefix + cleaned
+                let prefixLen = prefix.count
                 for (colIndex, character) in text.prefix(region.width).enumerated() {
+                    let cellStyle: Style = selectedItems.contains(rowIndex) && colIndex >= prefixLen
+                        ? .underline
+                        : []
                     renderer.setCell(row: region.top + rowIndex,
                                      col: region.left + colIndex,
-                                     char: character)
+                                     char: character,
+                                     style: cellStyle)
                 }
             }
         case .horizontal:
@@ -89,10 +128,19 @@ public class ListWidget: Widget {
                 }
                 let text = (idx == 0 ? segment : " " + segment)
                 let maxChars = max(region.width - colOffset, 0)
+                // Only underline the cleaned text portion for multi-selection
+                let cleanedLen = cleaned.count
+                // In segment: prefix of 1 (bracket or space), plus an extra space for non-first items
+                let baseOffset = (idx == 0 ? 1 : 2)
                 for (i, character) in text.prefix(maxChars).enumerated() {
+                    let cellStyle: Style = selectedItems.contains(idx)
+                        && i >= baseOffset && i < baseOffset + cleanedLen
+                        ? .underline
+                        : []
                     renderer.setCell(row: region.top,
                                      col: region.left + colOffset + i,
-                                     char: character)
+                                     char: character,
+                                     style: cellStyle)
                 }
                 colOffset += text.count
                 if colOffset >= region.width { break }

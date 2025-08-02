@@ -20,13 +20,20 @@ details.isDisabled = true
 // Horizontal menu bar
 let menu = ListWidget(items: ["File", "Edit", "View", "Help"], title: "Menu")
 menu.orientation = .horizontal
-menu.onSelect = { idx, sel in
-    details.text = "Menu selected: \(sel)"
+menu.onSelect = { indices, selections in
+    if let sel = selections.first {
+        details.text = "Menu selected: \(sel)"
+    }
 }
 
 let list = ListWidget(items: ["Apple", "Banana", "Cherry"], title: "Fruits")
-list.onSelect = { _, selection in
-    details.text = "You selected: \(selection)"
+// Enable multiple selection: press space to toggle items (underlined when selected)
+list.allowsMultipleSelection = true
+list.onSelect = { _, selections in
+    // Display all selected fruits when Enter or Space is pressed
+    details.text = selections.isEmpty
+        ? "No fruits selected"
+        : "Selected fruits: \(selections.joined(separator: ", "))"
 }
 
 let input = TextInputWidget(prompt: "> ", title: "Command")

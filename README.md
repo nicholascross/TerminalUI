@@ -44,8 +44,10 @@ let details = TextAreaWidget(
 )
 
 let list = ListWidget(items: ["Apple", "Banana", "Cherry"], title: "Fruits")
-list.onSelect = { _, selection in
-    details.text = "You selected: \(selection)"
+list.onSelect = { indices, selections in
+    if let selection = selections.first {
+        details.text = "You selected: \(selection)"
+    }
 }
 
 let input = TextInputWidget(prompt: "> ", title: "Command")
