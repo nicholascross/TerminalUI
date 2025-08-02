@@ -10,7 +10,10 @@ Minimal terminal UI toolkit in Swift.
 - Input parsing: character keys, arrow keys, backspace/delete, paste events (with bracketed-paste support), Unicode
 - Layout: Stack, frames, regions
 - Rendering: cell buffer, borders, styles
-- Widgets: ListWidget, TextAreaWidget, TextInputWidget (multi-line prompt with editing, arrow-key navigation, line splitting, and submit on Ctrl-D)
+- Widgets:
+  - **ListWidget**: vertical or horizontal list of selectable items with single- or multi-selection support. Configure `orientation` (.vertical/.horizontal), toggle items with Space when `allowsMultipleSelection` is enabled, and confirm selection(s) with Enter. Highlights the current item (▶ or brackets) and underlines selected items. Use the `onSelect` callback to receive selected indices and values.
+  - **TextAreaWidget**: read-only or interactive multi-line text area with scrolling (↑/↓) and optional title. Ideal for displaying details or logs.
+  - **TextInputWidget**: single-line or multi-line input prompt with editing (insertion, deletion), arrow-key navigation (←/→/↑/↓), bracketed-paste support, and submit on Ctrl-D via the `onSubmit` callback.
 - Ability to disable widgets via `isDisabled` property (widgets remain focusable but ignore events; border styling can indicate disabled state)
 - UTF-8 and bracketed-paste support, SIGWINCH resize handling
 
@@ -33,7 +36,7 @@ defer {
     terminal.clearScreen()
 }
 
-// Build an interactive UI with a list, detail view, and text input
+// Build an interactive UI with a horizontal menu, a list, detail view, and text input
 // Press Ctrl-D to submit input, or 'q'/Ctrl-C to quit
 let details = TextAreaWidget(
     text: """
@@ -42,16 +45,27 @@ let details = TextAreaWidget(
         """,
     title: "Details"
 )
+details.isDisabled = true
 
-let list = ListWidget(items: ["Apple", "Banana", "Cherry"], title: "Fruits")
-list.onSelect = { indices, selections in
-    if let selection = selections.first {
-        details.text = "You selected: \(selection)"
+// Horizontal menu bar
+let menu = ListWidget(items: ["File", "Edit", "View", "Help"], title: "Menu")
+menu.orientation = .horizontal
+menu.onSelect = { _, selections in
+    if let sel = selections.first {
+        details.text = "Menu selected: \(sel)"
     }
 }
 
+// Vertical list with multiple selection
+let list = ListWidget(items: ["Apple", "Banana", "Cherry"], title: "Fruits")
+list.allowsMultipleSelection = true
+list.onSelect = { _, selections in
+    details.text = selections.isEmpty
+        ? "No fruits selected"
+        : "Selected fruits: \(selections.joined(separator: ", "))"
+}
+
 let input = TextInputWidget(prompt: "> ", title: "Command")
-// Handle submitted text (Ctrl-D)
 input.onSubmit = { text in
     details.text = "You entered: \(text)"
 }
@@ -64,6 +78,8 @@ let loop = UIEventLoop(terminal: terminal) {
         )
         .frame(height: 3)
 
+        menu.frame(height: 3)
+
         Stack(axis: .horizontal, spacing: 1) {
             list.frame(width: 20)
             details
@@ -72,7 +88,6 @@ let loop = UIEventLoop(terminal: terminal) {
         input.frame(height: 3)
     }
 }
-
 
 try loop.run()
 ```
@@ -89,7 +104,7 @@ The `TextInputWidget` supports:
 
 ## Example
 
-Run the interactive example (press 'q' or Ctrl-C to quit):
+The `TerminalUIExample` demonstrates a horizontal menu, a vertical list with multiple-selection support, a detail view, and a text input prompt. Use ↑/↓ (or ←/→ for the menu), Space to toggle selection, Enter to confirm selection(s), and Ctrl-D to submit input. Press 'q' or Ctrl-C to quit:
 
 ```sh
 swift run TerminalUIExample
