@@ -77,11 +77,17 @@ public class ListWidget: Widget {
         case .horizontal:
             var colOffset = 0
             for idx in items.indices {
-                let prefix = (idx == selectedIndex ? "▶ " : "  ")
                 let cleaned = items[idx]
                     .replacingOccurrences(of: "\n", with: "")
                     .replacingTabs()
-                let text = prefix + cleaned
+                // Build fixed-width segment so focus brackets don't shift other items
+                let segment: String
+                if idx == selectedIndex {
+                    segment = "[\(cleaned)]"
+                } else {
+                    segment = " \(cleaned) "
+                }
+                let text = (idx == 0 ? segment : " " + segment)
                 let maxChars = max(region.width - colOffset, 0)
                 for (i, character) in text.prefix(maxChars).enumerated() {
                     renderer.setCell(row: region.top,
