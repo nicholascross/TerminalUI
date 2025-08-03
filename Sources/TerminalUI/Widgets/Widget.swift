@@ -15,6 +15,9 @@ public protocol Widget {
     var isDisabled: Bool { get set }
     /// Indicates whether the widget's border should be hidden (space reserved but not drawn).
     var isBorderHidden: Bool { get set }
+    /// Optional: provide the cursor position when this widget is focused.
+    /// Returns the absolute terminal (row, col) position to move the cursor, or nil to hide cursor.
+    func cursorPosition(in contentRegion: Region) -> (row: Int, col: Int)?
 }
 
 public extension Widget {
@@ -24,4 +27,6 @@ public extension Widget {
     var isDisabled: Bool { get { false } set { } }
     /// Default hidden-border state (borders are shown by default).
     var isBorderHidden: Bool { get { false } set { } }
+    /// Default cursor position: no cursor shown.
+    func cursorPosition(in contentRegion: Region) -> (row: Int, col: Int)? { nil }
 }

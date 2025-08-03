@@ -166,6 +166,34 @@ public class TextInputWidget: Widget {
     }
 }
 
+// MARK: - Cursor support
+extension TextInputWidget {
+    /// Provide cursor position for this widget when focused.
+    public func cursorPosition(in contentRegion: Region) -> (row: Int, col: Int)? {
+        // Adjust vertical scroll to ensure cursor is visible
+        var offset = scrollOffset
+        if cursorRow < offset {
+            offset = cursorRow
+        }
+        if cursorRow >= offset + contentRegion.height {
+            offset = cursorRow - contentRegion.height + 1
+        }
+        // Compute row position
+        let visRow = cursorRow - offset
+        let row = contentRegion.top + visRow + 1
+
+        // Compute column position (account for prompt on first buffer line)
+        let fullLines = buffer.split(separator: "\n", omittingEmptySubsequences: false)
+            .map(String.init)
+        let rawLine = fullLines[cursorRow]
+        let beforeCursor = String(rawLine.prefix(cursorCol))
+        let cleaned = beforeCursor.replacingTabs()
+        let prefix = cursorRow == 0 ? prompt.count : 0
+        let col = contentRegion.left + prefix + cleaned.count + 1
+
+        return (row, col)
+    }
+}
 // MARK: - Widget conformance
 // MARK: - Widget conformance
 extension TextInputWidget {

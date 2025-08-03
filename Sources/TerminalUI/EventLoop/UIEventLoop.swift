@@ -220,7 +220,6 @@ public class UIEventLoop {
         }
     }
 
-
     private func redraw() {
         terminal.hideCursor()
         renderer.clearBuffer()
@@ -257,33 +256,12 @@ public class UIEventLoop {
         renderer.drawBorders(regions: regions, widgets: widgets)
         renderer.drawTitles(regions: regions, widgets: widgets, focusIndex: focusIndex)
         renderer.blit()
-        // Position cursor for focused multi-line text-input widget
-        if let textInputWidget = widgets[focusIndex] as? TextInputWidget {
-            let contentRegion = regions[focusIndex].inset(by: 1)
-            // Compute visible window based on scroll offset
-            var offset = textInputWidget.scrollOffset
-            if textInputWidget.cursorRow < offset {
-                offset = textInputWidget.cursorRow
-            }
-            if textInputWidget.cursorRow >= offset + contentRegion.height {
-                offset = textInputWidget.cursorRow - contentRegion.height + 1
-            }
-            // Compute row position
-            let visRow = textInputWidget.cursorRow - offset
-            let row = contentRegion.top + visRow + 1
-            // Compute column position (account for prompt on first buffer line)
-            let fullLines = textInputWidget.buffer.split(
-                separator: "\n", omittingEmptySubsequences: false
-            ).map(String.init)
-            let rawLine = fullLines[textInputWidget.cursorRow]
-            let beforeCursor = String(rawLine.prefix(textInputWidget.cursorCol))
-            let cleaned = beforeCursor.replacingTabs()
-            let prefix = textInputWidget.cursorRow == 0 ? textInputWidget.prompt.count : 0
-            let col = contentRegion.left + prefix + cleaned.count + 1
+        // Position cursor for focused widget if it provides one
+        let contentRegion = regions[focusIndex].inset(by: 1)
+        if let (row, col) = widgets[focusIndex].cursorPosition(in: contentRegion) {
             terminal.moveCursor(row: row, col: col)
             terminal.showCursor()
         }
         fflush(stdout)
     }
-
 }
