@@ -115,29 +115,29 @@ public class UIEventLoop {
     }
 
     /// Initialize the event loop with a custom layout strategy.
-/// Initialize the event loop with a custom layout strategy and injected dependencies.
-public init(
-    rows: Int,
-    columns: Int,
-    widgets: [Widget],
-    layout: LayoutNode,
-    terminal: Terminal,
-    renderer: EventLoopRenderer,
-    inputSource: InputEventSource
-) {
-    self.terminal = terminal
-    self.rows = rows
-    self.columns = columns
-    self.layout = layout
-    self.layout.update(rows: rows, cols: columns)
-    self.widgets = widgets
-    // Start focus on the first interactive widget, if any
-    focusIndex = widgets.firstIndex(where: { $0.isUserInteractive }) ?? 0
-    // Dependencies are injected to facilitate testing
-    self.renderer = renderer
-    self.inputSource = inputSource
-    // On resize, debounce bursts and update layout and renderer without reallocating
-    terminal.onResize = { [weak self] rows, columns in
+    /// Initialize the event loop with a custom layout strategy and injected dependencies.
+    public init(
+        rows: Int,
+        columns: Int,
+        widgets: [Widget],
+        layout: LayoutNode,
+        terminal: Terminal,
+        renderer: EventLoopRenderer,
+        inputSource: InputEventSource
+    ) {
+        self.terminal = terminal
+        self.rows = rows
+        self.columns = columns
+        self.layout = layout
+        self.layout.update(rows: rows, cols: columns)
+        self.widgets = widgets
+        // Start focus on the first interactive widget, if any
+        focusIndex = widgets.firstIndex(where: { $0.isUserInteractive }) ?? 0
+        // Dependencies are injected to facilitate testing
+        self.renderer = renderer
+        self.inputSource = inputSource
+        // On resize, debounce bursts and update layout and renderer without reallocating
+        terminal.onResize = { [weak self] rows, columns in
             guard let self = self else { return }
             self.resizeTask?.cancel()
             self.resizeTask = Task { @MainActor in
