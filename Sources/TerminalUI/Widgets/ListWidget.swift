@@ -90,13 +90,14 @@ public class ListWidget: Widget {
     }
 
     /// Render the list into the given buffer region.
-    public func render(into renderer: Renderer, region: Region) {
+    public func render(into renderer: EventLoopRenderer, region: Region) {
         // Clear entire region to spaces.
         for rowOffset in 0..<region.height {
             for colOffset in 0..<region.width {
                 renderer.setCell(row: region.top + rowOffset,
                                  col: region.left + colOffset,
-                                 char: " ")
+                                 char: " ",
+                                 style: [])
             }
         }
         switch orientation {

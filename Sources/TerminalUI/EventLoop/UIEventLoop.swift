@@ -5,11 +5,11 @@ import Foundation
 @MainActor
 public class UIEventLoop {
     private let terminal: Terminal
-    private let terminalInput = TerminalInput()
+    private let inputSource: InputEventSource
     private var layout: LayoutNode
     private var widgets: [Widget]
     private var focusIndex: Int = 0
-    private var renderer: Renderer
+    private let renderer: EventLoopRenderer
     private var rows: Int
     private var columns: Int
     private var running = false
@@ -101,28 +101,43 @@ public class UIEventLoop {
             fatalError("UIBuilder must produce at least one root layout node")
         }
         let (rows, columns) = terminal.getTerminalSize()
-        self.init(rows: rows, columns: columns, widgets: widgets, layout: root, terminal: terminal)
+        let renderer = Renderer(rows: rows, cols: columns, terminal: terminal)
+        let inputSource = TerminalInput()
+        self.init(
+            rows: rows,
+            columns: columns,
+            widgets: widgets,
+            layout: root,
+            terminal: terminal,
+            renderer: renderer,
+            inputSource: inputSource
+        )
     }
 
     /// Initialize the event loop with a custom layout strategy.
-    public init(
-        rows: Int,
-        columns: Int,
-        widgets: [Widget],
-        layout: LayoutNode,
-        terminal: Terminal
-    ) {
-        self.terminal = terminal
-        self.rows = rows
-        self.columns = columns
-        self.layout = layout
-        self.layout.update(rows: rows, cols: columns)
-        self.widgets = widgets
-        // Start focus on the first interactive widget, if any
-        focusIndex = widgets.firstIndex(where: { $0.isUserInteractive }) ?? 0
-        renderer = Renderer(rows: rows, cols: columns, terminal: terminal)
-        // On resize, debounce bursts and update layout and renderer without reallocating
-        terminal.onResize = { [weak self] rows, columns in
+/// Initialize the event loop with a custom layout strategy and injected dependencies.
+public init(
+    rows: Int,
+    columns: Int,
+    widgets: [Widget],
+    layout: LayoutNode,
+    terminal: Terminal,
+    renderer: EventLoopRenderer,
+    inputSource: InputEventSource
+) {
+    self.terminal = terminal
+    self.rows = rows
+    self.columns = columns
+    self.layout = layout
+    self.layout.update(rows: rows, cols: columns)
+    self.widgets = widgets
+    // Start focus on the first interactive widget, if any
+    focusIndex = widgets.firstIndex(where: { $0.isUserInteractive }) ?? 0
+    // Dependencies are injected to facilitate testing
+    self.renderer = renderer
+    self.inputSource = inputSource
+    // On resize, debounce bursts and update layout and renderer without reallocating
+    terminal.onResize = { [weak self] rows, columns in
             guard let self = self else { return }
             self.resizeTask?.cancel()
             self.resizeTask = Task { @MainActor in
@@ -154,8 +169,8 @@ public class UIEventLoop {
         // Drive periodic ticks asynchronously
         startTicks()
 
-        // Read input events asynchronously
-        for try await event in terminalInput.events() {
+        // Read input events asynchronously from injected source
+        for try await event in inputSource.events() {
             handle(event: event)
             if !running { break }
         }
@@ -416,7 +431,10 @@ public class UIEventLoop {
                 let startCol = region.left + 1
                 let row = region.top
                 for (offset, char) in textToDraw.enumerated() {
-                    renderer.setCell(row: row, col: startCol + offset, char: char)
+                    renderer.setCell(row: row,
+                                     col: startCol + offset,
+                                     char: char,
+                                     style: [])
                 }
             }
         }

@@ -137,3 +137,7 @@ public class Renderer {
         lastBuffer = buffer
     }
 }
+
+// MARK: - EventLoopRenderer conformance
+
+extension Renderer: EventLoopRenderer {}

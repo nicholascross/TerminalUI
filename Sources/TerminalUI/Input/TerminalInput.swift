@@ -62,3 +62,7 @@ public final class TerminalInput {
     }
 
 }
+
+// MARK: - InputEventSource conformance
+
+extension TerminalInput: InputEventSource {}

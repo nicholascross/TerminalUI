@@ -64,14 +64,17 @@ public class TextAreaWidget: Widget {
     }
 
     /// Render the text area into the given region, showing visible lines.
-    public func render(into renderer: Renderer, region: Region) {
+    public func render(into renderer: EventLoopRenderer, region: Region) {
         // Clamp scroll offset to valid range
         let maxOffset = max(0, lines.count - region.height)
         scrollOffset = min(scrollOffset, maxOffset)
         // Clear region to spaces
         for rowOffset in 0..<region.height {
             for colOffset in 0..<region.width {
-                renderer.setCell(row: region.top + rowOffset, col: region.left + colOffset, char: " ")
+                renderer.setCell(row: region.top + rowOffset,
+                                 col: region.left + colOffset,
+                                 char: " ",
+                                 style: [])
             }
         }
         // Draw visible lines
@@ -79,7 +82,10 @@ public class TextAreaWidget: Widget {
         for (lineIndex, line) in lines[scrollOffset..<endLine].enumerated() {
             let cleaned = line.replacingTabs()
             for (charIndex, char) in cleaned.prefix(region.width).enumerated() {
-                renderer.setCell(row: region.top + lineIndex, col: region.left + charIndex, char: char)
+                renderer.setCell(row: region.top + lineIndex,
+                                 col: region.left + charIndex,
+                                 char: char,
+                                 style: [])
             }
         }
     }

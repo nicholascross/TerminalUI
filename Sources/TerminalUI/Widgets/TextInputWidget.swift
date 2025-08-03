@@ -133,7 +133,7 @@ public class TextInputWidget: Widget {
     }
 
     /// Render the input prompt and buffer into the given region, scrolling to cursor.
-    public func render(into renderer: Renderer, region: Region) {
+    public func render(into renderer: EventLoopRenderer, region: Region) {
         // Adjust vertical scroll to ensure cursor is visible
         if cursorRow < scrollOffset {
             scrollOffset = cursorRow
@@ -144,7 +144,10 @@ public class TextInputWidget: Widget {
         // Clear full region
         for rowOffset in 0..<region.height {
             for colOffset in 0..<region.width {
-                renderer.setCell(row: region.top + rowOffset, col: region.left + colOffset, char: " ")
+                renderer.setCell(row: region.top + rowOffset,
+                                 col: region.left + colOffset,
+                                 char: " ",
+                                 style: [])
             }
         }
         // Draw visible lines (prefix prompt on first buffer line)
@@ -154,7 +157,10 @@ public class TextInputWidget: Widget {
             let cleaned = line.replacingTabs()
             let text = (globalIndex == 0 ? prompt + cleaned : cleaned)
             for (charIndex, char) in text.prefix(region.width).enumerated() {
-                renderer.setCell(row: region.top + visIndex, col: region.left + charIndex, char: char)
+                renderer.setCell(row: region.top + visIndex,
+                                 col: region.left + charIndex,
+                                 char: char,
+                                 style: [])
             }
         }
     }

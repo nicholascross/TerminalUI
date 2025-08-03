@@ -23,20 +23,21 @@ public final class SpinnerWidget: Widget {
         self.title = title
     }
 
-    public func render(into renderer: Renderer, region: Region) {
+    public func render(into renderer: EventLoopRenderer, region: Region) {
         // Clear region
         for r in 0..<region.height {
             for c in 0..<region.width {
                 renderer.setCell(row: region.top + r,
                                  col: region.left + c,
-                                 char: " ")
+                                 char: " ",
+                                 style: [])
             }
         }
         // Draw current frame centered
         let ch = frames[frameIndex]
         let col = region.left + region.width / 2
         let row = region.top + region.height / 2
-        renderer.setCell(row: row, col: col, char: ch)
+        renderer.setCell(row: row, col: col, char: ch, style: [])
     }
 
     @discardableResult

@@ -7,7 +7,7 @@ public protocol Widget {
     /// Indicates whether the widget is user interactive (focusable and handles input events).
     var isUserInteractive: Bool { get }
     /// Renders the widget into the given region.
-    func render(into renderer: Renderer, region: Region)
+    func render(into renderer: EventLoopRenderer, region: Region)
 
     /// Handles an input event. Returns true if the event produced an actionable result.
     func handle(event: InputEvent) -> Bool
