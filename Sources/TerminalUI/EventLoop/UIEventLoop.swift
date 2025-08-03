@@ -24,10 +24,13 @@ public class UIEventLoop {
     private func invalidate() {
         guard !drawScheduled else { return }
         drawScheduled = true
-        Task { @MainActor [weak self] in
+
+        Task.detached { [weak self] in
             guard let self = self else { return }
-            self.drawScheduled = false
-            self.redraw()
+            // Debounce redraw to coalesce multiple invalidate calls
+            try? await Task.sleep(nanoseconds: 16_000_000)
+            // redraw will reset drawScheduled
+            await self.redraw()
         }
     }
 
@@ -136,13 +139,11 @@ public class UIEventLoop {
         // Dependencies are injected to facilitate testing
         self.renderer = renderer
         self.inputSource = inputSource
-        // On resize, debounce bursts and update layout and renderer without reallocating
+
         terminal.onResize = { [weak self] rows, columns in
             guard let self = self else { return }
             self.resizeTask?.cancel()
             self.resizeTask = Task { @MainActor in
-                try? await Task.sleep(nanoseconds: 33_000_000)
-                guard !Task.isCancelled else { return }
                 self.rows = rows
                 self.columns = columns
                 self.layout.update(rows: rows, cols: columns)
@@ -221,6 +222,7 @@ public class UIEventLoop {
     }
 
     private func redraw() {
+        drawScheduled = false
         terminal.hideCursor()
         renderer.clearBuffer()
         let container = Region(top: 0, left: 0, width: columns, height: rows)
