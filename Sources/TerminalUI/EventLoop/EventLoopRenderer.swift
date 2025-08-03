@@ -11,9 +11,3 @@ public protocol EventLoopRenderer: AnyObject {
     /// Resize the renderer's buffer to the given dimensions.
     func resize(rows: Int, cols: Int)
 }
-
-/// Protocol defining an asynchronous source of input events for UIEventLoop.
-public protocol InputEventSource {
-    /// Async sequence of InputEvent values, ending on EOF or error.
-    func events() -> AsyncThrowingStream<InputEvent, Error>
-}
