@@ -10,4 +10,9 @@ public protocol EventLoopRenderer: AnyObject {
     func blit()
     /// Resize the renderer's buffer to the given dimensions.
     func resize(rows: Int, cols: Int)
+
+    /// Draw borders around widget regions, handling disabled and hidden borders and intersections.
+    func drawBorders(regions: [Region], widgets: [Widget])
+    /// Draw titles over the top border of each widget region, indicating focus and interactivity.
+    func drawTitles(regions: [Region], widgets: [Widget], focusIndex: Int)
 }

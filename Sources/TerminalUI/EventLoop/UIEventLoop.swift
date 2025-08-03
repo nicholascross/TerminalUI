@@ -220,20 +220,6 @@ public class UIEventLoop {
         }
     }
 
-    /// A hashable key for accumulating border-edge masks.
-    private struct MaskKey: Hashable {
-        let row: Int
-        let col: Int
-    }
-
-    // OptionSet representing border-edge masks for box-drawing.
-    private struct BorderMask: OptionSet {
-        let rawValue: Int
-        static let north = BorderMask(rawValue: 1)
-        static let south = BorderMask(rawValue: 2)
-        static let west = BorderMask(rawValue: 4)
-        static let east = BorderMask(rawValue: 8)
-    }
 
     private func redraw() {
         terminal.hideCursor()
@@ -268,8 +254,8 @@ public class UIEventLoop {
             let contentRegion = region.inset(by: 1)
             widget.render(into: renderer, region: contentRegion)
         }
-        renderBorders(regions: regions)
-        renderTitles(regions: regions)
+        renderer.drawBorders(regions: regions, widgets: widgets)
+        renderer.drawTitles(regions: regions, widgets: widgets, focusIndex: focusIndex)
         renderer.blit()
         // Position cursor for focused multi-line text-input widget
         if let textInputWidget = widgets[focusIndex] as? TextInputWidget {
@@ -300,143 +286,4 @@ public class UIEventLoop {
         fflush(stdout)
     }
 
-    /// Renders borders around widget regions with correct box-drawing characters.
-    private func renderBorders(regions: [Region]) {
-        let (masks, disabledKeys) = buildBorderMasks(for: regions)
-        drawBorders(from: masks, disabledKeys: disabledKeys)
-    }
-
-    private func buildBorderMasks(for regions: [Region]) -> ([MaskKey: BorderMask], Set<MaskKey>) {
-        var masks = [MaskKey: BorderMask]()
-        var disabledKeys = Set<MaskKey>()
-        for (index, region) in regions.enumerated() {
-            let disabled = widgets[index].isDisabled
-            let hidden = widgets[index].isBorderHidden
-            if hidden { continue }
-            if region.width == 1, region.height > 1 {
-                markVerticalDivider(
-                    region,
-                    disabled: disabled,
-                    in: &masks,
-                    disabledKeys: &disabledKeys
-                )
-            } else if region.width > 1, region.height > 0 {
-                markPaneBorder(region, disabled: disabled, in: &masks, disabledKeys: &disabledKeys)
-            }
-        }
-        return (masks, disabledKeys)
-    }
-
-    private func markVerticalDivider(
-        _ region: Region,
-        disabled: Bool,
-        in masks: inout [MaskKey: BorderMask],
-        disabledKeys: inout Set<MaskKey>
-    ) {
-        for row in region.top ..< region.top + region.height {
-            let key = MaskKey(row: row, col: region.left)
-            masks[key, default: []].insert([.north, .south])
-            if disabled { disabledKeys.insert(key) }
-        }
-    }
-
-    private func markPaneBorder(
-        _ region: Region,
-        disabled: Bool,
-        in masks: inout [MaskKey: BorderMask],
-        disabledKeys: inout Set<MaskKey>
-    ) {
-        let top = region.top
-        let bottom = top + region.height - 1
-        let left = region.left
-        let right = left + region.width - 1
-
-        for col in (left + 1) ..< right {
-            let topKey = MaskKey(row: top, col: col)
-            masks[topKey, default: []].insert([.east, .west])
-            if disabled { disabledKeys.insert(topKey) }
-            let bottomKey = MaskKey(row: bottom, col: col)
-            masks[bottomKey, default: []].insert([.east, .west])
-            if disabled { disabledKeys.insert(bottomKey) }
-        }
-        for row in (top + 1) ..< bottom {
-            let leftKey = MaskKey(row: row, col: left)
-            masks[leftKey, default: []].insert([.north, .south])
-            if disabled { disabledKeys.insert(leftKey) }
-            let rightKey = MaskKey(row: row, col: right)
-            masks[rightKey, default: []].insert([.north, .south])
-            if disabled { disabledKeys.insert(rightKey) }
-        }
-        let tl = MaskKey(row: top, col: left)
-        masks[tl, default: []].insert([.south, .east]); if disabled { disabledKeys.insert(tl) }
-
-        let tr = MaskKey(row: top, col: right)
-        masks[tr, default: []].insert([.south, .west]); if disabled { disabledKeys.insert(tr) }
-
-        let bl = MaskKey(row: bottom, col: left)
-        masks[bl, default: []].insert([.north, .east]); if disabled { disabledKeys.insert(bl) }
-
-        let br = MaskKey(row: bottom, col: right)
-        masks[br, default: []].insert([.north, .west]); if disabled { disabledKeys.insert(br) }
-    }
-
-    private func drawBorders(
-        from masks: [MaskKey: BorderMask],
-        disabledKeys: Set<MaskKey>
-    ) {
-        for (key, mask) in masks {
-            let char = boxCharacter(for: mask)
-            let style: Style = disabledKeys.contains(key) ? .gray : []
-            renderer.setCell(row: key.row, col: key.col, char: char, style: style)
-        }
-    }
-
-    // swiftlint:disable:next cyclomatic_complexity
-    private func boxCharacter(for mask: BorderMask) -> Character {
-        switch mask {
-        case [.north, .south, .west, .east]: return "┼"
-        case [.south, .west, .east]: return "┬"
-        case [.north, .west, .east]: return "┴"
-        case [.north, .south, .east]: return "├"
-        case [.north, .south, .west]: return "┤"
-        case [.north, .south]: return "│"
-        case [.west, .east]: return "─"
-        case [.south, .east]: return "┌"
-        case [.south, .west]: return "┐"
-        case [.north, .east]: return "└"
-        case [.north, .west]: return "┘"
-        default:
-            return mask.isDisjoint(with: [.north, .south]) ? "─" : "│"
-        }
-    }
-
-    /// Draws widget titles over top borders, indicating focus and interactivity.
-    private func renderTitles(regions: [Region]) {
-        for index in widgets.indices {
-            let widget = widgets[index]
-            let region = regions[index]
-            let maxLen = max(0, region.width - 2)
-            var titleText: String?
-            if let title = widget.title {
-                if widget.isUserInteractive, index == focusIndex {
-                    titleText = "[\(title)]"
-                } else {
-                    titleText = " \(title) "
-                }
-            } else if widget.isUserInteractive, index == focusIndex {
-                titleText = "[*]"
-            }
-            if let text = titleText {
-                let textToDraw = String(text.prefix(maxLen))
-                let startCol = region.left + 1
-                let row = region.top
-                for (offset, char) in textToDraw.enumerated() {
-                    renderer.setCell(row: row,
-                                     col: startCol + offset,
-                                     char: char,
-                                     style: [])
-                }
-            }
-        }
-    }
 }
