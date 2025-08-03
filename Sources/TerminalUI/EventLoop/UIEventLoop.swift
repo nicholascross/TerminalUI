@@ -5,7 +5,7 @@ import Foundation
 @MainActor
 public class UIEventLoop {
     private let terminal: Terminal
-    private let input = TerminalInput()
+    private let terminalInput = TerminalInput()
     private var layout: LayoutNode
     private var widgets: [Widget]
     private var focusIndex: Int = 0
@@ -139,7 +139,6 @@ public class UIEventLoop {
     }
 
     /// Start processing input events, driving animation ticks and updating the UI.
-    /// Start processing input events, driving animation ticks and updating the UI.
     public func run() async throws {
         running = true
         try terminal.enableRawMode()
@@ -156,7 +155,7 @@ public class UIEventLoop {
         startTicks()
 
         // Read input events asynchronously
-        for try await event in input.events() {
+        for try await event in terminalInput.events() {
             handle(event: event)
             if !running { break }
         }
