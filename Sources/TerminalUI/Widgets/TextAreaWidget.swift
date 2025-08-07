@@ -10,10 +10,14 @@ public class TextAreaWidget: Widget {
     public var isDisabled: Bool = false
     /// When true, the widget's border is hidden (space reserved but not drawn).
     public var isBorderHidden: Bool
+
+    /// Whether this widget needs to be redrawn on the next render pass.
+    public var needsDisplay: Bool = true
     /// Lines of text to display in the area.
     public var lines: [String] {
         didSet {
             scrollOffset = lines.count
+            needsDisplay = true
         }
     }
     /// Current scroll offset (index of the topmost displayed line).
@@ -34,7 +38,10 @@ public class TextAreaWidget: Widget {
     /// Full text content: joined lines separated by newlines.
     public var text: String {
         get { lines.joined(separator: "\n") }
-        set { lines = newValue.split(separator: "\n", omittingEmptySubsequences: false).map(String.init) }
+        set {
+            lines = newValue.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
+            needsDisplay = true
+        }
     }
 
     /// Convenience initializer accepting a single string; splits on newlines for display.

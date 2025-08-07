@@ -18,6 +18,8 @@ public protocol Widget {
     /// Optional: provide the cursor position when this widget is focused.
     /// Returns the absolute terminal (row, col) position to move the cursor, or nil to hide cursor.
     func cursorPosition(in contentRegion: Region) -> (row: Int, col: Int)?
+    /// Flag indicating the widget needs to be redrawn (dirty).
+    var needsDisplay: Bool { get set }
 }
 
 public extension Widget {
@@ -29,4 +31,7 @@ public extension Widget {
     var isBorderHidden: Bool { get { false } set { } }
     /// Default cursor position: no cursor shown.
     func cursorPosition(in contentRegion: Region) -> (row: Int, col: Int)? { nil }
+
+    /// Default dirty flag: widgets start clean (no need to redraw).
+    var needsDisplay: Bool { get { false } set { /* no-op */ } }
 }

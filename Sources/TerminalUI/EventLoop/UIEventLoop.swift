@@ -59,7 +59,11 @@ public class UIEventLoop {
                 for widget in self.widgets {
                     if widget.handle(event: .tick(dt: delta)) { invalidated = true }
                 }
-                if invalidated {
+                if invalidated || self.widgets.contains(where: { $0.needsDisplay }) {
+                    // clear dirty flags for all widgets now that we're redrawing
+                    for idx in self.widgets.indices {
+                        self.widgets[idx].needsDisplay = false
+                    }
                     await MainActor.run { self.invalidate() }
                 }
 
