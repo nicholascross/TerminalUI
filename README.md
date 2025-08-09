@@ -86,7 +86,7 @@ let loop = UIEventLoop(terminal: terminal) {
             details
         }
 
-        input.frame(height: 3)
+        input.expanding(maxHeight: 8)
     }
 }
 

@@ -25,6 +25,8 @@ public class TextInputWidget: Widget {
 
     /// Combined buffer as a single string with newlines.
     public var buffer: String { lines.joined(separator: "\n") }
+    /// Current number of lines in the buffer.
+    public var lineCount: Int { lines.count }
 
     public init(prompt: String = "> ", title: String? = nil, isBorderHidden: Bool = false) {
         self.prompt = prompt
@@ -163,6 +165,17 @@ public class TextInputWidget: Widget {
                                  style: [])
             }
         }
+    }
+}
+// MARK: - Dynamic expanding layout support
+
+public extension TextInputWidget {
+    /// Wrap this widget to expand vertically as its content grows, up to a maximum height.
+    /// - Parameter maxHeight: The maximum height in rows.
+    /// - Returns: A layout node that dynamically sizes the widget based on its current line count.
+    func expanding(maxHeight: Int) -> DynamicSized<WidgetLeaf> {
+        let leaf = UIBuilder.buildExpression(self)
+        return DynamicSized(leaf, height: { min(self.lineCount, maxHeight) + 2 })
     }
 }
 
