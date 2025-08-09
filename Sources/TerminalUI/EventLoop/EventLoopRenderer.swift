@@ -1,6 +1,7 @@
 import Foundation
 
 /// Protocol defining rendering capabilities for UIEventLoop to manage its virtual screen buffer.
+@MainActor
 public protocol EventLoopRenderer: AnyObject {
     /// Clear the renderer's internal buffer.
     func clearBuffer()

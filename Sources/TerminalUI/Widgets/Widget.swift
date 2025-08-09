@@ -1,6 +1,7 @@
 import Foundation
 
 /// A generic UI widget that can render itself and handle events.
+@MainActor
 public protocol Widget {
     /// Optional title displayed over the top border of the widget.
     var title: String? { get set }

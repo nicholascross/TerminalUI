@@ -1,4 +1,5 @@
 /// A protocol for pluggable layout algorithms.
+@MainActor
 public protocol LayoutNode {
     /// Update internal state when container size changes (e.g., on resize).
     mutating func update(rows: Int, cols: Int)

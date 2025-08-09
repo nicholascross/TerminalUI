@@ -139,7 +139,7 @@ public class Renderer {
 }
 
 // MARK: - Border and Title Rendering
-
+@MainActor
 extension Renderer {
     private struct MaskKey: Hashable {
         let row: Int

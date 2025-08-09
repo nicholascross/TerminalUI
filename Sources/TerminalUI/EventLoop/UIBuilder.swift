@@ -3,6 +3,7 @@ import Foundation
 /// Result builder that lets you declare Widgets inline in your layout DSL.
 /// Widgets are collected in declaration order, and each is replaced by a WidgetLeaf internally.
 @resultBuilder
+@MainActor
 public enum UIBuilder {
     private static var widgets: [Widget] = []
 
