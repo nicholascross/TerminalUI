@@ -192,7 +192,7 @@ public class UIEventLoop {
             inPaste = false
             invalidate()
 
-        case .char("q") where !inPaste, .ctrlC:
+        case .ctrlC:
             running = false
 
         case .tab:

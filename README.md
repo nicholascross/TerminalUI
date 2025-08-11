@@ -38,7 +38,7 @@ defer {
 }
 
 // Build an interactive UI with a horizontal menu, a list, detail view, and text input
-// Press Ctrl-D to submit input, or 'q'/Ctrl-C to quit
+// Press Ctrl-D to submit input, or Ctrl-C to quit
 let details = TextAreaWidget(
     text: """
         Select an item from the list on the left.
@@ -105,7 +105,7 @@ The `TextInputWidget` supports:
 
 ## Example
 
-The `TerminalUIExample` demonstrates a horizontal menu, a vertical list with multiple-selection support, a detail view, and a text input prompt. Use ↑/↓ (or ←/→ for the menu), Space to toggle selection, Enter to confirm selection(s), and Ctrl-D to submit input. Press 'q' or Ctrl-C to quit:
+The `TerminalUIExample` demonstrates a horizontal menu, a vertical list with multiple-selection support, a detail view, and a text input prompt. Use ↑/↓ (or ←/→ for the menu), Space to toggle selection, Enter to confirm selection(s), and Ctrl-D to submit input. Press Ctrl-C to quit:
 
 ```sh
 swift run TerminalUIExample
