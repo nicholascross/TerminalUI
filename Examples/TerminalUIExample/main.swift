@@ -19,7 +19,7 @@ struct TerminalUIExample {
                 """,
             title: "Details"
         )
-        details.isDisabled = true
+        details.isDisabled = false
 
         // Horizontal menu bar
         let menu = ListWidget(items: ["File", "Edit", "View", "Help"], title: "Menu")

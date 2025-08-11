@@ -10,6 +10,8 @@ public class TextAreaWidget: Widget {
     public var isDisabled: Bool = false
     /// When true, the widget's border is hidden (space reserved but not drawn).
     public var isBorderHidden: Bool
+    /// When true, lines that exceed the available width will wrap onto subsequent rows. Defaults to true.
+    public var wrapText: Bool
 
     /// Whether this widget needs to be redrawn on the next render pass.
     public var needsDisplay: Bool = true
@@ -27,12 +29,14 @@ public class TextAreaWidget: Widget {
         lines: [String],
         title: String? = nil,
         isUserInteractive: Bool = true,
-        isBorderHidden: Bool = false
+        isBorderHidden: Bool = false,
+        wrapText: Bool = true
     ) {
         self.lines = lines
         self.title = title
         self.isUserInteractive = isUserInteractive
         self.isBorderHidden = isBorderHidden
+        self.wrapText = wrapText
     }
 
     /// Full text content: joined lines separated by newlines.
@@ -49,10 +53,15 @@ public class TextAreaWidget: Widget {
         text: String,
         title: String? = nil,
         isUserInteractive: Bool = true,
-        isBorderHidden: Bool = false
+        isBorderHidden: Bool = false,
+        wrapText: Bool = true
     ) {
         let lines = text.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
-        self.init(lines: lines, title: title, isUserInteractive: isUserInteractive, isBorderHidden: isBorderHidden)
+        self.init(lines: lines,
+                  title: title,
+                  isUserInteractive: isUserInteractive,
+                  isBorderHidden: isBorderHidden,
+                  wrapText: wrapText)
     }
 
     /// Handle scrolling events (up/down arrows). Returns true if event consumed.
@@ -72,9 +81,6 @@ public class TextAreaWidget: Widget {
 
     /// Render the text area into the given region, showing visible lines.
     public func render(into renderer: EventLoopRenderer, region: Region) {
-        // Clamp scroll offset to valid range
-        let maxOffset = max(0, lines.count - region.height)
-        scrollOffset = min(scrollOffset, maxOffset)
         // Clear region to spaces
         for rowOffset in 0..<region.height {
             for colOffset in 0..<region.width {
@@ -84,13 +90,30 @@ public class TextAreaWidget: Widget {
                                  style: [])
             }
         }
-        // Draw visible lines
-        let endLine = min(scrollOffset + region.height, lines.count)
-        for (lineIndex, line) in lines[scrollOffset..<endLine].enumerated() {
-            let cleaned = line.replacingTabs()
-            for (charIndex, char) in cleaned.prefix(region.width).enumerated() {
-                renderer.setCell(row: region.top + lineIndex,
-                                 col: region.left + charIndex,
+        // Build all display lines (with wrapping or truncation)
+        var fullDisplayLines: [String] = []
+        for original in lines {
+            let cleaned = original.replacingTabs()
+            if wrapText {
+                var start = cleaned.startIndex
+                while start < cleaned.endIndex {
+                    let end = cleaned.index(start, offsetBy: region.width, limitedBy: cleaned.endIndex) ?? cleaned.endIndex
+                    fullDisplayLines.append(String(cleaned[start..<end]))
+                    start = end
+                }
+            } else {
+                fullDisplayLines.append(String(cleaned.prefix(region.width)))
+            }
+        }
+        // Clamp scroll offset to valid range based on wrapped lines count
+        let maxOffset = max(0, fullDisplayLines.count - region.height)
+        scrollOffset = min(max(scrollOffset, 0), maxOffset)
+        // Draw visible slice
+        let endLine = min(scrollOffset + region.height, fullDisplayLines.count)
+        for (rowOffset, line) in fullDisplayLines[scrollOffset..<endLine].enumerated() {
+            for (colOffset, char) in line.enumerated() {
+                renderer.setCell(row: region.top + rowOffset,
+                                 col: region.left + colOffset,
                                  char: char,
                                  style: [])
             }

@@ -5,6 +5,7 @@ import Testing
 @Suite("TextInputWidget")
 struct TextInputWidgetTests {
     /// Feed a sequence of input events to a fresh TextInputWidget.
+    @MainActor
     private func feed(_ events: [InputEvent]) -> TextInputWidget {
         let widget = TextInputWidget(prompt: "", title: nil)
         for event in events {
@@ -15,6 +16,7 @@ struct TextInputWidgetTests {
     }
 
     @Test
+    @MainActor
     func multilinePasteSplitsLines() {
         let pasteText = "first line\nsecond line\nthird"
         var events: [InputEvent] = [.pasteStart]

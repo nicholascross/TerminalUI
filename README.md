@@ -12,7 +12,7 @@ Minimal terminal UI toolkit in Swift.
 - Rendering: cell buffer, borders, styles
 - Widgets:
   - **ListWidget**: vertical or horizontal list of selectable items with single- or multi-selection support. Configure `orientation` (.vertical/.horizontal), toggle items with Space when `allowsMultipleSelection` is enabled, and confirm selection(s) with Enter. Highlights the current item (▶ or brackets) and underlines selected items. Use the `onSelect` callback to receive selected indices and values.
-  - **TextAreaWidget**: read-only or interactive multi-line text area with scrolling (↑/↓) and optional title. Ideal for displaying details or logs.
+  - **TextAreaWidget**: read-only or interactive multi-line text area with vertical scrolling (↑/↓), optional wrapping of overflowing lines (default: enabled), and optional title. Ideal for displaying details or logs.
   - **TextInputWidget**: single-line or multi-line input prompt with editing (insertion, deletion), arrow-key navigation (←/→/↑/↓), bracketed-paste support, and submit on Ctrl-D via the `onSubmit` callback.
 - Ability to disable widgets via `isDisabled` property (widgets remain focusable but ignore events; border styling can indicate disabled state)
 - Ability to hide widget borders via `isBorderHidden` property (widgets remain focusable and layout unchanged; border space reserved but not drawn)
