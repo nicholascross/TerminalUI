@@ -1,0 +1,8 @@
+--swift-version 6.3
+--indent 4
+--max-width 150
+--wrap-parameters before-first
+--wrap-return-type never
+--binary-grouping none
+--decimal-grouping none
+--octal-grouping none
