@@ -11,12 +11,19 @@ TerminalUI uses separate SwiftPM targets to enforce dependency direction. The `T
 | `TerminalUIRuntime` | Application host, escape deadlines, frame transmission and native terminal session lifecycle. | Core, Input, Rendering, CTerminalSupport |
 | `TerminalUI` | Consumer facade with explicit aliases for the existing public names. | Core, Input, Rendering, Runtime |
 | `TerminalUILayout` | Optional builder API, component factories and negotiated stack strategies. | TerminalUI, Core |
+| `TerminalUIComponentRuntime` | Mounted identities, typed slots, dependencies, scoped callbacks and the update driver. | Core |
+| `TerminalUIComponents` | Optional struct views, state/bindings, bound controls, repetition and presentation adapter. | Layout composition, ComponentRuntime, ComponentMacros |
+| `TerminalUIComponentMacros` / `TerminalUIComponentMacroSupport` | Compiler plugin entry point and testable property-registration expansion. | SwiftSyntax, compiler plugin support |
 | `TerminalUIChroma` | Optional Chroma-to-semantic-text adapter. | TerminalUI, Chroma |
 
 The manifest lists all direct dependencies explicitly. No implementation target imports the facade, and the core does not depend on any implementation target. The existing `TerminalUI` and `TerminalUIChroma` library products are retained; the implementation targets are not additional published products. The optional `TerminalUILayout` product adds negotiated composition; its implementation is separate from the internal `TerminalUILayoutEngine` target.
 
 ```mermaid
 flowchart TD
+    Components[TerminalUIComponents] --> Composition
+    Components --> ComponentRuntime
+    Components --> Macros[Component macros]
+    ComponentRuntime --> Core
     Composition[TerminalUILayout composition] --> Facade[TerminalUI facade]
     Composition --> Core
     Facade --> Runtime
@@ -72,4 +79,8 @@ The [module migration review](Module-Migration-Review.md) records the nominal ty
 
 Negotiated layout uses a Core-owned `ElementLayout` container contract. The optional composition module supplies strategies; the renderer measures and places ordinary element children through that contract, preserving their focus, pointer, modal and retained-scroll behavior. Existing array-based stacks keep their original allocator. See [negotiated layout](Negotiated-Layout.md) for the public API and sizing semantics.
 
-The [component and state architecture migration plan](Specs/TerminalUI/Component-State-Architecture-Plan.md) describes the proposed next layer: struct components, persistent identity-based state, bindings, scheduled transactions and selective component rebuilding. It is a future implementation plan; the architecture above describes the current implementation.
+The optional component layer is implemented. Core owns the presentation source and opaque descriptor/boundary contracts; the host consumes those contracts without depending on `TerminalUIComponents`. Resolved boundaries are transparent to focus, mouse, modal discovery, measurement and painting. Layout nodes match keyed boundaries by generation identity and skip unchanged subtree revisions.
+
+`TerminalUIComponentRuntime` owns mount-local state and state-read subscriptions separately from `WidgetStateStore`. It updates cached output paths after child-only changes, replaces callbacks with fresh body captures, and schedules coalesced main-actor wakeups. A dedicated application-update pipe is observed by Linux polling and the Darwin select helper. Input consistency barriers precede subsequent dispatch; terminal output receives immutable snapshots. Teardown joins the input read before closing descriptors.
+
+See [components and mounted state](Components.md) for the public API, mixed migration, scoped focus, transactions, the LayoutDemo view model and validation. The [architecture migration plan](Specs/TerminalUI/Component-State-Architecture-Plan.md) records the design and delivery criteria.

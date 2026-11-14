@@ -6,8 +6,11 @@ public struct Element {
         case list(String, [ListRow], String?), table(String, [TableColumn], [TableRow], String?, Bool), dialog(String, String, Element), overlay(Element, Element)
         case scroll(String, Element), custom(any CustomWidget), spacer, divider
         case layout(any ElementLayout, [Element])
+        case component(any ComponentDescriptor), boundary(ComponentBoundary, Element)
     }
-    package let kind: Kind
+    package var kind: Kind
+    package var actionHandlers: [@MainActor (UIAction) -> Bool] = []
+    package var behaviors: [ElementBehavior] = []
     package var widthRule: LayoutSize = .content
     package var heightRule: LayoutSize = .content
     package var insets = Insets()

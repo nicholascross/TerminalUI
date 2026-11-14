@@ -17,6 +17,8 @@ final class FrameRenderer {
     private let measurement: LayoutMeasurer
     private let allocation: LayoutAllocator
     private let painters: BuiltInPainters
+    private let statistics = RenderingStatistics()
+    var renderingMetrics: RenderingMetrics { statistics.metrics }
     private var layoutRoot: LayoutNode?
     private var retainedFrame: CellGrid?
     private var pendingScrollID: String?
@@ -82,12 +84,13 @@ final class FrameRenderer {
         if let layoutRoot {
             layoutRoot.update(element)
         } else {
-            layoutRoot = LayoutNode(element)
+            layoutRoot = LayoutNode(element, statistics: statistics)
         }
     }
 
     /// Paints without reconciling elements or invalidating measurements.
     func renderGrid(width: Int, height: Int, environment: RenderEnvironment) -> CellGrid {
+        statistics.metrics.frames += 1
         invalidateGeometry()
         let theme = environment.theme
         focusedBounds = nil
@@ -140,6 +143,7 @@ final class FrameRenderer {
         let element = node.element
         node.mouse = nil
         guard element.isVisible, width > 0, height > 0 else { return }
+        statistics.metrics.paints += 1
         if remainingPath == nil, element.styleOverride.background != nil {
             canvas.fill(x: originX, y: originY, width: width, height: height,
                         style: inherited.merging(element.styleOverride).applying(to: theme.normal))
@@ -184,6 +188,10 @@ final class FrameRenderer {
             context.write(text, row: row, column: col, style: style, canvas: &canvas)
         }
         switch element.kind {
+        case .component: preconditionFailure("Resolve components with ComponentApplication before rendering")
+        case .boundary:
+            paint(node.children[0], x: originX, y: originY, width: contentWidth, height: contentHeight,
+                  canvas: &canvas, environment: environment, inherited: descendants, enabled: active, repaintPath: remainingPath)
         case let .text(text):
             let line = String(text.prefix(100000).prefix { $0 != "\n" && $0 != "\r" && $0 != "\r\n" })
             let truncated = metrics.truncate(line, width: contentWidth)
@@ -276,7 +284,7 @@ final class FrameRenderer {
                 }
             }
         case .custom:
-            painters.custom.draw(context: context, canvas: &canvas)
+            UIEvaluationPhase.perform("painting") { painters.custom.draw(context: context, canvas: &canvas) }
         case .divider: write(String(repeating: theme.borders.horizontal, count: contentWidth), 0, style: resolved(.border))
         case .spacer: break
         case let .panel(title, _), let .dialog(_, title, _):

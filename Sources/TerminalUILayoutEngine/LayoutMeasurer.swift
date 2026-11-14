@@ -12,6 +12,7 @@ package struct LayoutMeasurer {
 
     package func measure(_ node: LayoutNode, width: Int, theme: Theme) -> (Int, Int) {
         if let cached = node.measurement(at: width) { return (cached.width, cached.height) }
+        node.statistics.metrics.measurements += 1
         let element = node.element
         guard element.isVisible else { return (0, 0) }
         let available = max(1, width - min(width, element.insets.leading + element.insets.trailing))
@@ -38,9 +39,10 @@ package struct LayoutMeasurer {
                         max(1, min(4096, heights.reduce(0, +) + max(0, rows.count - 1) * element.listRowSpacing)))
         case let .table(_, _, rows, _, bordered):
             measured = (available, min(4096, rows.count + (bordered ? 4 : 1)))
-        case .scroll: measured = measure(node.children[0], width: available, theme: theme)
+        case .component: preconditionFailure("Resolve components with ComponentApplication before rendering")
+        case .boundary, .scroll: measured = measure(node.children[0], width: available, theme: theme)
         case let .custom(widget):
-            let size = widget.measure(context: WidgetMeasureContext(width: available, theme: theme))
+            let size = UIEvaluationPhase.perform("measurement") { widget.measure(context: WidgetMeasureContext(width: available, theme: theme)) }
             measured = (size.width, size.height)
         case let .layout(strategy, _):
             let size = strategy.sizeThatFits(LayoutProposal(width: available), subviews: subviews(of: node, theme: theme))

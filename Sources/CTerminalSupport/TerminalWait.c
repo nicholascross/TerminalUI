@@ -12,7 +12,11 @@ static int valid_descriptor(int descriptor) {
 }
 
 int tui_wait_readable(int terminal, int signals, int timeout_ms) {
-    if (!valid_descriptor(terminal) || !valid_descriptor(signals) || timeout_ms < 0) {
+    return tui_wait_readable_updates(terminal, signals, -1, timeout_ms);
+}
+
+int tui_wait_readable_updates(int terminal, int signals, int updates, int timeout_ms) {
+    if (!valid_descriptor(terminal) || !valid_descriptor(signals) || (updates != -1 && !valid_descriptor(updates)) || timeout_ms < 0) {
         errno = EINVAL;
         return -1;
     }
@@ -20,11 +24,13 @@ int tui_wait_readable(int terminal, int signals, int timeout_ms) {
     FD_ZERO(&readable);
     FD_SET(terminal, &readable);
     FD_SET(signals, &readable);
+    if (updates >= 0) FD_SET(updates, &readable);
     struct timeval timeout = {timeout_ms / 1000, (timeout_ms % 1000) * 1000};
     int maximum = terminal > signals ? terminal : signals;
+    if (updates > maximum) maximum = updates;
     int result = select(maximum + 1, &readable, NULL, NULL, &timeout);
     if (result <= 0) return result;
-    return (FD_ISSET(terminal, &readable) ? 1 : 0) | (FD_ISSET(signals, &readable) ? 2 : 0);
+    return (FD_ISSET(terminal, &readable) ? 1 : 0) | (FD_ISSET(signals, &readable) ? 2 : 0) | (updates >= 0 && FD_ISSET(updates, &readable) ? 4 : 0);
 }
 
 int tui_wait_writable(int terminal, int timeout_ms) {

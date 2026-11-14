@@ -1,6 +1,7 @@
 // swift-tools-version: 6.3
 
 import PackageDescription
+import CompilerPluginSupport
 
 let package = Package(
     name: "TerminalUI",
@@ -11,12 +12,14 @@ let package = Package(
     products: [
         .library(name: "TerminalUI", targets: ["TerminalUI"]),
         .library(name: "TerminalUILayout", targets: ["TerminalUILayout"]),
+        .library(name: "TerminalUIComponents", targets: ["TerminalUIComponents"]),
         .library(name: "TerminalUIChroma", targets: ["TerminalUIChroma"]),
         .executable(name: "RepositoryDemo", targets: ["RepositoryDemo"]),
         .executable(name: "LayoutDemo", targets: ["LayoutDemo"]),
     ],
     dependencies: [
         .package(url: "https://github.com/onevcat/Chroma.git", from: "0.3.1"),
+        .package(url: "https://github.com/swiftlang/swift-syntax.git", exact: "603.0.0"),
     ],
     targets: [
         .target(name: "CTerminalSupport", publicHeadersPath: "include"),
@@ -29,12 +32,28 @@ let package = Package(
         .target(name: "TerminalUIRuntime", dependencies: ["TerminalUICore", "TerminalUIInput", "TerminalUIRendering", "CTerminalSupport"]),
         .target(name: "TerminalUI", dependencies: ["TerminalUICore", "TerminalUIInput", "TerminalUIRendering", "TerminalUIRuntime"]),
         .target(name: "TerminalUILayout", dependencies: ["TerminalUI", "TerminalUICore"]),
+        .target(name: "TerminalUIComponentRuntime", dependencies: ["TerminalUICore"]),
+        .target(name: "TerminalUIComponentMacroSupport", dependencies: [
+            .product(name: "SwiftSyntaxMacros", package: "swift-syntax"),
+            .product(name: "SwiftDiagnostics", package: "swift-syntax"),
+            .product(name: "SwiftSyntaxBuilder", package: "swift-syntax"),
+        ]),
+        .macro(name: "TerminalUIComponentMacros", dependencies: [
+            "TerminalUIComponentMacroSupport",
+            .product(name: "SwiftSyntaxMacros", package: "swift-syntax"),
+            .product(name: "SwiftCompilerPlugin", package: "swift-syntax"),
+        ]),
+        .target(name: "TerminalUIComponents", dependencies: ["TerminalUILayout", "TerminalUIComponentRuntime", "TerminalUIComponentMacros"]),
         .target(name: "TerminalUIChroma", dependencies: ["TerminalUI", .product(name: "Chroma", package: "Chroma")]),
         .executableTarget(name: "RepositoryDemo", dependencies: ["TerminalUI", "TerminalUIChroma"], path: "Examples/RepositoryDemo"),
-        .executableTarget(name: "LayoutDemo", dependencies: ["TerminalUILayout"], path: "Examples/LayoutDemo"),
+        .target(name: "LayoutDemoSupport", dependencies: ["TerminalUIComponents"], path: "Examples/LayoutDemo"),
+        .executableTarget(name: "LayoutDemo", dependencies: ["LayoutDemoSupport"], path: "Examples/LayoutDemoRunner"),
+        .testTarget(name: "TerminalUIComponentRuntimeTests", dependencies: ["TerminalUIComponentRuntime"]),
+        .testTarget(name: "TerminalUIComponentsTests", dependencies: ["TerminalUIComponents", "TerminalUIRuntime", "TerminalUILayoutEngine"]),
+        .testTarget(name: "TerminalUIComponentMacrosTests", dependencies: ["TerminalUIComponentMacroSupport", .product(name: "SwiftSyntaxMacrosTestSupport", package: "swift-syntax")]),
         .testTarget(name: "TerminalUILayoutTests", dependencies: ["TerminalUILayout"]),
-        .testTarget(name: "LayoutDemoTests", dependencies: ["LayoutDemo", "TerminalUILayout"]),
-        .testTarget(name: "RepositoryDemoTests", dependencies: ["RepositoryDemo"]),
+        .testTarget(name: "LayoutDemoTests", dependencies: ["LayoutDemoSupport", "TerminalUIComponents"]),
+        .testTarget(name: "RepositoryDemoTests", dependencies: ["RepositoryDemo", "TerminalUI"]),
         .testTarget(
             name: "TerminalUITests",
             dependencies: [

@@ -57,3 +57,11 @@ public typealias TerminalApplication = TerminalUIRuntime.TerminalApplication
 public typealias TerminalConfiguration = TerminalUIRuntime.TerminalConfiguration
 public typealias TerminalError = TerminalUIRuntime.TerminalError
 public typealias TerminalHost = TerminalUIRuntime.TerminalHost
+
+// Presentation contracts also support optional component sources without importing that product.
+public typealias TerminalPresentationSource = TerminalUICore.TerminalPresentationSource
+public typealias PresentationServices = TerminalUICore.PresentationServices
+public typealias ScopedFocusTarget = TerminalUICore.ScopedFocusTarget
+public typealias LegacyApplicationPresentation = TerminalUIRuntime.LegacyApplicationPresentation
+
+public typealias RenderingMetrics = TerminalUICore.RenderingMetrics

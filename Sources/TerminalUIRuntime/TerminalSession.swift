@@ -73,9 +73,9 @@ final class TerminalSession: @unchecked Sendable {
         return TerminalSize(columns: Int(value.ws_col), rows: Int(value.ws_row))
     }
 
-    func readInput(timeout: Int32) throws -> Input {
+    func readInput(timeout: Int32, updateDescriptor: Int32 = -1) throws -> Input {
         #if canImport(Darwin)
-            let result = tui_wait_readable(descriptor, signalDescriptor, timeout)
+            let result = tui_wait_readable_updates(descriptor, signalDescriptor, updateDescriptor, timeout)
             if result < 0 {
                 if errno == EINTR { return Input() }
                 throw TerminalError.systemCall("select", errno)
@@ -84,7 +84,8 @@ final class TerminalSession: @unchecked Sendable {
             let signalReady = result & 2 != 0
         #else
             var descriptors = [pollfd(fd: descriptor, events: Int16(POLLIN), revents: 0),
-                               pollfd(fd: signalDescriptor, events: Int16(POLLIN), revents: 0)]
+                               pollfd(fd: signalDescriptor, events: Int16(POLLIN), revents: 0),
+                               pollfd(fd: updateDescriptor, events: Int16(POLLIN), revents: 0)]
             let result = poll(&descriptors, nfds_t(descriptors.count), timeout)
             if result < 0 {
                 if errno == EINTR { return Input() }

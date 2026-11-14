@@ -13,6 +13,7 @@ package extension LayoutMeasurer {
 
     func measure(_ node: LayoutNode, proposal: LayoutProposal, theme: Theme) -> WidgetSize {
         if let cached = node.measurement(for: proposal) { return cached }
+        node.statistics.metrics.measurements += 1
         let element = node.element
         guard element.isVisible else { return WidgetSize(width: 0, height: 0) }
         let widthPreference = preference(of: node, vertical: false, theme: theme)
@@ -29,6 +30,9 @@ package extension LayoutMeasurer {
         case let .layout(strategy, _):
             size = strategy.sizeThatFits(inner, subviews: subviews(of: node, theme: theme))
             size = WidgetSize(width: size.width + horizontal, height: size.height + vertical)
+        case .boundary:
+            let child = measure(node.children[0], proposal: inner, theme: theme)
+            size = WidgetSize(width: child.width + horizontal, height: child.height + vertical)
         case .panel, .dialog:
             let child = measure(node.children[0], proposal: LayoutProposal(
                 width: inner.width.map { max(0, $0 - 2) }, height: inner.height.map { max(0, $0 - 2) }), theme: theme)
@@ -93,6 +97,7 @@ package extension LayoutMeasurer {
             }
         }
         switch element.kind {
+        case .boundary: return preference(of: node.children[0], vertical: vertical, theme: theme)
         case .scroll, .list, .table, .spacer: return .flexible()
         case .field: return vertical ? .content : .flexible()
         case .panel, .dialog:

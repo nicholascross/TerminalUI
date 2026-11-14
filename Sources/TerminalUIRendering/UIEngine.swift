@@ -5,6 +5,8 @@ import TerminalUIText
 
 /// Deterministic, terminal-independent rendering and interaction state.
 public final class UIEngine {
+    public var metrics: RenderingMetrics { renderer.renderingMetrics }
+
     public var focusedID: String? {
         focusManager.focusedID
     }

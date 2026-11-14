@@ -1,6 +1,6 @@
 # Component and state architecture migration
 
-Status: implementation plan. This document specifies the next architecture; the APIs below are proposed, not implemented. The existing negotiated layout module remains the foundation.
+Status: implemented (2026-11-15). The existing negotiated layout module remains the foundation. The sections below retain the design and acceptance criteria; see [Components.md](../../Components.md) for the delivered API and validation commands. The implementation includes the optional product, macro-generated private-state registration, scoped bindings/callbacks, scheduled transactions and update wakeups, dependency-driven resolution, retained boundaries, and the cleaned-up LayoutDemo with its view model.
 
 ## Outcome
 

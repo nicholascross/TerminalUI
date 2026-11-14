@@ -1,85 +1,97 @@
-@testable import LayoutDemo
-import TerminalUILayout
+@testable import LayoutDemoSupport
+import TerminalUIComponents
 import Testing
 
 @MainActor
 struct LayoutNavigationTests {
+    @discardableResult
+    private func send(_ key: KeyEvent, app: LayoutApplication, engine: UIEngine) -> UIAction? {
+        let action = engine.handle(key, in: app.presentation.resolve())
+        if let action { app.presentation.handle(action) }
+        return action
+    }
+
+    private func focus(_ control: String, app: LayoutApplication, engine: UIEngine) throws {
+        let target = try #require(app.target(control))
+        #expect(engine.focus(target.engineID, in: app.presentation.resolve()))
+    }
+
+    private func screen(_ app: LayoutApplication, engine: UIEngine) -> String {
+        engine.render(app.presentation.resolve(), width: 80, height: 24).joined(separator: "\n")
+    }
+
+    @Test func viewModelCommandsHaveNoTerminalDependency() {
+        var model = LayoutViewModel()
+        model.submit("hello")
+        #expect(model.status == "Submitted 5 characters")
+        model.openCommands()
+        #expect(model.commandsOpen)
+        #expect(model.activatePane("pane.inspector") == "inspector")
+        #expect(model.status == "Focus: Inspector")
+        #expect(!model.commandsOpen)
+        #expect(model.activatePane("unknown") == nil)
+    }
+
     @Test func enterSubmitsWhileShiftEnterAndPasteRemainMultilineInput() throws {
         let app = LayoutApplication()
-        app.draft = "first"
         let engine = UIEngine()
-        #expect(engine.focus("command", in: app.view()))
-
-        let newline = try #require(engine.handle(.shiftEnter, in: app.view()))
-        #expect(newline == .textChanged("command", "first\n"))
-        app.handle(newline)
-        let paste = try #require(engine.handle(.paste("second\nthird"), in: app.view()))
-        #expect(paste == .textChanged("command", "first\nsecond\nthird"))
-        app.handle(paste)
-        #expect(app.status == "Ready")
-        #expect(engine.handle(.controlD, in: app.view()) == .unhandledKey(.controlD))
-        #expect(app.draft == "first\nsecond\nthird")
-
-        let submit = try #require(engine.handle(.enter, in: app.view()))
-        #expect(submit == .activated("submit"))
-        app.handle(submit)
-        #expect(app.draft.isEmpty)
-        #expect(app.status == "Submitted 18 characters")
+        try focus("command", app: app, engine: engine)
+        send(.paste("first"), app: app, engine: engine)
+        send(.shiftEnter, app: app, engine: engine)
+        send(.paste("second\nthird"), app: app, engine: engine)
+        #expect(screen(app, engine: engine).contains("Ready"))
+        #expect(send(.controlD, app: app, engine: engine) == .unhandledKey(.controlD))
+        send(.enter, app: app, engine: engine)
+        #expect(screen(app, engine: engine).contains("Submitted 18 characters"))
+        let rendered = engine.render(app.presentation.resolve(), width: 80, height: 24).joined(separator: "\n")
+        #expect(rendered.contains("Type a multiline command"))
     }
 
-    @Test func shortcutsReachEveryPaneWhileTheEditorHasFocus() {
+    @Test func shortcutsReachEveryPaneWhileDraftSurvivesParentRefresh() throws {
         let app = LayoutApplication()
-        app.draft = "Keep this draft"
         let engine = UIEngine()
+        try focus("command", app: app, engine: engine)
+        send(.paste("Keep this draft"), app: app, engine: engine)
         for (number, control) in zip("123", ["topics", "inspector", "command"]) {
-            let root = app.view()
-            #expect(engine.focus("command", in: root))
+            try focus("command", app: app, engine: engine)
             for key in [KeyEvent.altCharacter(number), .controlCharacter(number)] {
-                let action = engine.handle(key, in: root)
-                #expect(action == .activated("pane." + control))
-                if let action { app.handle(action) }
-                #expect(app.host.focusedID == control)
-                #expect(app.draft == "Keep this draft")
+                #expect(send(key, app: app, engine: engine) == .activated("pane." + control))
+                #expect(app.host.focusedID == app.target(control)?.engineID)
             }
         }
-        #expect(engine.handle(.character("1"), in: app.view()) == .textChanged("command", "Keep this draft1"))
-        #expect(engine.handle(.paste("23"), in: app.view()) == .textChanged("command", "Keep this draft23"))
+        try focus("command", app: app, engine: engine)
+        send(.character("1"), app: app, engine: engine)
+        send(.paste("23"), app: app, engine: engine)
+        send(.enter, app: app, engine: engine)
+        #expect(screen(app, engine: engine).contains("Submitted 18 characters"))
     }
 
-    @Test func commandMenuScopesShortcutsDismissesAndFocusesItsDestination() {
+    @Test func commandMenuScopesShortcutsDismissesAndFocusesItsDestination() throws {
         let app = LayoutApplication()
-        app.handle(.activated("pane.command"))
         let engine = UIEngine()
-        let root = app.view()
-        #expect(engine.focus("command", in: root))
-        #expect(engine.handle(.controlP, in: root) == .activated("commands"))
-        app.handle(.activated("commands"))
-        let modal = app.view()
-        #expect(!engine.focus("topics", in: modal))
-        #expect(engine.handle(.altCharacter("1"), in: modal) != .activated("pane.topics"))
-        #expect(engine.handle(.escape, in: modal) == .dismissRequested("commands"))
-        app.handle(.dismissRequested("commands"))
-        #expect(!app.commandsOpen)
-
-        app.handle(.activated("commands"))
-        app.handle(.textChanged("commands.search", "Inspector"))
-        #expect(engine.handle(.enter, in: app.view()) == .activated("pane.inspector"))
-        app.handle(.activated("pane.inspector"))
-        #expect(!app.commandsOpen)
-        #expect(app.host.focusedID == "inspector")
-        #expect(app.status == "Focus: Inspector")
+        try focus("command", app: app, engine: engine)
+        #expect(send(.controlP, app: app, engine: engine) == .activated("commands"))
+        let target = try #require(app.target("topics"))
+        #expect(!engine.focus(target.engineID, in: app.presentation.resolve()))
+        #expect(send(.altCharacter("1"), app: app, engine: engine) != .activated("pane.topics"))
+        send(.escape, app: app, engine: engine)
+        #expect(!screen(app, engine: engine).contains("Layout commands"))
+        send(.controlP, app: app, engine: engine)
+        send(.paste("Inspector"), app: app, engine: engine)
+        #expect(send(.enter, app: app, engine: engine) == .activated("pane.inspector"))
+        #expect(!screen(app, engine: engine).contains("Layout commands"))
+        #expect(app.host.focusedID == app.target("inspector")?.engineID)
+        #expect(screen(app, engine: engine).contains("Focus: Inspector"))
     }
 
-    @Test func menuBarSupportsKeyboardNavigationAndActivation() {
+    @Test func menuBarSupportsBoundKeyboardNavigationAndActivation() throws {
         let app = LayoutApplication()
         let engine = UIEngine()
-        var root = app.view()
-        #expect(engine.focus("navigation", in: root))
-        #expect(engine.handle(.right, in: root) == .selectionChanged("navigation", "pane.inspector"))
-        app.handle(.selectionChanged("navigation", "pane.inspector"))
-        root = app.view()
-        #expect(engine.handle(.enter, in: root) == .activated("pane.inspector"))
-        app.handle(.activated("pane.inspector"))
-        #expect(app.host.focusedID == "inspector")
+        let target = try #require(app.presentation.focusTarget(key: "navigation", id: "navigation"))
+        #expect(engine.focus(target.engineID, in: app.presentation.resolve()))
+        send(.right, app: app, engine: engine)
+
+        #expect(send(.enter, app: app, engine: engine) == .activated("pane.inspector"))
+        #expect(app.host.focusedID == app.target("inspector")?.engineID)
     }
 }

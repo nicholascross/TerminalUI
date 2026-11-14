@@ -120,6 +120,9 @@ let view = Column(spacing: 1) {
 
 The files panel takes remaining height; the heading, composer and status bar request their own sizes. Builders support conditionals, loops, arrays and ordinary functions returning `Element`. Existing array-based row/column APIs retain their sizing behavior and compose with the new containers. See [negotiated layout](Documentation/Negotiated-Layout.md) for preferences, sizing rules and custom layouts. Run `swift run LayoutDemo` or `swift run LayoutDemo --preview`.
 
+The optional `TerminalUIComponents` product adds mounted struct views, `@TerminalComponent`, `@State`, `@Binding`, bound controls and scheduled selective updates. LayoutDemo uses this layer with a dedicated `LayoutViewModel`, shared bindings and an independent command draft. See [components and mounted state](Documentation/Components.md) for compiled examples, identity rules, transactions, mixed migration and scoped focus.
+
+
 ## Styling and terminal capabilities
 
 `Theme.terminalNative` uses terminal-default text and background where practical; `Theme.dark` and `Theme.light` supply foreground palettes intended for dark and light terminal backgrounds respectively. `Theme.dusk()` supplies the Parallax harness palette directly: an opaque dark background, layered surfaces, violet accents, tinted badges and rounded borders. It detects colour capability by default; pass `Theme.dusk(colorCapability: .ansi16)` when the host uses an explicit override. Its ANSI variant uses neutral named backgrounds to avoid mapping dark surfaces to bright colours in customised terminal palettes. Select a theme with `TerminalHost(theme:)`, or assign `host.theme` at runtime to redraw. A theme is a value: copy a built-in and change its semantic properties, for example:

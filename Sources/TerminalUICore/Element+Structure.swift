@@ -2,7 +2,7 @@ package extension Element {
     var children: [Element] {
         switch kind {
         case let .column(_, children), let .row(_, children), let .layout(_, children): children
-        case let .panel(_, child), let .dialog(_, _, child), let .scroll(_, child): [child]
+        case let .boundary(_, child), let .panel(_, child), let .dialog(_, _, child), let .scroll(_, child): [child]
         case let .overlay(base, top): [base, top]
         default: []
         }

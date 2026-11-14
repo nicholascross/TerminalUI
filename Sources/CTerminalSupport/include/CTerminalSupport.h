@@ -10,6 +10,8 @@ int tui_signals_termination_requested(void);
 // select-based terminal readiness for macOS, where poll does not support /dev/tty.
 // Read returns a mask: 1 for terminal input, 2 for the signal pipe; -1 on error.
 int tui_wait_readable(int terminal, int signals, int timeout_ms);
+// Adds a dedicated application-update descriptor (-1 disables it); bit 4 reports updates.
+int tui_wait_readable_updates(int terminal, int signals, int updates, int timeout_ms);
 // Write returns 1 when writable, 0 on timeout, or -1 on error.
 int tui_wait_writable(int terminal, int timeout_ms);
 
