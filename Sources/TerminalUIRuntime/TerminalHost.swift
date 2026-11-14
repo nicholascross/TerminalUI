@@ -18,6 +18,8 @@ public final class TerminalHost {
     private var legacySource: LegacyApplicationPresentation?
     private var legacyID: ObjectIdentifier?
     private var sourceID: ObjectIdentifier?
+    private weak var activeSource: (any TerminalPresentationSource)?
+    private var lastNotifiedFocus: ScopedFocusTarget?
     private var sourceRevision: UInt64?
     private var updateWakeup: ApplicationUpdateWakeup?
     public private(set) var frameWriteCount = 0
@@ -58,10 +60,23 @@ public final class TerminalHost {
         engine.focusedID
     }
 
+    /// The current focus as an opaque handle, suitable for comparing scoped component targets.
+    public var focusedTarget: ScopedFocusTarget? {
+        engine.focusedID.map { ScopedFocusTarget(engineID: $0) }
+    }
+
+    private func publishFocus(to source: any TerminalPresentationSource) {
+        let target = focusedTarget
+        guard lastNotifiedFocus != target else { return }
+        lastNotifiedFocus = target
+        source.focusDidChange(target)
+    }
+
     /// Focuses a control in the current view, keeping it visible in enclosing scroll views.
     @discardableResult
     public func focus(_ id: String, in root: Element) -> Bool {
         let result = engine.focus(id, in: root)
+        if let activeSource { publishFocus(to: activeSource) }
         if result { invalidate() }
         return result
     }
@@ -74,6 +89,7 @@ public final class TerminalHost {
     /// Clears transient widget state before reusing an ID for a different semantic value.
     public func resetState(for id: String) {
         engine.resetState(for: id)
+        if let activeSource { publishFocus(to: activeSource) }
         invalidate()
     }
 
@@ -83,33 +99,58 @@ public final class TerminalHost {
         updateWakeup?.signal()
     }
 
-    private func currentView(_ source: any TerminalPresentationSource) -> Element {
+    /// Connects presentation services without acquiring a TTY or evaluating the root.
+    public func connect(_ source: any TerminalPresentationSource) {
         if sourceID != ObjectIdentifier(source) {
             sourceID = ObjectIdentifier(source)
             sourceRevision = nil
+            lastNotifiedFocus = nil
             needsViewRebuild = true
         }
+        activeSource = source
         source.connect(PresentationServices(requestUpdate: { [weak self] in
             self?.needsRepaint = true
             self?.updateWakeup?.signal()
-        }, focus: { [weak self] id, root in
-            guard let self else { return false }
+        }, focus: { [weak self, weak source] id, root in
+            guard let self, let source else { return false }
             let focused = self.engine.focus(id, in: root)
+            self.publishFocus(to: source)
             if focused { self.needsRepaint = true; self.updateWakeup?.signal() }
             return focused
         }, reveal: { [weak self] id in
             self?.engine.keepVisible(id)
             self?.needsRepaint = true
             self?.updateWakeup?.signal()
+        }, stop: { [weak self] in
+            self?.stop()
         }))
-        let root = source.resolve(invalidateRoot: needsViewRebuild)
+    }
+
+    /// Resolves a frame using the host's focus and theme without acquiring a TTY.
+    public func preview(_ source: any TerminalPresentationSource, width: Int = 80, height: Int = 24) -> [String] {
+        inputSize = TerminalSize(columns: width, rows: height)
+        _ = currentView(source)
+        return engine.repaintGrid(width: width, height: height).lines
+    }
+
+    private func currentView(_ source: any TerminalPresentationSource) -> Element {
+        connect(source)
+        var root = source.resolve(invalidateRoot: needsViewRebuild)
         needsViewRebuild = false
-        if sourceRevision != source.revision {
-            sourceRevision = source.revision
-            retainedRoot = root
-            engine.updateTree(root)
+        while true {
+            if sourceRevision != source.revision {
+                sourceRevision = source.revision
+                retainedRoot = root
+                engine.updateTree(root)
+            }
+            publishFocus(to: source)
+            guard source.hasPendingUpdates else { return root }
+            // Focus feedback can dirty component state. Resolve it before dispatch or painting.
+            let previousRevision = source.revision
+            root = source.resolve(invalidateRoot: false)
+            // A transaction can deliberately defer resolution until its outermost scope exits.
+            if source.revision == previousRevision { return root }
         }
-        return root
     }
 
     /// Shared by the terminal loop and terminal-independent interaction tests.
@@ -120,8 +161,8 @@ public final class TerminalHost {
     func renderIfNeeded(_ source: any TerminalPresentationSource, size: TerminalSize) -> CellGrid? {
         inputSize = size
         guard needsRepaint || source.hasPendingUpdates, size.columns > 0, size.rows > 0 else { return nil }
-        needsRepaint = false
         _ = currentView(source)
+        needsRepaint = false
         return engine.repaintGrid(width: size.columns, height: size.rows)
     }
 
@@ -131,6 +172,7 @@ public final class TerminalHost {
 
     func handleInput(_ event: KeyEvent, source: any TerminalPresentationSource) {
         let result = engine.handleEvent(event, in: currentView(source))
+        publishFocus(to: source)
         needsRepaint = true
         if case let .rebuild(action) = result {
             if let action { deliver(action, to: source) } else { invalidate() }
@@ -150,6 +192,7 @@ public final class TerminalHost {
             // Resolve effects and geometry before the next pointer event in the same input read.
             engine.prepareMouseInput(width: size.columns, height: size.rows)
             let result = engine.handleMouseEvent(mouse)
+            publishFocus(to: source)
             needsRepaint = true
             if case let .rebuild(action) = result {
                 if let action { deliver(action, to: source) } else { invalidate() }
@@ -170,6 +213,7 @@ public final class TerminalHost {
     @discardableResult
     public func focus(_ target: ScopedFocusTarget, in source: any TerminalPresentationSource) -> Bool {
         let result = engine.focus(target.engineID, in: currentView(source))
+        publishFocus(to: source)
         if result { needsRepaint = true; updateWakeup?.signal() }
         return result
     }

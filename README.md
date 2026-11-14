@@ -120,7 +120,7 @@ let view = Column(spacing: 1) {
 
 The files panel takes remaining height; the heading, composer and status bar request their own sizes. Builders support conditionals, loops, arrays and ordinary functions returning `Element`. Existing array-based row/column APIs retain their sizing behavior and compose with the new containers. See [negotiated layout](Documentation/Negotiated-Layout.md) for preferences, sizing rules and custom layouts. Run `swift run LayoutDemo` or `swift run LayoutDemo --preview`.
 
-The optional `TerminalUIComponents` product adds mounted struct views, `@TerminalComponent`, `@State`, `@Binding`, bound controls and scheduled selective updates. LayoutDemo uses this layer with a dedicated `LayoutViewModel`, shared bindings and an independent command draft. See [components and mounted state](Documentation/Components.md) for compiled examples, identity rules, transactions, mixed migration and scoped focus.
+The optional `TerminalUIComponents` product adds declarative applications with `@main @TerminalApplication`, mounted struct views, `@TerminalComponent`, `@State`, `@Binding`, bound controls and scheduled selective updates. Declare the root screen and optional theme/configuration; the framework assembles the host and presentation. Mounted screens access focus and shutdown through `@ApplicationContext`. LayoutDemo uses this layer with a dedicated `LayoutViewModel`, shared bindings and an independent command draft. See [components and mounted state](Documentation/Components.md) for compiled examples, application setup, identity rules, transactions, mixed migration and scoped focus.
 
 
 ## Styling and terminal capabilities

@@ -3,7 +3,8 @@ import TerminalUIComponents
 /// Shared presentation state and commands. The screen stores this value in one mounted @State slot.
 public struct LayoutViewModel: Equatable, Sendable {
     public var status = "Ready"
-    public var barFocus: String? = "pane.topics"
+    public var barFocus: String? = Pane.topics.actionID
+    public var focusedPane: Pane?
     public var commandsOpen = false
 
     public init() {}
@@ -20,12 +21,8 @@ public struct LayoutViewModel: Equatable, Sendable {
         commandsOpen = false
     }
 
-    public mutating func activatePane(_ id: String) -> String? {
-        guard ["pane.topics", "pane.inspector", "pane.command"].contains(id) else { return nil }
-        let control = String(id.dropFirst("pane.".count))
-        commandsOpen = false
-        status = "Focus: \(control.capitalized)"
-        return control
+    public mutating func didNavigate(to pane: Pane) {
+        status = "Focus: \(pane.title)"
     }
 
     public var topics: [ListRow] {
@@ -35,15 +32,15 @@ public struct LayoutViewModel: Equatable, Sendable {
     }
 
     public var paneCommands: [MenuItem] {
-        [MenuItem(id: "pane.topics", title: "Focus Topics", shortcut: "1"),
-         MenuItem(id: "pane.inspector", title: "Focus Inspector", shortcut: "2"),
-         MenuItem(id: "pane.command", title: "Focus Command", shortcut: "3")]
+        Pane.allCases.map { pane in
+            MenuItem(id: pane.actionID, title: "Focus " + pane.title, shortcut: pane.shortcut)
+        }
     }
 
     public var navigationItems: [MenuItem] {
-        zip(paneCommands, ["Topics", "Inspector", "Command"]).map { command, title in
-            MenuItem(id: command.id, title: title, shortcut: command.shortcut,
-                     globalShortcuts: command.shortcut.map { [.altCharacter($0), .controlCharacter($0)] } ?? [])
+        Pane.allCases.map { pane in
+            MenuItem(id: pane.actionID, title: pane.title, shortcut: pane.shortcut,
+                     globalShortcuts: [.altCharacter(pane.shortcut), .controlCharacter(pane.shortcut)])
         } + [MenuItem(id: "commands", title: "Commands", globalShortcuts: [.controlP])]
     }
 }

@@ -11,15 +11,18 @@ public struct PresentationServices {
     public var requestUpdate: () -> Void
     public var focus: (String, Element) -> Bool
     public var reveal: (String) -> Void
+    public var stop: () -> Void
 
     public init(
         requestUpdate: @escaping () -> Void = {},
         focus: @escaping (String, Element) -> Bool = { _, _ in false },
         reveal: @escaping (String) -> Void = { _ in },
+        stop: @escaping () -> Void = {},
     ) {
         self.requestUpdate = requestUpdate
         self.focus = focus
         self.reveal = reveal
+        self.stop = stop
     }
 }
 
@@ -31,6 +34,12 @@ public protocol TerminalPresentationSource: AnyObject {
     func connect(_ services: PresentationServices)
     func resolve(invalidateRoot: Bool) -> Element
     func handle(_ action: UIAction)
+    /// Called after host focus changes, outside component evaluation.
+    func focusDidChange(_ target: ScopedFocusTarget?)
+}
+
+public extension TerminalPresentationSource {
+    func focusDidChange(_: ScopedFocusTarget?) {}
 }
 
 /// An explicit, generation-scoped control address obtained from a mounted component root.

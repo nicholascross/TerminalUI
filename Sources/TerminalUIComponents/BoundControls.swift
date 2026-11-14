@@ -75,6 +75,16 @@ public func Tabs(id: String, tabs: [Tab], selection: Binding<String>) -> Element
 }
 
 public extension Element {
+    /// Observes host focus changes through generation-scoped handles. Writes may update local state.
+    @MainActor func onFocusChange(_ action: @escaping @MainActor (ScopedFocusTarget?) -> Void) -> Element {
+        var value = self
+        value.behaviors.removeAll { $0.event == .focus }
+        value.behaviors.append(ElementBehavior(.focus, id: "") { id in
+            action(id.map { ScopedFocusTarget(engineID: $0) })
+        })
+        return value
+    }
+
     /// Handles an otherwise unclaimed action in this mounted scope. Return true to consume it.
     @MainActor func onAction(_ handler: @escaping @MainActor (UIAction) -> Bool) -> Element {
         var value = self

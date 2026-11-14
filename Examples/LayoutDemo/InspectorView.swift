@@ -4,7 +4,7 @@ struct TopicsView: TerminalView {
     let topics: [ListRow]
     @Binding var selection: String
     var body: Element {
-        Panel("Topics") { List(id: "topics", rows: topics, selection: $selection) }
+        Panel("Topics") { List(id: Pane.topics.rawValue, rows: topics, selection: $selection) }
     }
 }
 
@@ -20,7 +20,7 @@ struct InspectorView: TerminalView {
 
     var body: Element {
         Panel("Inspector") {
-            ScrollView(id: "inspector") {
+            ScrollView(id: Pane.inspector.rawValue) {
                 Column(spacing: 1) {
                     Paragraph(description)
                     for index in 1 ... 12 {

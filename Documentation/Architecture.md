@@ -12,8 +12,8 @@ TerminalUI uses separate SwiftPM targets to enforce dependency direction. The `T
 | `TerminalUI` | Consumer facade with explicit aliases for the existing public names. | Core, Input, Rendering, Runtime |
 | `TerminalUILayout` | Optional builder API, component factories and negotiated stack strategies. | TerminalUI, Core |
 | `TerminalUIComponentRuntime` | Mounted identities, typed slots, dependencies, scoped callbacks and the update driver. | Core |
-| `TerminalUIComponents` | Optional struct views, state/bindings, bound controls, repetition and presentation adapter. | Layout composition, ComponentRuntime, ComponentMacros |
-| `TerminalUIComponentMacros` / `TerminalUIComponentMacroSupport` | Compiler plugin entry point and testable property-registration expansion. | SwiftSyntax, compiler plugin support |
+| `TerminalUIComponents` | Optional declarative applications and runner, struct views, state/bindings, application context, bound controls, repetition and presentation adapter. | Core, Runtime, Layout composition, ComponentRuntime, ComponentMacros |
+| `TerminalUIComponentMacros` / `TerminalUIComponentMacroSupport` | Compiler plugin entry point, application entry/conformance/isolation and testable property-registration expansion. | SwiftSyntax, compiler plugin support |
 | `TerminalUIChroma` | Optional Chroma-to-semantic-text adapter. | TerminalUI, Chroma |
 
 The manifest lists all direct dependencies explicitly. No implementation target imports the facade, and the core does not depend on any implementation target. The existing `TerminalUI` and `TerminalUIChroma` library products are retained; the implementation targets are not additional published products. The optional `TerminalUILayout` product adds negotiated composition; its implementation is separate from the internal `TerminalUILayoutEngine` target.

@@ -4,6 +4,61 @@ import TerminalUIComponentMacroSupport
 import XCTest
 
 final class MacroTests: XCTestCase {
+    func testApplicationEntryPoint() {
+        assertMacroExpansion("""
+        @main
+        @TerminalApplication
+        struct Demo {
+            var root: some TerminalView { Screen() }
+        }
+        """, expandedSource: """
+        @main
+        struct Demo {
+            @MainActor
+            var root: some TerminalView { Screen() }
+
+            @MainActor
+            public static func main() async throws {
+                try await Self().makeApplication().run(arguments: CommandLine.arguments)
+            }
+        }
+
+        extension Demo: TerminalUIComponents.TerminalApplicationDefinition {
+        }
+        """, macros: ["TerminalApplication": TerminalApplicationMacro.self])
+    }
+
+    func testRejectsReferenceApplications() {
+        assertMacroExpansion("""
+        @TerminalApplication
+        class Demo {}
+        """, expandedSource: """
+        class Demo {}
+        """, diagnostics: [DiagnosticSpec(
+            message: "@TerminalApplication requires a struct with a root conforming to TerminalView",
+            line: 1, column: 1,
+        )], macros: ["TerminalApplication": TerminalApplicationMacro.self])
+    }
+
+    func testPrivateApplicationContextRegistration() {
+        assertMacroExpansion("""
+        @TerminalComponent
+        struct Screen: TerminalView {
+            @ApplicationContext private var application
+            var body: Element { Button("Quit", id: "quit").onActivate { application.stop() } }
+        }
+        """, expandedSource: """
+        struct Screen: TerminalView {
+            @ApplicationContext private var application
+            var body: Element { Button("Quit", id: "quit").onActivate { application.stop() } }
+
+            public mutating func _installState(_ installation: StateInstallation) {
+                self._application._install(in: installation, key: "application")
+            }
+        }
+        """, macros: ["TerminalComponent": TerminalComponentMacro.self])
+    }
+
     func testPrivateStateRegistration() {
         assertMacroExpansion("""
         @TerminalComponent

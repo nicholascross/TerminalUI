@@ -1,5 +1,20 @@
 import TerminalUIComponents
 
+@main
+@TerminalApplication
+public struct ConsumerApplication {
+    public var root: some TerminalView { Workspace() }
+}
+
+@TerminalComponent
+public struct ApplicationControls: TerminalView {
+    @ApplicationContext private var application
+
+    public var body: Element {
+        Button("Quit", id: "quit").onActivate { application.stop() }
+    }
+}
+
 @TerminalComponent
 public struct CommandPane: TerminalView {
     @State private var draft = ""
@@ -15,12 +30,22 @@ public struct CommandPane: TerminalView {
     }
 }
 
+@TerminalComponent
 public struct Workspace: TerminalView {
+    @ApplicationContext private var application
+
     public var body: Element {
         Column {
             Text("Workspace")
             CommandPane(submit: { _ in })
             Component(CommandPane(submit: { _ in }), key: "second")
+            ApplicationControls()
+            StatusBar("Tab: focus · Enter: submit · Shift+Enter: newline · Ctrl-C: quit")
+        }
+        .onAction { action in
+            guard case .unhandledKey(.controlC) = action else { return false }
+            application.stop()
+            return true
         }
     }
 }

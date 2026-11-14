@@ -188,6 +188,16 @@ package final class ComponentRuntime {
         }
     }
 
+    package func focusDidChange(_ target: ScopedFocusTarget?) {
+        let address = BehaviorAddress(event: .focus, id: "")
+        func handlers(_ record: MountedComponent) -> [ElementBehavior] {
+            let own = record.registrations[address].map { [$0] } ?? []
+            return own + record.orderedChildren.flatMap(handlers)
+        }
+        // A callback may resolve new output. Snapshot registrations before delivering it.
+        for handler in handlers(root) { handler.invoke(target?.engineID) }
+    }
+
     package func handle(_ action: UIAction) -> Bool {
         let event: ElementBehaviorEvent
         let id: String

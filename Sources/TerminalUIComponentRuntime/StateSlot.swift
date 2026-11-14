@@ -54,6 +54,8 @@ package final class MountContext {
         self.record = record; self.driver = driver
     }
 
+    package var applicationServices: (any ApplicationServices)? { driver.applicationServices }
+
     package func install<Value>(key: String, initial: () -> Value, equals: ((Value, Value) -> Bool)?) -> StateSlot<Value> {
         if let old = record.state[key] {
             guard let typed = old as? StateSlot<Value> else {

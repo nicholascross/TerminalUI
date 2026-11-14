@@ -28,7 +28,10 @@ extension ComponentRuntime {
         for behavior in element.behaviors {
             let event: ElementBehaviorEvent
             let id: String
-            if behavior.event == .submit {
+            if behavior.event == .focus {
+                event = .focus
+                id = ""
+            } else if behavior.event == .submit {
                 event = .activate
                 id = scoped("@submit:" + behavior.controlID)
                 value.submitID = id

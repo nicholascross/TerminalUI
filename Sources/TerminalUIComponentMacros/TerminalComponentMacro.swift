@@ -18,5 +18,5 @@ public struct TerminalComponentMacro: MemberMacro {
 
 @main
 struct TerminalUIComponentPlugin: CompilerPlugin {
-    let providingMacros: [Macro.Type] = [TerminalComponentMacro.self]
+    let providingMacros: [Macro.Type] = [TerminalComponentMacro.self, TerminalApplicationMacro.self]
 }

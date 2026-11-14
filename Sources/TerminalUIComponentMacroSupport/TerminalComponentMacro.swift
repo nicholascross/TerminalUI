@@ -32,7 +32,8 @@ public struct TerminalComponentMacro: MemberMacro {
         for member in declaration.memberBlock.members {
             guard let property = member.decl.as(VariableDeclSyntax.self), property.attributes.contains(where: {
                 guard case let .attribute(attribute) = $0 else { return false }
-                return attribute.attributeName.trimmedDescription.split(separator: ".").last == "State"
+                let name = attribute.attributeName.trimmedDescription.split(separator: ".").last
+                return name == "State" || name == "ApplicationContext"
             }) else { continue }
             guard property.bindingSpecifier.tokenKind == .keyword(.var),
                   !property.modifiers.contains(where: { $0.name.tokenKind == .keyword(.static) || $0.name.tokenKind == .keyword(.class) }),
@@ -40,7 +41,7 @@ public struct TerminalComponentMacro: MemberMacro {
                   let binding = property.bindings.first,
                   let identifier = binding.pattern.as(IdentifierPatternSyntax.self)
             else {
-                context.diagnose(Diagnostic(node: property, message: ComponentDiagnostic(message: "@State requires a single stored instance var")))
+                context.diagnose(Diagnostic(node: property, message: ComponentDiagnostic(message: "Mounted properties require a single stored instance var")))
                 continue
             }
             let name = String(identifier.identifier.text.filter { $0 != "`" })

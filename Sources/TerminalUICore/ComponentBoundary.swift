@@ -15,7 +15,7 @@ package struct ComponentBoundary: Equatable {
 }
 
 package enum ElementBehaviorEvent: Hashable {
-    case text, selection, submit, activate, dismiss
+    case text, selection, submit, activate, dismiss, focus
 }
 
 package struct ElementBehavior {

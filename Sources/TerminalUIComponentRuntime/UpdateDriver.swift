@@ -7,6 +7,7 @@ package final class UpdateDriver {
     package var wake: () -> Void = {}
     package var dirty: Set<String> = []
     package var evaluating: MountedComponent?
+    package weak var applicationServices: (any ApplicationServices)?
     package var pending = false
     package var transactionDepth = 0
     package var metrics = ComponentMetrics()

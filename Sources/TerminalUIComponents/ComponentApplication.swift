@@ -34,6 +34,7 @@ public final class ComponentApplication: TerminalPresentationSource {
     ) {
         legacy = nil; fallback = onAction
         runtime = ComponentRuntime(makeRoot: { Component(root) }, schedule: schedule, diagnostic: diagnostic)
+        runtime.driver.applicationServices = self
     }
 
     /// Rebuilds the legacy view only for explicit invalidation or an unclaimed action.
@@ -44,6 +45,7 @@ public final class ComponentApplication: TerminalPresentationSource {
     ) {
         self.legacy = legacy; fallback = { _ in }
         runtime = ComponentRuntime(makeRoot: { legacy.view() }, schedule: schedule, diagnostic: diagnostic)
+        runtime.driver.applicationServices = self
     }
 
     public func connect(_ services: PresentationServices) {
@@ -57,6 +59,10 @@ public final class ComponentApplication: TerminalPresentationSource {
         let force = invalidateRoot || invalidated
         invalidated = false
         return runtime.resolve(invalidateRoot: force)
+    }
+
+    public func focusDidChange(_ target: ScopedFocusTarget?) {
+        runtime.focusDidChange(target)
     }
 
     public func handle(_ action: UIAction) {
@@ -96,6 +102,10 @@ public final class ComponentApplication: TerminalPresentationSource {
         services.reveal(target.engineID)
     }
 
+    public var context: TerminalApplicationContext { TerminalApplicationContext(services: self) }
+
+    public func stop() { services.stop() }
+
     /// Ends the generation explicitly, useful when a harness/root is being reused.
     public func unmount() {
         runtime.unmount()
@@ -114,3 +124,5 @@ public final class ComponentApplication: TerminalPresentationSource {
         #endif
     }
 }
+
+extension ComponentApplication: ApplicationServices {}
