@@ -1,6 +1,6 @@
 import TerminalUICore
 import TerminalUIInteraction
-import TerminalUILayout
+import TerminalUILayoutEngine
 import TerminalUIText
 
 struct TablePainter {

@@ -1,5 +1,5 @@
 import TerminalUICore
-import TerminalUILayout
+import TerminalUILayoutEngine
 import TerminalUIText
 
 /// Owns pointer press identity and routes only against a live geometry view.

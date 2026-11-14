@@ -9,6 +9,9 @@ package final class LayoutNode {
     package weak var textLayout: TextLayoutCache.Entry?
     package var mouse: MouseGeometry?
     private var measurements: [Int: WidgetSize] = [:]
+    private var proposals: [LayoutProposal: WidgetSize] = [:]
+    private var widthPreference: LayoutPreference?
+    private var heightPreference: LayoutPreference?
 
     package init(_ element: Element) {
         self.element = element
@@ -32,7 +35,12 @@ package final class LayoutNode {
             changed = true
         }
         element = next
-        if changed { measurements.removeAll(keepingCapacity: true) }
+        if changed {
+            measurements.removeAll(keepingCapacity: true)
+            proposals.removeAll(keepingCapacity: true)
+            widthPreference = nil
+            heightPreference = nil
+        }
         return changed
     }
 
@@ -44,6 +52,27 @@ package final class LayoutNode {
         // A node can be proposed several widths by rows, panels and alignment.
         if measurements.count >= 4 { measurements.removeAll(keepingCapacity: true) }
         measurements[width] = size
+    }
+
+    package func measurement(for proposal: LayoutProposal) -> WidgetSize? { proposals[proposal] }
+
+    package func preference(vertical: Bool) -> LayoutPreference? { vertical ? heightPreference : widthPreference }
+
+    package func remember(_ preference: LayoutPreference, vertical: Bool) {
+        if vertical { heightPreference = preference } else { widthPreference = preference }
+    }
+
+    package func invalidateMeasurements() {
+        measurements.removeAll(keepingCapacity: true)
+        proposals.removeAll(keepingCapacity: true)
+        widthPreference = nil
+        heightPreference = nil
+        for child in children { child.invalidateMeasurements() }
+    }
+
+    package func remember(_ size: WidgetSize, for proposal: LayoutProposal) {
+        if proposals.count >= 8 { proposals.removeAll(keepingCapacity: true) }
+        proposals[proposal] = size
     }
 
     /// Repaint enclosing scroll views and overlays together so clipping and compositing stay intact.
@@ -67,7 +96,9 @@ package final class LayoutNode {
     private func hasSameMeasurement(as next: Element) -> Bool {
         guard element.isVisible == next.isVisible, element.isEnabled == next.isEnabled,
               element.widthRule == next.widthRule, element.heightRule == next.heightRule,
-              element.insets == next.insets else { return false }
+              element.insets == next.insets,
+              element.layoutWidth == next.layoutWidth, element.layoutHeight == next.layoutHeight,
+              element.hasExplicitWidth == next.hasExplicitWidth, element.hasExplicitHeight == next.hasExplicitHeight else { return false }
         switch (element.kind, next.kind) {
         case let (.text(old), .text(new)), let (.paragraph(old), .paragraph(new)):
             return old == new

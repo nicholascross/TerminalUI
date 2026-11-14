@@ -1,5 +1,5 @@
 import TerminalUI
-import TerminalUILayout
+import TerminalUILayoutEngine
 import Testing
 
 struct RetainedLayoutTests {

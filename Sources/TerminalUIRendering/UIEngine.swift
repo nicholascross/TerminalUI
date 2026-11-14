@@ -1,6 +1,6 @@
 import TerminalUICore
 import TerminalUIInteraction
-import TerminalUILayout
+import TerminalUILayoutEngine
 import TerminalUIText
 
 /// Deterministic, terminal-independent rendering and interaction state.
@@ -10,7 +10,7 @@ public final class UIEngine {
     }
 
     public var theme: Theme {
-        didSet { renderer.invalidate() }
+        didSet { renderer.invalidateMeasurements() }
     }
 
     private let tree: ElementTree

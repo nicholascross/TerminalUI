@@ -1,5 +1,5 @@
 import TerminalUI
-import TerminalUILayout
+import TerminalUILayoutEngine
 @testable import TerminalUIRendering
 import TerminalUIText
 import Testing

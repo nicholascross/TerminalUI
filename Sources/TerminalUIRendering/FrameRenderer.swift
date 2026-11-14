@@ -1,6 +1,6 @@
 import TerminalUICore
 import TerminalUIInteraction
-import TerminalUILayout
+import TerminalUILayoutEngine
 import TerminalUIText
 
 struct RenderEnvironment {
@@ -50,6 +50,11 @@ final class FrameRenderer {
     func invalidateGeometry() {
         geometry?.invalidate()
         geometry = nil
+    }
+
+    func invalidateMeasurements() {
+        layoutRoot?.invalidateMeasurements()
+        invalidate()
     }
 
     func invalidate() {
@@ -310,6 +315,17 @@ final class FrameRenderer {
                         write(theme.borders.rightJoin, line, contentWidth - 1, style: style)
                     }
                 }
+            }
+        case let .layout(strategy, _):
+            let children = node.children.filter(\.element.isVisible)
+            let size = WidgetSize(width: contentWidth, height: contentHeight)
+            let placements = strategy.placeSubviews(in: size, subviews: measurement.subviews(of: node, theme: theme), alignment: element.alignment)
+            var placed = Set<Int>()
+            for placement in placements where children.indices.contains(placement.index) && placed.insert(placement.index).inserted {
+                let x = min(contentWidth, placement.x), y = min(contentHeight, placement.y)
+                paint(children[placement.index], x: originX + x, y: originY + y,
+                      width: min(contentWidth - x, placement.size.width), height: min(contentHeight - y, placement.size.height),
+                      canvas: &canvas, environment: environment, inherited: descendants, enabled: active, repaintPath: remainingPath)
             }
         case let .column(spacing, _), let .row(spacing, _):
             let vertical = if case .column = element.kind { true } else { false }

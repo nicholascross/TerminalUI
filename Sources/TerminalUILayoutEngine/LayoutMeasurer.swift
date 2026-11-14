@@ -42,6 +42,9 @@ package struct LayoutMeasurer {
         case let .custom(widget):
             let size = widget.measure(context: WidgetMeasureContext(width: available, theme: theme))
             measured = (size.width, size.height)
+        case let .layout(strategy, _):
+            let size = strategy.sizeThatFits(LayoutProposal(width: available), subviews: subviews(of: node, theme: theme))
+            measured = (size.width, size.height)
         case .spacer: measured = (0, 0)
         case .divider: measured = (1, 1)
         case .panel, .dialog:

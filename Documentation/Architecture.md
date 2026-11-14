@@ -5,18 +5,21 @@ TerminalUI uses separate SwiftPM targets to enforce dependency direction. The `T
 | `TerminalUICore` | Element model, actions and events, styles, canvas/grid, display width, geometry values and custom-widget contracts. Includes the small self-contained tab/menu widgets used by element factories. | None |
 | `TerminalUIText` | Wrapping, bounded text-layout caching, text metrics and editor coordinates. | Core |
 | `TerminalUIInput` | Incremental keyboard, paste and mouse packet decoding. | Core |
-| `TerminalUILayout` | Retained nodes, measurement, allocation, mouse geometry and node-to-text-cache adaptation. | Core, Text |
+| `TerminalUILayoutEngine` | Retained nodes, measurement, allocation, mouse geometry and node-to-text-cache adaptation. | Core, Text |
 | `TerminalUIInteraction` | Keyboard/pointer routing, shortcuts, transient state, editing, collection navigation, focus and tree-query policies. | Core, Text, Layout |
 | `TerminalUIRendering` | Engine composition, built-in painters, retained repainting, frame differencing and ANSI style encoding. | Core, Text, Layout, Interaction |
 | `TerminalUIRuntime` | Application host, escape deadlines, frame transmission and native terminal session lifecycle. | Core, Input, Rendering, CTerminalSupport |
 | `TerminalUI` | Consumer facade with explicit aliases for the existing public names. | Core, Input, Rendering, Runtime |
+| `TerminalUILayout` | Optional builder API, component factories and negotiated stack strategies. | TerminalUI, Core |
 | `TerminalUIChroma` | Optional Chroma-to-semantic-text adapter. | TerminalUI, Chroma |
 
-The manifest lists all direct dependencies explicitly. No implementation target imports the facade, and the core does not depend on any implementation target. The existing `TerminalUI` and `TerminalUIChroma` library products are retained; the implementation targets are not additional published products.
+The manifest lists all direct dependencies explicitly. No implementation target imports the facade, and the core does not depend on any implementation target. The existing `TerminalUI` and `TerminalUIChroma` library products are retained; the implementation targets are not additional published products. The optional `TerminalUILayout` product adds negotiated composition; its implementation is separate from the internal `TerminalUILayoutEngine` target.
 
 ```mermaid
 flowchart TD
-    Facade[TerminalUI facade] --> Runtime
+    Composition[TerminalUILayout composition] --> Facade[TerminalUI facade]
+    Composition --> Core
+    Facade --> Runtime
     Facade --> Rendering
     Facade --> Input
     Facade --> Core
@@ -66,3 +69,7 @@ Scroll composition, clipping, mouse geometry and targeted repaint boundaries are
 All extracted services use instance composition. Existing public factories/constants and the host's process-wide active-session guard retain their behaviour. The guard protects process-wide terminal attributes and signal ownership.
 
 The [module migration review](Module-Migration-Review.md) records the nominal type ownership changes and compatibility checks. Run `swift test` for all tests, including captured-geometry expiry and press/release continuity through a rebuilt view. Input, interaction and runtime-policy tests also have their own test targets; mixed engine/host tests remain in `TerminalUITests`. `TerminalUICompatibilityTests` depends only on the facade and uses ordinary imports. After building the demo, run `python3 Scripts/test-terminalui-pty.py` for terminal lifecycle and integration checks.
+
+Negotiated layout uses a Core-owned `ElementLayout` container contract. The optional composition module supplies strategies; the renderer measures and places ordinary element children through that contract, preserving their focus, pointer, modal and retained-scroll behavior. Existing array-based stacks keep their original allocator. See [negotiated layout](Negotiated-Layout.md) for the public API and sizing semantics.
+
+The [component and state architecture migration plan](Specs/TerminalUI/Component-State-Architecture-Plan.md) describes the proposed next layer: struct components, persistent identity-based state, bindings, scheduled transactions and selective component rebuilding. It is a future implementation plan; the architecture above describes the current implementation.

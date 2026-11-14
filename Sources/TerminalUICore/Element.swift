@@ -5,6 +5,7 @@ public struct Element {
         case button(String, String), field(String, String, String, Bool)
         case list(String, [ListRow], String?), table(String, [TableColumn], [TableRow], String?, Bool), dialog(String, String, Element), overlay(Element, Element)
         case scroll(String, Element), custom(any CustomWidget), spacer, divider
+        case layout(any ElementLayout, [Element])
     }
     package let kind: Kind
     package var widthRule: LayoutSize = .content
@@ -23,6 +24,10 @@ public struct Element {
     package var followsEnd = false
     package var keyActions: [(key: KeyEvent, actionID: String)] = []
     package var menuShortcutItems: [MenuItem] = []
+    package var layoutWidth: LayoutPreference = .automatic
+    package var layoutHeight: LayoutPreference = .automatic
+    package var hasExplicitWidth = false
+    package var hasExplicitHeight = false
 
     public static func text(_ value: String) -> Self { .init(kind: .text(value)) }
     public static func paragraph(_ value: String) -> Self { .init(kind: .paragraph(value)) }
@@ -74,11 +79,26 @@ public struct Element {
 
     public static func dialog(id: String, title: String, content: Self) -> Self { .init(kind: .dialog(id, title, content)) }
     public static func custom(_ widget: any CustomWidget) -> Self { .init(kind: .custom(widget)) }
+    /// Hosts ordinary children using a custom measurement and placement strategy.
+    public static func layout(_ strategy: any ElementLayout, children: [Self]) -> Self {
+        .init(kind: .layout(strategy, children))
+    }
     public static func spacer() -> Self { .init(kind: .spacer, widthRule: .fill(), heightRule: .fill()) }
     public static func divider() -> Self { .init(kind: .divider) }
     public func overlay(_ element: Self?) -> Self { element.map { .init(kind: .overlay(self, $0)) } ?? self }
-    public func width(_ rule: LayoutSize) -> Self { var copy = self; copy.widthRule = rule; return copy }
-    public func height(_ rule: LayoutSize) -> Self { var copy = self; copy.heightRule = rule; return copy }
+    public func width(_ rule: LayoutSize) -> Self {
+        var copy = self; copy.widthRule = rule; copy.hasExplicitWidth = true; copy.layoutWidth = .automatic; return copy
+    }
+    public func height(_ rule: LayoutSize) -> Self {
+        var copy = self; copy.heightRule = rule; copy.hasExplicitHeight = true; copy.layoutHeight = .automatic; return copy
+    }
+    /// Supplies preferences to negotiated parents without changing ordinary stack sizing.
+    public func layoutSizing(width: LayoutPreference = .automatic, height: LayoutPreference = .automatic) -> Self {
+        var copy = self
+        copy.layoutWidth = width
+        copy.layoutHeight = height
+        return copy
+    }
     public func padding(_ insets: Insets) -> Self { var copy = self; copy.insets = insets; return copy }
     /// Identifies content for a programmatic keep-visible request.
     public func id(_ value: String) -> Self { var copy = self; copy.visibilityID = value; return copy }

@@ -1,6 +1,6 @@
 import TerminalUI
 import TerminalUIInteraction
-import TerminalUILayout
+import TerminalUILayoutEngine
 @testable import TerminalUIRendering
 import TerminalUIText
 import Testing

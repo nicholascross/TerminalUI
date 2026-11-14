@@ -1,5 +1,5 @@
 import TerminalUICore
-import TerminalUILayout
+import TerminalUILayoutEngine
 
 /// Immutable inputs shared by built-in painters for one assigned content rectangle.
 struct ElementPaintContext {

@@ -99,6 +99,27 @@ Unicode cell widths vary by emulator. The width policy is conservative and shoul
 
 The [internal architecture](Documentation/Architecture.md) describes the SwiftPM targets and dependency composition. The [module migration review](Documentation/Module-Migration-Review.md) records the public type ownership changes; existing source imports and qualified names remain available through the `TerminalUI` facade.
 
+## Optional negotiated layout
+
+The `TerminalUILayout` product adds closure-based composition and negotiated sizing while using the same elements, controls and terminal host:
+
+```swift
+import TerminalUILayout
+
+let view = Column(spacing: 1) {
+    Text("Workspace").role(.heading)
+    Panel("Files") {
+        List(id: "files", rows: fileRows, selection: selectedFile)
+    }
+    Panel("Command") {
+        TextEditor(id: "command", value: draft)
+    }.height(.fit(maximum: 8))
+    StatusBar("Tab: focus · Ctrl-C: quit")
+}
+```
+
+The files panel takes remaining height; the heading, composer and status bar request their own sizes. Builders support conditionals, loops, arrays and ordinary functions returning `Element`. Existing array-based row/column APIs retain their sizing behavior and compose with the new containers. See [negotiated layout](Documentation/Negotiated-Layout.md) for preferences, sizing rules and custom layouts. Run `swift run LayoutDemo` or `swift run LayoutDemo --preview`.
+
 ## Styling and terminal capabilities
 
 `Theme.terminalNative` uses terminal-default text and background where practical; `Theme.dark` and `Theme.light` supply foreground palettes intended for dark and light terminal backgrounds respectively. `Theme.dusk()` supplies the Parallax harness palette directly: an opaque dark background, layered surfaces, violet accents, tinted badges and rounded borders. It detects colour capability by default; pass `Theme.dusk(colorCapability: .ansi16)` when the host uses an explicit override. Its ANSI variant uses neutral named backgrounds to avoid mapping dark surfaces to bright colours in customised terminal palettes. Select a theme with `TerminalHost(theme:)`, or assign `host.theme` at runtime to redraw. A theme is a value: copy a built-in and change its semantic properties, for example:
