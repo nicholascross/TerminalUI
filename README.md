@@ -32,6 +32,8 @@ struct Workspace: TerminalView {
 
 Views mount automatically, and state is installed before body evaluation. Conditional branches have separate lifetimes, fixed sibling slots remain stable, and `ForEach(items, id: \.id)` preserves item state across reorder. `.id(value)` establishes subtree identity; changing it resets the subtree. View IDs and `ForEach` item IDs also support focus paths and reveal. Local control IDs remain separate from view IDs.
 
+Built-in themes include `.terminalNative`, `.dark`, `.light`, `.dusk()`, `.tokyoNight()`, `.dracula()`, `.nord()`, `.ayuLight()` and `.everforest()`. Light and Ayu Light paint their own light backgrounds; Everforest uses a dark green-grey palette. The named presets include backgrounds, control states and syntax colours, with automatic colour capability detection. Use the RepositoryDemo's Theme menu to cycle through them.
+
 Run the examples and terminal-independent previews:
 
 ```sh

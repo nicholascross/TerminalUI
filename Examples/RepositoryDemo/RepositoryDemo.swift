@@ -26,7 +26,9 @@ final class RepositoryApp: TerminalApplication {
     var menuSelection: String? = "theme"
     var themeIndex = 0
     let colorCapability: ColorCapability
-    var themeNames: [String] { ["Dusk", "Dark", "Light", "Terminal native"] }
+    var themeNames: [String] {
+        ["Dusk", "Dark", "Light", "Terminal native", "Tokyo Night", "Dracula", "Nord", "Ayu Light", "Everforest"]
+    }
     var syntax = SyntaxExample.swift
     var sampleField = "Click to place caret: 界 café"
     var sampleEditor = "Editable scratchpad\nPaste multiple lines here."
@@ -184,7 +186,7 @@ final class RepositoryApp: TerminalApplication {
             return .dialog(id: "help", title: "Read-only Git browser", content: .column(spacing: 1, [
                 .paragraph("Files shows git status (index and working tree columns). Select a file to inspect its working diff; use Staged diff for the index. Untracked files are listed without a diff. Refresh reloads external changes."),
                 .paragraph("Select branches to inspect their recent history. Click a commit or press Enter in Commits to open its full message, author, date, changed files and patch. The Commit tab reopens the selected commit; Newer and Older step through history. Branch selection does not check out a branch. This browser only runs read-only Git queries."),
-                .paragraph("Theme cycles Dusk, dark, light and terminal-native palettes. Samples opens the component gallery; Syntax shows highlighting examples. Click controls or use Alt+1–4, Tab and Enter. Wheel scrolls the pane under the pointer. Escape closes dialogs."),
+                .paragraph("Theme cycles Dusk, dark, light, terminal-native, Tokyo Night, Dracula, Nord, Ayu Light and Everforest palettes. Samples opens the component gallery; Syntax shows highlighting examples. Click controls or use Alt+1–4, Tab and Enter. Wheel scrolls the pane under the pointer. Escape closes dialogs."),
                 .button("Close", id: "close")
             ])).width(.fixed(min(68, columns)))
         default: return nil
@@ -246,7 +248,10 @@ final class RepositoryApp: TerminalApplication {
             modal = "commands"; menuQuery = ""; menuSelection = "theme"
         case .activated("theme"):
             themeIndex = (themeIndex + 1) % themeNames.count
-            host.theme = [Theme.dusk(colorCapability: colorCapability), .dark, .light, .terminalNative][themeIndex]
+            host.theme = [Theme.dusk(colorCapability: colorCapability), .dark, .light, .terminalNative,
+                          .tokyoNight(colorCapability: colorCapability), .dracula(colorCapability: colorCapability),
+                          .nord(colorCapability: colorCapability), .ayuLight(colorCapability: colorCapability),
+                          .everforest(colorCapability: colorCapability)][themeIndex]
             modal = nil; status = "Theme: \(themeNames[themeIndex])"
         case .activated("help"): modal = "help"
         case .activated("close"), .activated("commands.back"), .dismissRequested: modal = nil

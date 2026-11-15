@@ -10,7 +10,7 @@ struct LayoutDemo {
     }
 
     var theme: Theme {
-        .dusk()
+        .nord()
     }
 
     var configuration: TerminalConfiguration {
