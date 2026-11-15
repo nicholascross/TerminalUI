@@ -124,3 +124,7 @@ The [layout demo](Examples/LayoutDemo/README.md) is a starting point for composi
 - [Layout and sizing](Documentation/Layout.md)
 - [Views, state, bindings and focus](Documentation/Components.md)
 - [All guides](Documentation/README.md)
+
+## Licence
+
+TerminalUI is available under the [MIT licence](LICENSE).
