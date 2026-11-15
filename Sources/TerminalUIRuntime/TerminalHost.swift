@@ -136,6 +136,7 @@ public final class TerminalHost {
 
     private func currentView(_ source: any TerminalPresentationSource) -> Element {
         connect(source)
+        if let inputSize { source.sizeDidChange(inputSize) }
         var root = source.resolve(invalidateRoot: needsViewRebuild)
         needsViewRebuild = false
         while true {
@@ -160,6 +161,7 @@ public final class TerminalHost {
     }
 
     func renderIfNeeded(_ source: any TerminalPresentationSource, size: TerminalSize) -> CellGrid? {
+        if inputSize != size { needsRepaint = true }
         inputSize = size
         guard needsRepaint || source.hasPendingUpdates, size.columns > 0, size.rows > 0 else { return nil }
         _ = currentView(source)

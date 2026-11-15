@@ -10,6 +10,12 @@ public struct TerminalApplicationContext {
         self.services = services
     }
 
+    /// Current host or preview dimensions in cells. Reads in a view subscribe it to size changes.
+    /// Dimensions are zero until the host supplies a size or after the application is released.
+    public var terminalSize: TerminalSize {
+        services?.terminalSize ?? TerminalSize(columns: 0, rows: 0)
+    }
+
     /// Finds a control through a path of view IDs or ForEach item IDs.
     /// Unidentified views are transparent; each identified subtree needs a path entry.
     public func focusTarget(path: [AnyHashable] = [], id: String) -> ScopedFocusTarget? {

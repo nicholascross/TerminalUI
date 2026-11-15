@@ -35,6 +35,8 @@ Only the root is required. The application macro supplies conformance, main-acto
 
 The builder preserves fixed slots, branches, optional content and repetitions. Ordinary `for` loops use positional identity; use `ForEach` for keyed collections. Parameter-pack tuples have no fixed child-count limit. `AnyTerminalView` provides deliberate heterogeneous storage and availability erasure; normal composition remains generic.
 
+`Stack(axis:spacing:alignment:)` accepts `.horizontal` or `.vertical`. Change its axis to adapt a layout while preserving child state and focus. Switching between separate `Row` and `Column` conditional branches gives each branch a separate lifetime.
+
 ## State and bindings
 
 `@TerminalComponent` registers private `@State` and `@ApplicationContext` properties before evaluation. State initializers run once per mount generation. Recreated views reconnect to authoritative typed slots. The public installation support exists for external macro expansions; it is compiler support, not an application service.
@@ -108,6 +110,8 @@ Values retain their concrete type, including through `AnyHashable` erasure. `app
 
 Read `application.focusedValue(of: Pane.self)` for the actual typed focus, optionally `in: workspaceScope`. Reads during view evaluation subscribe that view to focus changes; there is no need to mirror focus in application state. The value is read-only and returns `nil` when actual focus is outside the requested type or scope.
 
+Read `application.terminalSize` for the current terminal or preview dimensions in cells. The host supplies the size before the first frame and updates views that read it when dimensions change. Responsive views need no initial size, resize handler or size argument passed through their parents. Dimensions are zero before the host supplies a size or after the application is released.
+
 Use `.onFocusChange(of: Pane.self) { ... }` for effects such as updating a status message. It observes actual typed focus in the modified subtree, including keyboard, pointer and context requests. It reports the initial value and subsequent changes, with `nil` when focus is outside that subtree's registered destinations of the requested type. Registration changes are reflected even when the underlying control handle stays the same; unrelated renders do not repeat notifications. Callbacks run outside evaluation and may update state. The original `.onFocusChange` overload continues to report opaque focus handles. Contexts reference their presentation weakly; after release, lookups fail and stop is harmless.
 
 Apply `.initialFocus()` to a control to prefer it when the screen or a modal first opens. Hidden and disabled controls are skipped; the first eligible preference wins. Updates preserve subsequent keyboard, pointer and programmatic focus, and dismissing a modal restores its opener. The layout demo marks the Topics list, so keyboard exploration starts in the workspace.
@@ -118,4 +122,4 @@ Apply `.initialFocus()` to a control to prefer it when the screen or a modal fir
 
 Use `EngineContent(element)` from `TerminalUIBridge` to embed raw content. `ViewPresentation(root:)` implements the engine presentation-source contract for an engine-owned host. Import both entry points explicitly and qualify overlapping control names. The bridge also enables raw `Element` values as view bodies and `engineElement(view)` for deferred mixed composition. Resolve presentations before passing their elements to a renderer.
 
-LayoutDemo demonstrates a state-owned value model, shared bindings, an independent command draft, modal commands and focus-driven navigation. The compiled external consumer adds helper views, a generic container, explicitly typed bodies, conditionals and both loop forms. Tests and PTY scripts are listed in the [README](../README.md).
+LayoutDemo demonstrates a state-owned value model, shared bindings, an independent command draft, modal commands and focus-driven navigation. `RepositoryDemo` shows a complete read-only Git browser with separate models, view model and pane views. Its screen owns loading, failures and retry; the application uses the optional [typed argument integration](Arguments.md). The external consumer fixture in `Tests/Fixtures/PublicAPIConsumer` adds helper views, a generic container, explicitly typed bodies, conditionals and both loop forms. Tests and PTY scripts are listed in the [README](../README.md).

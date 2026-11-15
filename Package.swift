@@ -11,16 +11,18 @@ let package = Package(
     ],
     products: [
         .library(name: "TerminalUI", targets: ["TerminalUI"]),
+        .library(name: "TerminalUIArgumentParser", targets: ["TerminalUIArgumentParser"]),
         .library(name: "TerminalUIEngine", targets: ["TerminalUIEngine"]),
         .library(name: "TerminalUIBridge", targets: ["TerminalUIBridge"]),
         .library(name: "TerminalUIChroma", targets: ["TerminalUIChroma"]),
         .executable(name: "RepositoryDemo", targets: ["RepositoryDemo"]),
         .executable(name: "LayoutDemo", targets: ["LayoutDemo"]),
-        .executable(name: "ComponentConsumer", targets: ["ComponentConsumer"]),
+        .executable(name: "EngineDemo", targets: ["EngineDemo"]),
     ],
     dependencies: [
         .package(url: "https://github.com/onevcat/Chroma.git", from: "0.3.1"),
         .package(url: "https://github.com/swiftlang/swift-syntax.git", exact: "603.0.0"),
+        .package(url: "https://github.com/apple/swift-argument-parser", from: "1.8.2"),
     ],
     targets: [
         .target(name: "CTerminalSupport", publicHeadersPath: "include"),
@@ -48,16 +50,26 @@ let package = Package(
             "TerminalUICore", "TerminalUIRuntime", "TerminalUIComponentRuntime", "TerminalUIComponentMacros",
         ]),
         .target(name: "TerminalUIChroma", dependencies: ["TerminalUICore", .product(name: "Chroma", package: "Chroma")]),
-        .executableTarget(name: "RepositoryDemo", dependencies: ["TerminalUIEngine", "TerminalUIChroma"], path: "Examples/RepositoryDemo"),
+        .target(name: "TerminalUIArgumentParser", dependencies: [
+            "TerminalUI", "TerminalUIComponentMacros", .product(name: "ArgumentParser", package: "swift-argument-parser"),
+        ]),
+        .target(name: "RepositoryDemoSupport", dependencies: ["TerminalUI"], path: "Examples/RepositoryDemo/Support"),
+        .executableTarget(name: "RepositoryDemo", dependencies: [
+            "RepositoryDemoSupport", "TerminalUI", "TerminalUIArgumentParser",
+            .product(name: "ArgumentParser", package: "swift-argument-parser"),
+        ], path: "Examples/RepositoryDemo/App"),
         .target(name: "LayoutDemoSupport", dependencies: ["TerminalUI"], path: "Examples/LayoutDemo/Support"),
         .executableTarget(name: "LayoutDemo", dependencies: ["LayoutDemoSupport", "TerminalUI"], path: "Examples/LayoutDemo/App"),
-        .executableTarget(name: "ComponentConsumer", dependencies: ["TerminalUI"], path: "Examples/ComponentConsumer"),
+        .executableTarget(name: "EngineDemo", dependencies: ["TerminalUIEngine"], path: "Examples/EngineDemo", exclude: ["README.md"]),
         .testTarget(name: "TerminalUIComponentRuntimeTests", dependencies: ["TerminalUIComponentRuntime"]),
         .testTarget(name: "TerminalUIComponentsTests", dependencies: ["TerminalUI", "TerminalUIEngine", "TerminalUIBridge", "TerminalUIRuntime", "TerminalUILayoutEngine"]),
         .testTarget(name: "TerminalUIComponentMacrosTests", dependencies: ["TerminalUIComponentMacroSupport", .product(name: "SwiftSyntaxMacrosTestSupport", package: "swift-syntax")]),
         .testTarget(name: "TerminalUILayoutTests", dependencies: ["TerminalUIEngine"]),
         .testTarget(name: "LayoutDemoTests", dependencies: ["LayoutDemoSupport", "TerminalUI"]),
-        .testTarget(name: "RepositoryDemoTests", dependencies: ["RepositoryDemo", "TerminalUIEngine"]),
+        .testTarget(name: "RepositoryDemoTests", dependencies: ["RepositoryDemoSupport", "TerminalUI"]),
+        .testTarget(name: "TerminalUIArgumentParserTests", dependencies: [
+            "TerminalUIArgumentParser", "TerminalUI", .product(name: "ArgumentParser", package: "swift-argument-parser"),
+        ]),
         .testTarget(
             name: "TerminalUITests",
             dependencies: [

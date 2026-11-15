@@ -12,3 +12,4 @@ DerivedData/
 !.env.example
 *.p12
 *.mobileprovision
+__pycache__/

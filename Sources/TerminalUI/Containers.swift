@@ -1,5 +1,25 @@
 import TerminalUICore
 
+/// Changes layout direction without replacing the mounted content.
+public struct Stack<Content: TerminalView>: PrimitiveView {
+    public typealias Body = Never
+    let axis: StackLayout.Axis
+    let spacing: Int
+    let alignment: Alignment
+    let content: Content
+    public init(axis: StackLayout.Axis, spacing: Int = 0, alignment: Alignment = .leading, @ViewBuilder content: () -> Content) {
+        self.axis = axis
+        self.spacing = spacing
+        self.alignment = alignment
+        self.content = content()
+    }
+    package func lower(path: [CompositionAddress]) -> [Element] {
+        var element = Element.layout(StackLayout(axis: axis, spacing: spacing, alignment: alignment), children: lowerView(content, path: path))
+        element.compositionPath = path
+        return [element]
+    }
+}
+
 public struct Column<Content: TerminalView>: PrimitiveView {
     public typealias Body = Never
     let spacing: Int

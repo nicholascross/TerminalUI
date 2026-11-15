@@ -26,6 +26,10 @@ assert 'TerminalUIEngine' not in dependencies('TerminalUI')
 assert not {'TerminalUI', 'TerminalUIComponentMacros'} & dependencies('TerminalUIEngine')
 assert dependencies('TerminalUIBridge') == {'TerminalUI', 'TerminalUIEngine', 'TerminalUICore'}
 assert 'TerminalUICore' in dependencies('TerminalUIChroma')
+assert dependencies('TerminalUIArgumentParser') == {'TerminalUI', 'TerminalUIComponentMacros'}
+assert not {'TerminalUIArgumentParser', 'ArgumentParser'} & dependencies('TerminalUI')
+assert not {'TerminalUIArgumentParser', 'ArgumentParser'} & dependencies('TerminalUIEngine')
+assert any(dependency.get('product', [None])[0] == 'ArgumentParser' for dependency in by_name['TerminalUIArgumentParser']['dependencies'])
 for target in ['TerminalUICore', 'TerminalUIText', 'TerminalUIInput', 'TerminalUILayoutEngine',
                'TerminalUIInteraction', 'TerminalUIRendering', 'TerminalUIRuntime', 'TerminalUIComponentRuntime', 'TerminalUIChroma']:
     assert not {'TerminalUI', 'TerminalUIEngine', 'TerminalUIBridge'} & dependencies(target)
@@ -39,10 +43,16 @@ with tempfile.TemporaryDirectory(prefix='terminalui-api-') as directory:
     manifest = '''// swift-tools-version: 6.3
 import PackageDescription
 let package = Package(name: "ExternalConsumers", dependencies: [
-    .package(name: "TerminalUI", path: ROOT)
+    .package(name: "TerminalUI", path: ROOT),
+    .package(url: "https://github.com/apple/swift-argument-parser", from: "1.8.2")
 ], targets: [
     .executableTarget(name: "HighConsumer", dependencies: [.product(name: "TerminalUI", package: "TerminalUI")]),
     .executableTarget(name: "EngineConsumer", dependencies: [.product(name: "TerminalUIEngine", package: "TerminalUI")]),
+    .executableTarget(name: "ArgumentConsumer", dependencies: [
+        .product(name: "TerminalUI", package: "TerminalUI"),
+        .product(name: "TerminalUIArgumentParser", package: "TerminalUI"),
+        .product(name: "ArgumentParser", package: "swift-argument-parser")
+    ]),
     .executableTarget(name: "BridgeConsumer", dependencies: [
         .product(name: "TerminalUI", package: "TerminalUI"),
         .product(name: "TerminalUIEngine", package: "TerminalUI"),
@@ -52,9 +62,10 @@ let package = Package(name: "ExternalConsumers", dependencies: [
 ])
 '''.replace('ROOT', json.dumps(str(root)))
     (package / 'Package.swift').write_text(manifest)
-    for target in ['HighConsumer', 'EngineConsumer', 'BridgeConsumer']:
+    for target in ['HighConsumer', 'EngineConsumer', 'BridgeConsumer', 'ArgumentConsumer']:
         (package / 'Sources' / target).mkdir(parents=True)
-    (package / 'Sources/HighConsumer/Main.swift').write_text((root / 'Examples/ComponentConsumer/Consumer.swift').read_text())
+    (package / 'Sources/HighConsumer/Main.swift').write_text((root / 'Tests/Fixtures/PublicAPIConsumer/Consumer.swift').read_text())
+    (package / 'Sources/ArgumentConsumer/Main.swift').write_text((root / 'Tests/Fixtures/ArgumentApplicationConsumer/Main.swift').read_text())
     (package / 'Sources/EngineConsumer/Main.swift').write_text('''import TerminalUIEngine
 struct Widget: TerminalUIEngine.CustomWidget {
     var id: String? { "widget" }
@@ -97,13 +108,20 @@ import TerminalUIChroma
 ''')
     # Reuse the workspace build cache; the consumers themselves have no package access.
     build = ['swift', 'build', '--package-path', str(package), '--scratch-path', str(root / '.build'), '-j', '4']
-    for product in ['HighConsumer', 'EngineConsumer', 'BridgeConsumer']:
+    for product in ['HighConsumer', 'EngineConsumer', 'BridgeConsumer', 'ArgumentConsumer']:
         run(build + ['--product', product])
     bin_path = Path(run(build + ['--show-bin-path']).strip())
     preview = run([str(bin_path / 'HighConsumer'), '--preview'])
     assert 'Workspace' in preview
     run([str(bin_path / 'EngineConsumer')])
     run([str(bin_path / 'BridgeConsumer')])
+    assert 'typed-external-preview' in run([str(bin_path / 'ArgumentConsumer'), '--message', 'typed-external-preview', '--preview'])
+    for args, exit_code in [(['--message', 'do-not-build', '--help'], 0),
+                            (['--message', 'do-not-build', '--unknown'], 64), (['--message'], 64)]:
+        result = subprocess.run([str(bin_path / 'ArgumentConsumer'), *args], text=True, capture_output=True)
+        assert result.returncode == exit_code, (args, result.stdout, result.stderr)
+        assert 'Usage:' in result.stdout + result.stderr or 'USAGE:' in result.stdout + result.stderr
+    print('Argument-aware external application: generated initializer, typed preview and help/errors before root construction passed')
     print('External SwiftPM consumers: opaque and typed bodies, generics, private macros, engine/custom widget, both bridges and Chroma passed')
 
     compiler = ['swiftc', '-typecheck', '-swift-version', '6', '-parse-as-library', '-module-name', 'BoundaryConsumer',

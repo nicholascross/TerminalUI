@@ -1,11 +1,10 @@
 import Foundation
 import Testing
-import TerminalUIEngine
-@testable import RepositoryDemo
+@testable import RepositoryDemoSupport
 
 struct GitRepositoryTests {
     @Test func queriesPreserveIndexWorktreeAndBranch() throws {
-        let fixture = try Fixture()
+        let fixture = try RepositoryFixture()
         defer { fixture.remove() }
         try fixture.git(["init", "-b", "main"])
         try fixture.git(["config", "user.name", "Demo Test"])
@@ -45,7 +44,7 @@ struct GitRepositoryTests {
     }
 
     @Test func emptyDetachedAndRenamedRepositories() throws {
-        let fixture = try Fixture()
+        let fixture = try RepositoryFixture()
         defer { fixture.remove() }
         try fixture.git(["init", "-b", "main"])
         let repository = try GitRepository(directory: fixture.url.path)
@@ -69,54 +68,54 @@ struct GitRepositoryTests {
     }
 
     @Test @MainActor func commitViewerHandlesEmptyHistoryNavigationAndRefresh() throws {
-        let fixture = try Fixture()
+        let fixture = try RepositoryFixture()
         defer { fixture.remove() }
         try fixture.git(["init", "-b", "main"])
         try fixture.git(["config", "user.name", "Demo Test"])
         try fixture.git(["config", "user.email", "demo@example.test"])
         let repository = try GitRepository(directory: fixture.url.path)
-        let app = try RepositoryApp(host: TerminalHost(), repository: repository)
-        app.handle(.activated("inspect.commit"))
-        #expect(app.detail == "commit")
-        #expect(app.commitInspection == "No commits yet in this repository.")
+        var model = try RepositoryViewModel(repository: repository)
+        model.showCommit()
+        #expect(model.inspection == .commit)
+        #expect(model.output == "No commits yet in this repository.")
 
         try fixture.write("file.txt", "first\n")
         try fixture.git(["add", "."])
         try fixture.git(["commit", "-m", "First commit", "-m", "Full body"])
-        app.handle(.activated("refresh"))
-        let first = try #require(app.commit)
-        #expect(app.detail == "commit")
-        #expect(app.commitInspection.contains("Full body"))
-        #expect(app.commitInspection.contains("+first"))
+        model.refresh()
+        let first = try #require(model.commit)
+        #expect(model.inspection == .commit)
+        #expect(model.output.contains("Full body"))
+        #expect(model.output.contains("+first"))
         try fixture.write("file.txt", "second\n")
         try fixture.git(["add", "."])
         try fixture.git(["commit", "-m", "Second commit"])
-        app.handle(.activated("refresh"))
-        #expect(app.commit == first)
-        app.handle(.activated("commit.newer"))
-        #expect(app.commit != first)
-        #expect(app.commitInspection.contains("Second commit"))
-        #expect(app.commitInspection.contains("+second"))
-        app.handle(.activated("commit.older"))
-        #expect(app.commit == first)
-        app.handle(.activated("commit.older"))
-        #expect(app.commit == first)
-        app.handle(.selectionChanged("detail", "source"))
-        app.handle(.selectionChanged("detail", "commit"))
-        #expect(app.commitInspection.contains("Full body"))
-        let cleanApp = try RepositoryApp(host: TerminalHost(), repository: repository)
-        #expect(cleanApp.detail == "commit")
-        #expect(cleanApp.commitInspection.contains("Second commit"))
+        model.refresh()
+        #expect(model.commit == first)
+        model.moveCommit(by: -1)
+        #expect(model.commit != first)
+        #expect(model.output.contains("Second commit"))
+        #expect(model.output.contains("+second"))
+        model.moveCommit(by: 1)
+        #expect(model.commit == first)
+        model.moveCommit(by: 1)
+        #expect(model.commit == first)
+        model.showWorkingDiff()
+        model.showCommit()
+        #expect(model.output.contains("Full body"))
+        let cleanModel = try RepositoryViewModel(repository: repository)
+        #expect(cleanModel.inspection == .commit)
+        #expect(cleanModel.output.contains("Second commit"))
     }
 
     @Test func invalidRepositoryReportsGitError() throws {
-        let fixture = try Fixture()
+        let fixture = try RepositoryFixture()
         defer { fixture.remove() }
         #expect(throws: GitRepository.Failure.self) { try GitRepository(directory: fixture.url.path) }
     }
 }
 
-private struct Fixture {
+struct RepositoryFixture {
     let url: URL
     init() throws {
         url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)

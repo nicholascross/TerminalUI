@@ -90,6 +90,8 @@ package final class ComponentRuntime {
     private var initialized = false
     private var currentFocus: ScopedFocusTarget?
     private var focusSelection: StateSlot<FocusSelection>?
+    private var currentTerminalSize = TerminalSize(columns: 0, rows: 0)
+    private var terminalSizeSlot: StateSlot<TerminalSize>?
     private var generation: UInt64 = 0
     package private(set) var revision: UInt64 = 0
     package var hasPendingUpdates: Bool {
@@ -111,6 +113,17 @@ package final class ComponentRuntime {
 
     package func connect(_ services: PresentationServices) {
         driver.wake = services.requestUpdate
+    }
+
+    package var terminalSize: TerminalSize {
+        let slot = terminalSizeSlot ?? StateSlot(currentTerminalSize, driver: driver, equals: ==)
+        terminalSizeSlot = slot
+        return slot.read()
+    }
+
+    package func sizeDidChange(_ size: TerminalSize) {
+        currentTerminalSize = size
+        terminalSizeSlot?.write(size)
     }
 
     package func resolve(invalidateRoot: Bool = false) -> Element {
@@ -442,5 +455,7 @@ package final class ComponentRuntime {
         currentFocus = nil
         focusSelection?.detach()
         focusSelection = nil
+        terminalSizeSlot?.detach()
+        terminalSizeSlot = nil
     }
 }

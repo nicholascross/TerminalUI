@@ -4,6 +4,119 @@ import TerminalUIComponentMacroSupport
 import XCTest
 
 final class MacroTests: XCTestCase {
+    func testArgumentApplicationSynthesizesStorageInitializerAndTypedLauncher() {
+        assertMacroExpansion("""
+        @main
+        @TerminalApplication(arguments: Settings.Options.self)
+        struct Demo {
+            var root: some TerminalView { Screen(path: arguments.path) }
+        }
+        """, expandedSource: """
+        @main
+        struct Demo {
+            @MainActor
+            var root: some TerminalView { Screen(path: arguments.path) }
+
+            @MainActor private let arguments: Settings.Options
+
+            @MainActor
+            init(arguments: Settings.Options) {
+                self.arguments = arguments
+            }
+
+            @MainActor
+            public var configuration: TerminalUI.TerminalConfiguration {
+                arguments.terminal.configuration
+            }
+
+            @MainActor
+            public static func main() async {
+                await TerminalUIArgumentParser.TerminalArgumentLauncher.run(Settings.Options.self) {
+                    Self(arguments: $0)
+                }
+            }
+        }
+
+        extension Demo: TerminalUI.TerminalApplicationDefinition {
+        }
+        """, macros: ["TerminalApplication": TerminalApplicationMacro.self])
+    }
+
+    func testArgumentApplicationRejectsDuplicateStorage() {
+        assertMacroExpansion("""
+        @TerminalApplication(arguments: Options.self)
+        struct Demo {
+            let arguments: Options
+        }
+        """, expandedSource: """
+        struct Demo {
+            @MainActor
+            let arguments: Options
+        }
+
+        extension Demo: TerminalUI.TerminalApplicationDefinition {
+        }
+        """, diagnostics: [DiagnosticSpec(
+            message: "@TerminalApplication generates arguments; remove the explicit property",
+            line: 3, column: 5
+        )], macros: ["TerminalApplication": TerminalApplicationMacro.self])
+    }
+
+    func testArgumentApplicationRejectsDuplicateInitializer() {
+        assertMacroExpansion("""
+        @TerminalApplication(arguments: Options.self)
+        struct Demo {
+            init(arguments: Options) {}
+        }
+        """, expandedSource: """
+        struct Demo {
+            @MainActor
+            init(arguments: Options) {}
+        }
+
+        extension Demo: TerminalUI.TerminalApplicationDefinition {
+        }
+        """, diagnostics: [DiagnosticSpec(
+            message: "@TerminalApplication generates init(arguments:); remove the explicit initializer",
+            line: 3, column: 5
+        )], macros: ["TerminalApplication": TerminalApplicationMacro.self])
+    }
+
+    func testArgumentApplicationRejectsASecondConfigurationSource() {
+        assertMacroExpansion("""
+        @TerminalApplication(arguments: Options.self)
+        struct Demo {
+            var configuration: TerminalConfiguration { .init(mouseEnabled: false) }
+        }
+        """, expandedSource: """
+        struct Demo {
+            @MainActor
+            var configuration: TerminalConfiguration { .init(mouseEnabled: false) }
+        }
+
+        extension Demo: TerminalUI.TerminalApplicationDefinition {
+        }
+        """, diagnostics: [DiagnosticSpec(
+            message: "Terminal configuration is generated from arguments.terminal; remove the app's configuration property",
+            line: 3, column: 5
+        )], macros: ["TerminalApplication": TerminalApplicationMacro.self])
+    }
+
+    func testArgumentApplicationRequiresAMetatypeLiteral() {
+        assertMacroExpansion("""
+        @TerminalApplication(arguments: optionsType)
+        struct Demo {}
+        """, expandedSource: """
+        struct Demo {}
+
+        extension Demo: TerminalUI.TerminalApplicationDefinition {
+        }
+        """, diagnostics: [DiagnosticSpec(
+            message: "Pass an arguments type using .self, for example @TerminalApplication(arguments: Options.self)",
+            line: 1, column: 22
+        )], macros: ["TerminalApplication": TerminalApplicationMacro.self])
+    }
+
     func testApplicationEntryPoint() {
         assertMacroExpansion("""
         @main

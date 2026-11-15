@@ -1,6 +1,5 @@
 """Compile a public-API consumer and verify idle updates, scoped editors and teardown on a PTY."""
 import fcntl
-import glob
 import os
 import pathlib
 import pty
@@ -13,13 +12,15 @@ import tempfile
 import termios
 import time
 
+from pty_support import module_objects
+
 root = pathlib.Path(__file__).resolve().parent.parent
 os.chdir(root)
 bin_path = subprocess.check_output(['swift', 'build', '--show-bin-path'], text=True).strip()
 modules = ['CTerminalSupport', 'TerminalUICore', 'TerminalUIText', 'TerminalUIInput',
            'TerminalUILayoutEngine', 'TerminalUIInteraction', 'TerminalUIRendering',
            'TerminalUIRuntime', 'TerminalUI', 'TerminalUIComponentRuntime']
-objects = [path for module in modules for path in glob.glob(f'{bin_path}/{module}.build/*.o')]
+objects = module_objects(bin_path, modules)
 with tempfile.TemporaryDirectory(prefix='terminalui-components-') as directory:
     executable = f'{directory}/ComponentHostProbe'
     subprocess.run(['swiftc', '-swift-version', '6', '-parse-as-library',

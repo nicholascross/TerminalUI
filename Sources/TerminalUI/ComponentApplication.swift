@@ -67,7 +67,18 @@ package final class ComponentApplication: TerminalPresentationSource {
         runtime.focusDidChange(target)
     }
 
+    package var terminalSize: TerminalSize { runtime.terminalSize }
+
+    package func sizeDidChange(_ size: TerminalSize) {
+        runtime.sizeDidChange(size)
+    }
+
     package func handle(_ action: UIAction) {
+        // The host sends the initial size before the first frame. Mount resize handlers first.
+        if case .resized(let size) = action {
+            sizeDidChange(size)
+            _ = resolve()
+        }
         if runtime.handle(action) { return }
         let original = runtime.unscoped(action)
         if let legacy { legacy.handle(original) } else { fallback(original) }

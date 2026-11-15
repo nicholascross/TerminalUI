@@ -1,6 +1,6 @@
 # Architecture
 
-`TerminalUI` owns the high-level declarative API. `TerminalUIEngine` owns the low-level facade. Neither depends on the other or re-exports implementation modules. `TerminalUIBridge` is an explicit opt-in target depending on both; engine-only consumers avoid high-level and macro compilation. `TerminalUIChroma` depends directly on shared semantic text models in Core.
+`TerminalUI` owns the high-level declarative API. `TerminalUIEngine` owns the low-level facade. Neither depends on the other or re-exports implementation modules. `TerminalUIBridge` is an explicit opt-in target depending on both; engine-only consumers avoid high-level and macro compilation. `TerminalUIChroma` depends directly on shared semantic text models in Core. `TerminalUIArgumentParser` adds typed application arguments as an optional adapter; neither public facade depends on Argument Parser. Its macro overload generates argument storage, initialization and configuration from the shared terminal options. See [application arguments](Arguments.md) for startup and configuration ownership.
 
 | Target | Responsibility | Direct dependencies |
 | --- | --- | --- |
@@ -13,6 +13,7 @@
 | `TerminalUIRuntime` | Host, presentation services, wakeups and terminal lifecycle. | Core, Input, Rendering, CTerminalSupport |
 | `TerminalUIComponentRuntime` | Mount identity, state slots, dependencies, scopes and scheduling. | Core |
 | `TerminalUI` | Public typed views, builders, modifiers, macros, runner and harness. | Core, Runtime, ComponentRuntime, ComponentMacros |
+| `TerminalUIArgumentParser` | Opt-in typed CLI arguments, shared terminal options and generated app initialization/configuration. | TerminalUI, ComponentMacros, ArgumentParser |
 | `TerminalUIEngine` | Raw facade, legacy element builder and factories. | Core, Input, Rendering, Runtime |
 | `TerminalUIBridge` | Raw content in views and views as engine presentations. | TerminalUI, TerminalUIEngine, Core |
 | `TerminalUIComponentMacros` / `TerminalUIComponentMacroSupport` | Compiler plugin, application entry/conformance/isolation and state registration. | SwiftSyntax and compiler plugin tooling |
@@ -26,6 +27,9 @@ flowchart TD
     UI --> Runtime
     UI --> Macros
     UI --> Core
+    Arguments[TerminalUIArgumentParser] --> UI
+    Arguments --> Macros
+    Arguments --> Parser[ArgumentParser]
     Engine --> Runtime
     Engine --> Rendering
     Engine --> Input

@@ -31,6 +31,36 @@ private struct PlainScreen: TerminalView {
     }
 }
 
+@TerminalComponent
+private struct ResizeScreen: TerminalView {
+    @State private var size = TerminalSize(columns: 80, rows: 24)
+
+    var body: some TerminalView {
+        TerminalUI.Text("\(size.columns)x\(size.rows)")
+            .onAction { action in
+                guard case .resized(let next) = action else { return false }
+                size = next
+                return true
+            }
+    }
+}
+
+@TerminalComponent
+private struct SizeAwareScreen: TerminalView {
+    @ApplicationContext private var application
+    @State private var count = 0
+    let probe: ApplicationProbe
+
+    var body: some TerminalView {
+        probe.bodies += 1
+        let size = application.terminalSize
+        return Column {
+            TerminalUI.Text("\(size.columns)x\(size.rows) · \(count)")
+            TerminalUI.Button("Increment", id: "increment").onActivate { count += 1 }
+        }
+    }
+}
+
 @TerminalApplication
 private struct DefaultApplication {
     var root: some TerminalView {
@@ -61,6 +91,56 @@ private struct ConfiguredApplication {
 
 @MainActor
 struct ApplicationTests {
+    @Test func `preview size is available on first evaluation and updates only its readers`() throws {
+        let reader = ApplicationProbe()
+        let sibling = ApplicationProbe()
+        let app = TerminalApp(root: Column {
+            SizeAwareScreen(probe: reader)
+            ApplicationScreen(probe: sibling)
+        })
+        #expect(app.context.terminalSize == .init(columns: 0, rows: 0))
+        #expect(app.preview(width: 120, height: 40)[0].hasPrefix("120x40 · 0"))
+        #expect(reader.bodies == 1)
+        let siblingBodies = sibling.bodies
+        let increment = try #require(app.context.focusTarget(id: "increment"))
+        #expect(app.context.focus(increment))
+        app.host.handleInput(.enter, source: app.presentation)
+        #expect(app.preview(width: 120, height: 40)[0].hasPrefix("120x40 · 1"))
+        let readerBodies = reader.bodies
+        #expect(app.preview(width: 60, height: 32)[0].hasPrefix("60x32 · 1"))
+        #expect(reader.bodies == readerBodies + 1)
+        #expect(sibling.bodies == siblingBodies)
+        #expect(app.context.terminalSize == .init(columns: 60, rows: 32))
+        _ = app.preview(width: 60, height: 32)
+        #expect(reader.bodies == readerBodies + 1)
+        app.presentation.unmount()
+        #expect(app.preview(width: 60, height: 32)[0].hasPrefix("60x32 · 0"))
+    }
+
+    @Test func `host resize and engine bridge supply context dimensions`() throws {
+        let app = TerminalApp(root: SizeAwareScreen(probe: ApplicationProbe()))
+        app.host.deliver(.resized(.init(columns: 120, rows: 40)), to: app.presentation)
+        #expect(app.context.terminalSize == .init(columns: 120, rows: 40))
+        #expect(try #require(app.host.renderIfNeeded(app.presentation, size: .init(columns: 120, rows: 40))).lines[0]
+            .hasPrefix("120x40 · 0"))
+        // A size passed directly to rendering also schedules a frame without a resize action.
+        #expect(try #require(app.host.renderIfNeeded(app.presentation, size: .init(columns: 60, rows: 32))).lines[0]
+            .hasPrefix("60x32 · 0"))
+
+        let host = TerminalHost()
+        let presentation = ViewPresentation(root: SizeAwareScreen(probe: ApplicationProbe()))
+        #expect(host.preview(presentation, width: 100, height: 30)[0].hasPrefix("100x30 · 0"))
+        #expect(host.preview(presentation, width: 70, height: 20)[0].hasPrefix("70x20 · 0"))
+    }
+
+    @Test func `initial resize reaches screen before its first frame`() {
+        let app = TerminalApp(root: ResizeScreen())
+        app.host.deliver(.resized(.init(columns: 120, rows: 40)), to: app.presentation)
+        #expect(app.preview(width: 120, height: 40)[0].hasPrefix("120x40"))
+        app.host.deliver(.resized(.init(columns: 60, rows: 32)), to: app.presentation)
+        #expect(app.preview(width: 60, height: 32)[0].hasPrefix("60x32"))
+    }
+
     @Test func `declarative application defaults preview without terminal access`() {
         let definition = DefaultApplication()
         #expect(!definition.configuration.mouseEnabled)
@@ -122,6 +202,7 @@ struct ApplicationTests {
         #expect(presentation == nil)
         #expect(context.focusTarget(id: "draft") == nil)
         #expect(!context.focus(target))
+        #expect(context.terminalSize == .init(columns: 0, rows: 0))
         context.stop()
     }
 

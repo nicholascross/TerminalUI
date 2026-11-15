@@ -32,6 +32,7 @@ public final class ViewPresentation<Root: TerminalView>: TerminalPresentationSou
     public func resolve(invalidateRoot: Bool = false) -> Element { adapter.resolve(invalidateRoot: invalidateRoot) }
     public func handle(_ action: UIAction) { adapter.handle(action) }
     public func focusDidChange(_ target: ScopedFocusTarget?) { adapter.focusDidChange(target) }
+    public func sizeDidChange(_ size: TerminalSize) { adapter.sizeDidChange(size) }
 }
 
 /// Converts typed composition to deferred engine content for explicit mixed applications.

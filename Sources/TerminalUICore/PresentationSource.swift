@@ -36,10 +36,13 @@ public protocol TerminalPresentationSource: AnyObject {
     func handle(_ action: UIAction)
     /// Called after host focus changes, outside component evaluation.
     func focusDidChange(_ target: ScopedFocusTarget?)
+    /// Supplies host or preview dimensions before resolving the next frame.
+    func sizeDidChange(_ size: TerminalSize)
 }
 
 extension TerminalPresentationSource {
     public func focusDidChange(_: ScopedFocusTarget?) {}
+    public func sizeDidChange(_: TerminalSize) {}
 }
 
 /// An explicit, generation-scoped control address obtained from a mounted component root.
