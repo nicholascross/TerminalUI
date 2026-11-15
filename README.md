@@ -1,116 +1,126 @@
 # TerminalUI
 
-Minimal terminal UI toolkit in Swift.
+**Build terminal interfaces with a declarative Swift layout DSL.**
 
-<img width="810" height="530" alt="Example UI render" src="https://github.com/user-attachments/assets/5eb4e7d7-b437-451e-84c7-2fbdbf746ac8" />
+Compose screens from rows, columns, panels and interactive controls. Describe how content should fit, grow and align, bind controls to your state, and let TerminalUI handle layout and interaction as the terminal resizes.
 
-## Features
+- **Readable layouts.** Nest views to express the structure of your screen, with sizing and styling alongside the content they affect.
+- **Flexible sizing.** Combine fixed sidebars, expanding workspaces and content that grows within a limit. Sizes and spacing use terminal cells.
+- **Interactive by default.** Use text editors, lists, tables, menus and dialogs with keyboard navigation, scrolling and optional mouse support.
+- **Reusable Swift views.** Extract components, share state and use ordinary Swift conditionals to build dynamic screens.
 
-- Terminal control: raw mode, cursor, styling, size detection
-- Input parsing: character keys, arrow keys, backspace/delete, paste events (with bracketed-paste support), Unicode
-- Layout: Stack, frames, regions
-- Rendering: cell buffer, borders, styles
-- Widgets:
-  - **ListWidget**: vertical or horizontal list of selectable items with single- or multi-selection support. Configure `orientation` (.vertical/.horizontal), toggle items with Space when `allowsMultipleSelection` is enabled, and confirm selection(s) with Enter. Highlights the current item (▶ or brackets) and underlines selected items. Use the `onSelect` callback to receive selected indices and values.
-  - **TextAreaWidget**: read-only or interactive multi-line text area with vertical scrolling (↑/↓), optional wrapping of overflowing lines (default: enabled), and optional title. Ideal for displaying details or logs.
-  - **TextInputWidget**: single-line or multi-line input prompt with editing (insertion, deletion), arrow-key navigation (←/→/↑/↓), bracketed-paste support, and submit on Ctrl-D via the `onSubmit` callback.
-- Ability to disable widgets via `isDisabled` property (widgets remain focusable but ignore events; border styling can indicate disabled state)
-- Ability to hide widget borders via `isBorderHidden` property (widgets remain focusable and layout unchanged; border space reserved but not drawn)
-- UTF-8 and bracketed-paste support, SIGWINCH resize handling
+![A TerminalUI workspace with navigation, an inspector and a multiline command editor](Documentation/Images/layout-workspace.png)
 
-## Quick Start
+Requires **Swift 6.3**. Add the `TerminalUI` library product to your Swift Package Manager executable target. Interactive terminal support is tested on Linux.
 
-Add TerminalUI to your Swift project via Swift Package Manager:
+## A small app, a complete screen
 
-```swift
-.package(url: "https://github.com/nicholascross/TerminalUI.git", from: "0.1.0"),
-```
-
-Then add "TerminalUI" to your target dependencies and import it:
+This notes app binds an editor to a live preview. The draft panel grows to eight rows, while the preview fills the remaining space and scrolls when needed.
 
 ```swift
 import TerminalUI
 
-let terminal = Terminal()
-defer {
-    terminal.showCursor()
-    terminal.clearScreen()
+@main
+@TerminalApplication
+struct NotesApp {
+    var root: some TerminalView { NotesView() }
+    var theme: Theme { .nord() }
 }
 
-// Build an interactive UI with a horizontal menu, a list, detail view, and text input
-// Press Ctrl-D to submit input, or Ctrl-C to quit
-let details = TextAreaWidget(
-    text: """
-        Select an item from the list on the left.
-        Use ↑/↓ to navigate, and type below to send input.
-        """,
-    title: "Details"
-)
-details.isDisabled = true
+@TerminalComponent
+struct NotesView: TerminalView {
+    @State private var draft = ""
+    @ApplicationContext private var application
 
-// Horizontal menu bar
-let menu = ListWidget(items: ["File", "Edit", "View", "Help"], title: "Menu")
-menu.orientation = .horizontal
-menu.onSelect = { _, selections in
-    if let sel = selections.first {
-        details.text = "Menu selected: \(sel)"
-    }
-}
+    var body: some TerminalView {
+        Column(spacing: 1) {
+            Row {
+                Text("Notes").role(.heading)
+                Spacer()
+                Button("Quit").onActivate { application.stop() }
+            }
 
-// Vertical list with multiple selection
-let list = ListWidget(items: ["Apple", "Banana", "Cherry"], title: "Fruits")
-list.allowsMultipleSelection = true
-list.onSelect = { _, selections in
-    details.text = selections.isEmpty
-        ? "No fruits selected"
-        : "Selected fruits: \(selections.joined(separator: ", "))"
-}
+            Panel("Draft") {
+                TextEditor(id: "draft", text: $draft)
+                    .initialFocus()
+            }
+            .height(.fit(maximum: 8))
 
-let input = TextInputWidget(prompt: "> ", title: "Command")
-input.onSubmit = { text in
-    details.text = "You entered: \(text)"
-}
+            Panel("Preview") {
+                ScrollView(id: "preview") {
+                    Paragraph(draft.isEmpty ? "Your notes appear here." : draft)
+                }
+            }
 
-let loop = UIEventLoop(terminal: terminal) {
-    Stack(axis: .vertical, spacing: 0) {
-        TextAreaWidget(
-            text: " TerminalUI Demo ",
-            isUserInteractive: false
-        )
-        .frame(height: 3)
-
-        menu.frame(height: 3)
-
-        Stack(axis: .horizontal, spacing: 1) {
-            list.frame(width: 20)
-            details
+            StatusBar("Tab: move focus · Shift+Enter: new line")
         }
-
-        input.expanding(maxHeight: 8)
     }
 }
-
-try await loop.run()
 ```
 
-## Text Input Handling
+`@TerminalApplication` supplies the application entry point. `@TerminalComponent` connects local `@State` to the view; passing `$draft` to the editor keeps the preview in sync as you type.
 
-The `TextInputWidget` supports:
+## Layout that reads like your screen
 
-- Multi-line text entry with Enter splitting lines.
-- Character insertion and deletion (Backspace/Delete).
-- Arrow-key navigation (←, →, ↑, ↓) across and within lines.
-- Bracketed-paste support: pasted text (including multi-line) is inserted seamlessly.
-- Submit buffer with Ctrl-D (`.submit`), which returns the full input and clears the widget.
+Use `Column` for vertical sections and `Row` for side-by-side panes. Wrap related content in a `Panel`, add a `ScrollView` for longer content, and use `Spacer` to push controls apart.
 
-## Example
+```swift
+Row(spacing: 1) {
+    Panel("Navigation") {
+        Column(spacing: 1) {
+            Text("Overview").role(.heading)
+            Text("Activity")
+            Text("Settings")
+        }
+    }
+    .width(.fixed(24))
 
-The `TerminalUIExample` demonstrates a horizontal menu, a vertical list with multiple-selection support, a detail view, and a text input prompt. Use ↑/↓ (or ←/→ for the menu), Space to toggle selection, Enter to confirm selection(s), and Ctrl-D to submit input. Press Ctrl-C to quit:
+    Panel("Workspace") {
+        ScrollView(id: "workspace") {
+            Paragraph("The workspace uses the remaining width and height.")
+        }
+    }
+}
+```
+
+Most views choose a useful size automatically: text fits its content, while lists, tables and scroll views expand. Override sizing where the design calls for it:
+
+| Intent | Modifier |
+| --- | --- |
+| Keep a sidebar 24 cells wide | `.width(.fixed(24))` |
+| Let a panel grow up to eight rows | `.height(.fit(maximum: 8))` |
+| Keep a list as tall as its content | `.height(.content)` |
+
+Add padding, alignment and text styles where you need them. Layouts adjust to the available terminal space as the window resizes.
+
+## From a screen to an application
+
+Extract any part of a screen into a `TerminalView` with a `body: some TerminalView`. Keep local values in `@State` and use `@Binding` when views share editable data.
+
+Add lists, tables, tabs or searchable menus as your application grows. Controls support keyboard navigation and callbacks for actions such as activating a button or submitting text.
+
+![A searchable command menu for navigating between panes](Documentation/Images/layout-commands.png)
+
+Choose a built-in theme at the application level, as the example does with `.nord()`. Text roles such as `.heading` and `.secondary` keep styling consistent across the screen.
+
+## Try it
+
+From a checkout of this repository:
 
 ```sh
-swift run TerminalUIExample
+# Explore layouts and interactive controls.
+swift run LayoutDemo
+
+# Browse a Git repository.
+swift run RepositoryDemo --repo /path/to/repository
 ```
 
-## Acknowledgements
+The [layout demo](Examples/LayoutDemo/README.md) is a starting point for composing your own screen. The [repository browser](Examples/RepositoryDemo/README.md) shows how to organise a larger application into views and shared state.
 
-This project has utilized generative AI tools in various aspects of its development, including coding assistance, testing, and documentation enhancement. The use of these tools has contributed to the efficiency and effectiveness of the development process.
+![The repository browser with branches, commits, files and a detail inspector](Documentation/Images/repository-browser.png)
+
+## Learn more
+
+- [Layout and sizing](Documentation/Layout.md)
+- [Views, state, bindings and focus](Documentation/Components.md)
+- [All guides](Documentation/README.md)

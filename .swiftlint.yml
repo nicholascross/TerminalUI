@@ -1,0 +1,74 @@
+included:
+  - Sources
+  - Tests
+
+excluded:
+  - .build
+  - .swiftpm
+
+# SwiftLint cannot exempt private supporting types; AGENTS.md defines the convention.
+# opt_in_rules:
+#   - one_declaration_per_file
+
+disabled_rules:
+  # swift-format owns trailing-comma style.
+  - trailing_comma
+  # swift-format/swiftformat own multiline brace placement.
+  - opening_brace
+  # Formatter wrapping can move disable-next comments away from fixture literals.
+  - superfluous_disable_command
+
+line_length:
+  warning: 180
+  error: 300
+  ignores_urls: true
+  ignores_comments: true
+  ignores_function_declarations: true
+  ignores_interpolated_strings: true
+  ignores_multiline_strings: true
+  ignores_regex_literals: true
+
+# Human-readable Swift Testing names are intentionally backticked.
+# "or" is part of Fulcrum's expression language; "ci" names CI evidence.
+identifier_name:
+  excluded:
+    - "^id$"
+    - "^or$"
+    - "^ci$"
+    - "^`.+`$"
+
+nesting:
+  type_level:
+    warning: 2
+  function_level:
+    warning: 2
+  ignore_coding_keys: true
+
+large_tuple:
+  warning: 3
+  error: 4
+
+function_parameter_count:
+  warning: 7
+  error: 9
+  ignores_default_parameters: true
+
+function_body_length:
+  warning: 80
+  error: 160
+
+type_body_length:
+  warning: 350
+  error: 500
+
+file_length:
+  warning: 600
+  error: 1000
+  ignore_comment_only_lines: true
+
+cyclomatic_complexity:
+  warning: 15
+  error: 30
+  ignores_case_statements: true
+
+reporter: xcode
