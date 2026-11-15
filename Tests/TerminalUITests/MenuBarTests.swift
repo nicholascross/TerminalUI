@@ -28,7 +28,7 @@ struct MenuBarTests {
         #expect(engine.handle(.left, in: unavailable) == .selectionChanged("bar", "chat"))
         #expect(engine.handle(.home, in: unavailable) == .selectionChanged("bar", "chat"))
         #expect(engine.handle(.end, in: unavailable) == .selectionChanged("bar", "quit"))
-        #expect(engine.handle(.character("2"), in: bar) == .activated("review"))
+        #expect(engine.handle(.character("2"), in: bar) == nil)
     }
 
     @Test func shortcutsActivateOnlyWhenFocusedAndPasteNeverActivates() {

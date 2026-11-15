@@ -21,7 +21,7 @@ private struct SharedState: TerminalView {
     var body: some TerminalView {
         probe.parentCalls += 1
         probe.first = $first; probe.second = $second; probe.useFirst = $useFirst
-        return BindingReader(first: $first, second: $second, useFirst: $useFirst, probe: probe).bodyBoundary
+        return BindingReader(first: $first, second: $second, useFirst: $useFirst, probe: probe)
     }
 }
 
@@ -30,10 +30,6 @@ private struct BindingReader: TerminalView {
     @Binding var second: String
     @Binding var useFirst: Bool
     let probe: Dependencies
-    var bodyBoundary: some TerminalView {
-        TerminalUI.Component(self)
-    }
-
     var body: some TerminalView {
         probe.childCalls += 1
         return TerminalUI.Text(useFirst ? first : second)

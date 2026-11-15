@@ -113,6 +113,9 @@ import TerminalUIChroma
                 'CustomWidget', 'WidgetMeasureContext', 'WidgetDrawContext', 'TerminalPresentationSource', 'PresentationServices']
     checks = [(name, f'let value: {name}? = nil', f"cannot find type '{name}'") for name in excluded]
     checks += [
+        ('removed-component', '@MainActor func check() { _ = Component(Text("x"), key: "x") }', "cannot find 'Component' in scope"),
+        ('removed-menu-action', 'let value: MenuAction? = nil', "cannot find type 'MenuAction'"),
+        ('removed-menu-action-builder', 'let value: MenuActionBuilder? = nil', "cannot find type 'MenuActionBuilder'"),
         ('inferred-host', '@MainActor func check() { _ = TerminalApp(root: Text("x")).host }', "'host' is inaccessible"),
         ('inferred-presentation', '@MainActor func check() { _ = TerminalApp(root: Text("x")).presentation }', "'presentation' is inaccessible"),
         ('harness-elements', '@MainActor func check() { _ = ApplicationHarness(root: Text("x")).resolve() }', "has no member 'resolve'"),

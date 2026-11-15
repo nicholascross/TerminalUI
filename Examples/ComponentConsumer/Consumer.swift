@@ -41,7 +41,7 @@ public struct Workspace: TerminalView {
         Column {
             Text("Workspace")
             CommandPane(submit: { _ in })
-            Component(CommandPane(submit: { _ in }), key: "second")
+            CommandPane(submit: { _ in }).id("second")
             ApplicationControls()
             StatusBar("Tab: focus · Enter: submit · Shift+Enter: newline · Ctrl-C: quit")
         }
@@ -85,8 +85,39 @@ public struct CompositionExamples: TerminalView {
         Framed {
             TypedLabel()
             if expanded { Text("Expanded") } else { Text("Collapsed") }
-            ForEach([1, 2, 3], id: \.self) { Text("Item \($0)").id($0) }
+            ForEach([1, 2, 3], id: \.self) { Text("Item \($0)") }
             for index in 0..<2 { Text("Position \(index)") }
         }
+    }
+}
+
+public enum ConsumerDestination: String, CaseIterable, MenuItemDefinition {
+    case topics, inspector
+    public var id: Self { self }
+    public var title: String { rawValue == "topics" ? "Topics" : "Inspector" }
+    public var menuShortcut: MenuShortcut { self == .topics ? .automatic : .key("i") }
+}
+
+@TerminalComponent
+public struct MenuExamples: TerminalView {
+    @ApplicationContext private var application
+    @State private var commandsOpen = false
+    private var focused: ConsumerDestination? { application.focusedValue(of: ConsumerDestination.self) }
+    public var body: some TerminalView {
+        Column {
+            MenuBar(id: "destinations", items: ConsumerDestination.allCases, activeItem: focused)
+            Button("Commands").onActivate { commandsOpen = true }.keyboardShortcut(.controlP)
+            Button("Topics").focusTarget(ConsumerDestination.topics)
+            Button("Inspector").focusTarget(ConsumerDestination.inspector)
+        }
+        .overlay {
+            if commandsOpen {
+                Menu(id: "choices", title: "Choices", items: ConsumerDestination.allCases,
+                     initialSelection: focused, itemTitle: { "Focus \($0.title)" })
+                .onActivate { commandsOpen = false }
+                .onDismiss { commandsOpen = false }
+            }
+        }
+        .onFocusChange(of: ConsumerDestination.self) { _ in }
     }
 }

@@ -46,9 +46,10 @@ extension Element {
             .text("No matching items.").role(.secondary).visible(matches.isEmpty),
             reason.map { .paragraph($0).role(.warning) } ?? .text("").visible(false),
             .button("Return", id: id + ".back"),
-            .keyHints("↓: results · Enter: open · Esc back")
+            .text("↓: results · Enter: open · Esc back").role(.secondary)
         ]))
         menu.menuShortcutItems = matches
+        menu.dismissalButtonID = id + ".back"
         return menu
     }
 }

@@ -4,6 +4,8 @@ import TerminalUICore
 @MainActor
 package protocol ApplicationServices: AnyObject {
     func focusTarget(path: [AnyHashable], id: String) -> ScopedFocusTarget?
+    func focusTarget(value: ViewID, in scope: ViewScope?) -> ScopedFocusTarget?
+    func focusedValue(of type: ObjectIdentifier, in scope: ViewScope?) -> AnyHashable?
     func focus(_ target: ScopedFocusTarget) -> Bool
     func keepVisible(_ target: ScopedFocusTarget)
     func scope(id: AnyHashable, in parent: ViewScope?) -> ViewScope?

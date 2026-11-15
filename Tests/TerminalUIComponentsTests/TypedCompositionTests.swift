@@ -56,8 +56,8 @@ private struct CollectionsScreen: TerminalView {
     let probe: CompositionProbe
     var body: some TerminalView {
         Column {
-            ForEach(probe.items, id: \.self) { TypedEditor("left-" + $0, probe: probe).id($0) }.scope(probe.leftScopeName)
-            ForEach(probe.items, id: \.self) { TypedEditor("right-" + $0, probe: probe).id($0) }.scope("right")
+            ForEach(probe.items, id: \.self) { TypedEditor("left-" + $0, probe: probe) }.scope(probe.leftScopeName)
+            ForEach(probe.items, id: \.self) { TypedEditor("right-" + $0, probe: probe) }.scope("right")
         }
     }
 }
@@ -108,6 +108,88 @@ private struct LoweringReader: TerminalView {
 
 @MainActor
 struct TypedCompositionTests {
+    @Test func `view ID paths address nested subtrees through ordinary composition`() throws {
+        let probe = CompositionProbe()
+        let app = ApplicationHarness(
+            root: Column {
+                Column { TypedEditor("left", probe: probe).id("leaf") }.id("left")
+                Column { TypedEditor("right", probe: probe).id("leaf") }.id("right")
+                TypedEditor("unidentified", probe: probe)
+            })
+        let left = try #require(app.context.focusTarget(path: ["left", "leaf"], id: "editor"))
+        let right = try #require(app.context.focusTarget(path: ["right", "leaf"], id: "editor"))
+        let unidentified = try #require(app.context.focusTarget(id: "editor"))
+        #expect(left != right)
+        #expect(left != unidentified)
+        #expect(app.context.focusTarget(path: ["leaf"], id: "editor") == nil)
+        #expect(app.context.focusTarget(path: ["left"], id: "editor") == nil)
+        #expect(app.context.focusTarget(path: ["missing"], id: "editor") == nil)
+        #expect(app.context.focus(left))
+        app.send(.enter)
+        #expect(app.context.focus(right))
+        app.send(.enter)
+        #expect(probe.submitted == ["left:left", "right:right"])
+    }
+
+    @Test func `focus and reveal share typed ID equality including erased IDs`() throws {
+        enum Destination: Hashable { case editor }
+        let probe = CompositionProbe()
+        let app = ApplicationHarness(
+            root: Column {
+                TypedEditor("integer", probe: probe).id(1)
+                TypedEditor("unsigned", probe: probe).id(UInt(1))
+                TypedEditor("string", probe: probe).id("1")
+                TypedEditor("enum", probe: probe).id(AnyHashable(Destination.editor))
+            })
+        let ids: [AnyHashable] = [1, UInt(1), "1", Destination.editor]
+        var targets: [ScopedFocusTarget] = []
+        for id in ids {
+            let target = try #require(app.context.focusTarget(path: [id], id: "editor"))
+            #expect(!targets.contains(target))
+            targets.append(target)
+            #expect(app.context.reveal(id))
+            #expect(app.context.focus(target))
+            app.send(.enter)
+        }
+        #expect(probe.submitted == ["integer:integer", "unsigned:unsigned", "string:string", "enum:enum"])
+    }
+
+    @Test func `changing a nested ID replaces focus handles and state while the root ID stays addressable`() throws {
+        struct Screen: TerminalView {
+            let probe: CompositionProbe
+            var body: some TerminalView {
+                TypedEditor("editor", probe: probe).id(probe.identity)
+            }
+        }
+        let probe = CompositionProbe()
+        let app = ApplicationHarness(root: Screen(probe: probe).id("root"))
+        let original = try #require(app.context.focusTarget(path: ["root", 1], id: "editor"))
+        probe.values["editor"]?.wrappedValue = "retained"
+        app.invalidate()
+        #expect(app.context.focusTarget(path: ["root", 1], id: "editor") == original)
+        #expect(probe.values["editor"]?.wrappedValue == "retained")
+        probe.identity = 2
+        app.invalidate()
+        let replacement = try #require(app.context.focusTarget(path: ["root", 2], id: "editor"))
+        #expect(replacement != original)
+        #expect(app.context.focusTarget(path: ["root", 1], id: "editor") == nil)
+        #expect(!app.context.focus(original))
+        #expect(probe.values["editor"]?.wrappedValue == "editor")
+        #expect(probe.initializations["editor"] == 2)
+    }
+
+    @Test func `ambiguous view ID paths fail without choosing an arbitrary control`() {
+        let probe = CompositionProbe()
+        var diagnostics: [String] = []
+        let app = ApplicationHarness(
+            root: Column {
+                TypedEditor("first", probe: probe).id("duplicate")
+                TypedEditor("second", probe: probe).id("duplicate")
+            }, diagnostic: { diagnostics.append($0) })
+        #expect(app.context.focusTarget(path: ["duplicate"], id: "editor") == nil)
+        #expect(diagnostics == ["Ambiguous view ID path"])
+    }
+
     @Test func `primitive lowering records reads under the child and replaces subscriptions`() throws {
         let probe = LoweringProbe()
         let app = ApplicationHarness(root: LoweringOwner(probe: probe))

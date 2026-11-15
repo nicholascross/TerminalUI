@@ -37,6 +37,7 @@ extension TerminalView {
         ModifiedView(content: self, deferToBody: true) { $0.onKey(key, activate: id) }
     }
     public func onSubmit(_ id: String) -> ModifiedView<Self> { ModifiedView(content: self, deferToBody: true) { $0.onSubmit(id) } }
+    /// Identifies a subtree for focus paths and reveal. Changing the ID resets its state.
     public func id<ID: Hashable>(_ id: ID) -> IdentityView<Self, ID> { IdentityView(content: self, id: id) }
     public func scope<ID: Hashable>(_ id: ID) -> ScopeView<Self, ID> { ScopeView(content: self, id: id) }
     public func overlay<Overlay: TerminalView>(_ overlay: Overlay?) -> OverlayView<Self, Overlay> { OverlayView(content: self, overlay: overlay) }
@@ -52,7 +53,10 @@ public struct OverlayView<Content: TerminalView, Overlay: TerminalView>: Primiti
     package func lower(path: [CompositionAddress]) -> [Element] {
         // Keep both slots even when the optional overlay is absent.
         var base = rootElement(lowerView(content, path: path + [.slot(0)]))
-        if let overlay { base = base.overlay(rootElement(lowerView(overlay, path: path + [.slot(1)]))) }
+        if let overlay {
+            let elements = lowerView(overlay, path: path + [.slot(1)])
+            if !elements.isEmpty { base = base.overlay(rootElement(elements)) }
+        }
         base.compositionPath = path
         return [base]
     }
@@ -69,7 +73,7 @@ public struct IdentityView<Content: TerminalView, ID: Hashable>: PrimitiveView {
     let id: ID
     package func lower(path: [CompositionAddress]) -> [Element] {
         let key = AnyHashable(ViewID(id))
-        var element = Element.component(ViewDescriptor(value: IdentityContent(content: content), key: nil))
+        var element = Element.component(ViewDescriptor(value: IdentityContent(content: content)))
         element.compositionPath = path + [.key(key)]
         element.viewID = key
         return [element]
@@ -82,7 +86,7 @@ public struct ScopeView<Content: TerminalView, ID: Hashable>: PrimitiveView {
     let content: Content
     let id: ID
     package func lower(path: [CompositionAddress]) -> [Element] {
-        var element = Element.component(ViewDescriptor(value: IdentityContent(content: content), key: nil))
+        var element = Element.component(ViewDescriptor(value: IdentityContent(content: content)))
         element.compositionPath = path
         element.scopeID = AnyHashable(ViewID(id))
         return [element]

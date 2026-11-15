@@ -85,14 +85,21 @@ package final class ComponentApplication: TerminalPresentationSource {
         try runtime.driver.transaction(work)
     }
 
-    /// `path` lists explicit component keys from the root. Ordinary reveal IDs are separate.
+    /// `path` lists view IDs and ForEach item IDs from the root.
     package func focusTarget(path: [AnyHashable] = [], id: String) -> ScopedFocusTarget? {
         _ = resolve()
         return runtime.focusTarget(path: path, id: id)
     }
 
-    package func focusTarget(key: AnyHashable, id: String) -> ScopedFocusTarget? {
-        focusTarget(path: [key], id: id)
+    package func focusTarget(value: ViewID, in scope: ViewScope?) -> ScopedFocusTarget? {
+        _ = resolve()
+        return runtime.focusTarget(value: value, in: scope)
+    }
+
+    package func focusedValue(of type: ObjectIdentifier, in scope: ViewScope?) -> AnyHashable? {
+        // Reads during evaluation subscribe to focus without recursively resolving their own body.
+        if runtime.driver.evaluating == nil { _ = resolve() }
+        return runtime.focusedValue(of: type, in: scope)
     }
 
     @discardableResult

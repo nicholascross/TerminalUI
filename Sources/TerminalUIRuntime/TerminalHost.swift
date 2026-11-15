@@ -102,6 +102,7 @@ public final class TerminalHost {
     /// Connects presentation services without acquiring a TTY or evaluating the root.
     public func connect(_ source: any TerminalPresentationSource) {
         if sourceID != ObjectIdentifier(source) {
+            if sourceID != nil { engine.resetFocus() }
             sourceID = ObjectIdentifier(source)
             sourceRevision = nil
             lastNotifiedFocus = nil

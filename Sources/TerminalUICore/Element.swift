@@ -38,6 +38,14 @@ public struct Element {
     package var isEnabled = true
     package var submitID: String?
     package var menuResultsID: String?
+    package var dismissalButtonID: String?
+    package var prefersInitialFocus = false
+    package var focusValue: ViewID?
+    package var focusValueObservers: [FocusValueObserver] = []
+    /// Callback menu actions are local addresses; ordinary MenuItem payloads remain application IDs.
+    package var localMenuActionIDs: [String: String] = [:]
+    package var isCollectionMenu = false
+    package var menuActivationObservers: [@MainActor () -> Void] = []
     package var listLineLimit = 1
     package var listRowSpacing = 0
     package var followsEnd = false
@@ -52,7 +60,6 @@ public struct Element {
     public static func paragraph(_ value: String) -> Self { .init(kind: .paragraph(value)) }
     public static func paragraph(_ spans: [TextSpan]) -> Self { .init(kind: .styledParagraph(spans)) }
     public static func statusBar(_ value: String) -> Self { .text(value).role(.secondary) }
-    public static func keyHints(_ value: String) -> Self { .text(value).role(.secondary) }
     public static func column(spacing: Int = 0, _ children: [Self]) -> Self { .init(kind: .column(max(0, spacing), children)) }
     public static func row(spacing: Int = 0, _ children: [Self]) -> Self { .init(kind: .row(max(0, spacing), children)) }
     public static func panel(title: String, content: Self) -> Self { .init(kind: .panel(title, content)) }

@@ -3,8 +3,6 @@ import TerminalUI
 /// Shared presentation state and commands. The screen stores this value in one mounted @State slot.
 public struct LayoutViewModel: Equatable, Sendable {
     public var status = "Ready"
-    public var barFocus: String? = Pane.topics.id
-    public var focusedPane: Pane?
     public var commandsOpen = false
 
     public init() {}
@@ -21,7 +19,7 @@ public struct LayoutViewModel: Equatable, Sendable {
         commandsOpen = false
     }
 
-    public mutating func didNavigate(to pane: Pane) {
+    public mutating func didFocus(_ pane: Pane) {
         status = "Focus: \(pane.title)"
     }
 
@@ -31,16 +29,13 @@ public struct LayoutViewModel: Equatable, Sendable {
          ListRow(id: "composer", title: "Growing composer")]
     }
 
-    public var paneCommands: [MenuItem] {
-        Pane.allCases.map { pane in
-            MenuItem(id: pane.id, title: "Focus " + pane.title, shortcut: pane.shortcut)
+    public func contextualHints(for focusedPane: Pane?) -> String {
+        if commandsOpen { return "Type to filter · ↓ results · Enter open · Esc return" }
+        switch focusedPane {
+        case .topics: return "↑/↓ select a topic · Tab next pane"
+        case .inspector: return "↑/↓ scroll · PgUp/PgDn page · Tab next pane"
+        case .command: return "Enter send · Shift+Enter newline · paste inserts text"
+        case nil: return "←/→ choose · Enter activate · Tab next control"
         }
-    }
-
-    public var navigationItems: [MenuItem] {
-        Pane.allCases.map { pane in
-            MenuItem(id: pane.id, title: pane.title, shortcut: pane.shortcut,
-                     globalShortcuts: [.altCharacter(pane.shortcut), .controlCharacter(pane.shortcut)])
-        } + [MenuItem(id: "commands", title: "Commands", globalShortcuts: [.controlP])]
     }
 }

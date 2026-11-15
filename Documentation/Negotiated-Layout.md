@@ -39,6 +39,10 @@ Run `swift run LayoutDemo` for an interactive example or `swift run LayoutDemo -
 
 The demo has a persistent navigation bar: Alt+1, Alt+2 and Alt+3 focus Topics, Inspector and Command respectively. Control+1–3 also work when reported distinctly by the terminal. Ctrl-P opens searchable pane commands; Escape closes the menu and restores focus. Shortcuts preserve the draft. Plain digits and pasted digits remain editor data. The toolbar also supports clicking and focused keyboard navigation.
 
+Focus starts on Topics. Contextual hints describe the focused pane, while a separate shortcut line keeps navigation, menu, focus traversal and quit controls visible. The demo passes `Pane.allCases` to `MenuBar` and `Menu`; activation focuses its typed target by default, numbering is automatic, and `MenuBar` retains its own keyboard highlight. The adjacent Commands button opens the modal with an explicit Ctrl-P shortcut.
+
+Pane controls register `.focusTarget(Pane.topics)` and the corresponding typed values for Inspector and Command. `LayoutScreen` reads actual focus through `application.focusedValue(of: Pane.self)` and observes `.onFocusChange(of: Pane.self)` for status effects; moving or wrapping a pane does not require changing navigation paths. Command activation uses `.onActivate` to dismiss its modal before default workspace focus.
+
 Mouse clicks and wheel scrolling are enabled in this demo. Use `swift run LayoutDemo --no-mouse` to preserve the terminal's normal text-selection behavior.
 
 In the command editor, Enter submits and clears the draft, while Shift+Enter inserts a newline. Multiline paste remains text and does not submit. Ctrl-D has no submission binding.
@@ -49,7 +53,7 @@ In the command editor, Enter submits and clears the draft, while Shift+Enter ins
 
 `Panel`, `ScrollView` and `Dialog` accept builder content. A single root is used directly; multiple roots are grouped vertically. Put an explicit row or column inside when choosing arrangement and spacing.
 
-Named helpers cover the existing controls, including `MenuBar`, searchable `Menu`, `Tabs`, `Progress`, `KeyHints` and engine `Custom`. Menu bars, tabs and key hints use one row and flexible width; they retain the underlying controls' shortcut, modal and input semantics. For example:
+Named helpers cover the existing controls, including `MenuBar`, searchable `Menu`, `Tabs`, `Progress` and engine `Custom`. Menu bars and tabs use one row and flexible width; they retain the underlying controls' shortcut and input semantics. Display shortcut hints with `Text("Ctrl-P: commands").role(.secondary)`. For example:
 
 ```swift
 MenuBar(id: "navigation", items: [
@@ -91,7 +95,7 @@ Automatic preferences are:
 | Panel, dialog | Child preference plus decoration | Child preference plus decoration |
 | Negotiated row/column | Flexible if a child expands horizontally | Flexible if a child expands vertically |
 | Spacer | Flexible on its containing stack's axis | Flexible on its containing stack's axis |
-| Named `StatusBar`, `Divider`, `KeyHints`, `MenuBar`, `Tabs` | Flexible | One row |
+| Named `StatusBar`, `Divider`, `MenuBar`, `Tabs` | Flexible | One row |
 
 A spacer does not make a horizontal header grow vertically. An empty stack measures zero. Hidden children do not participate in measurement, spacing or placement. Disabled children retain their layout space, with existing interaction rules.
 

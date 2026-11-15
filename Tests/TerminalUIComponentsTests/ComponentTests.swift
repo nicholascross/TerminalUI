@@ -53,7 +53,7 @@ private final class Fixture: TerminalApplication {
         return Column {
             TerminalUI.ForEach(keys, id: \.self) { [self] key in
                 if alternate {
-                    TerminalUI.Component(AlternateEditor(name: prefix + key, probe: probe), key: "editor")
+                    AlternateEditor(name: prefix + key, probe: probe).id("editor")
                 } else {
                     ComponentEditor(name: prefix + key, probe: probe).element(key: key, visible: !hidden.contains(key))
                 }
@@ -72,7 +72,7 @@ private struct ComponentEditor {
     let name: String
     let probe: Probe
     func element(key _: String, visible: Bool) -> some TerminalView {
-        TerminalUI.Component(Editor(name: name, probe: probe), key: "editor").visible(visible)
+        Editor(name: name, probe: probe).id("editor").visible(visible)
     }
 }
 
@@ -251,7 +251,7 @@ private final class CustomBindingApplication: TerminalApplication {
 }
 
 extension ComponentTests {
-    @Test func `duplicate sibling keys are diagnosed`() async {
+    @Test func `duplicate ForEach item IDs are diagnosed`() async {
         await #expect(processExitsWith: .failure) {
             await MainActor.run {
                 let fixture = Fixture()
@@ -298,7 +298,7 @@ private struct AlternateEditor: TerminalView {
 }
 
 extension ComponentTests {
-    @Test func `replacing component type starts new state even with the same key`() {
+    @Test func `replacing component type starts new state even with the same ID`() {
         let fixture = Fixture()
         let app = ComponentApplication(legacy: fixture, schedule: { _ in })
         _ = app.resolve()

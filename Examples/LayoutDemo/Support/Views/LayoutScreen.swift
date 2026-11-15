@@ -7,34 +7,46 @@ public struct LayoutScreen: TerminalView {
 
     public init() {}
 
-    private var navigation: LayoutNavigation { LayoutNavigation(application: application) }
+    private var focusedPane: Pane? { application.focusedValue(of: Pane.self) }
 
     public var body: some TerminalView {
         Column(spacing: 1) {
-            Component(HeaderView(), key: "header")
-            Component(NavigationView(items: model.navigationItems, selection: model.focusedPane?.id,
-                                     focusedItem: $model.barFocus), key: "navigation")
-            Component(WorkspaceView(topics: model.topics, submit: { model.submit($0) }), key: "workspace")
+            HeaderView(quit: { application.stop() })
+            Row(spacing: 1) {
+                MenuBar(id: "navigation", items: Pane.allCases, activeItem: focusedPane)
+                    .id("navigation")
+                Button("Commands")
+                    .onActivate { model.openCommands() }
+                    .keyboardShortcut(.controlP)
+            }
+            WorkspaceView(topics: model.topics, submit: { model.submit($0) })
+                .id("workspace")
             StatusBar(model.status)
-            KeyHints("Alt+1–3: panes · Ctrl-P: menu · Enter: send · Shift+Enter: newline · Ctrl-C: quit")
+            Column {
+                Text(model.contextualHints(for: focusedPane)).role(.secondary)
+                Text("Alt+1–3 panes · Ctrl-P menu · Tab focus · Ctrl-C quit").role(.secondary)
+            }
         }
-        .overlay(model.commandsOpen ? Component(CommandMenu(items: model.paneCommands, initialSelection: model.focusedPane), key: "commands") : nil)
-        .onFocusChange { model.focusedPane = navigation.pane(for: $0) }
+        .overlay {
+            if model.commandsOpen {
+                Menu(
+                    id: "commands", title: "Layout commands",
+                    items: Pane.allCases, initialSelection: focusedPane,
+                    itemTitle: { "Focus \($0.title)" }
+                )
+                .onActivate { model.dismissCommands() }
+                .onDismiss { model.dismissCommands() }
+            }
+        }
+        .onFocusChange(of: Pane.self) { pane in
+            if let pane { model.didFocus(pane) }
+        }
         .onAction(handle)
     }
 
     private func handle(_ action: UIAction) -> Bool {
-        if case let .activated(id) = action, let pane = Pane(actionID: id) {
-            model.dismissCommands()
-            if navigation.focus(pane) { model.didNavigate(to: pane) }
-            return true
-        }
-        switch action {
-        case .activated("commands"): model.openCommands()
-        case .dismissRequested("commands"), .activated("commands.back"): model.dismissCommands()
-        case .activated("quit"), .unhandledKey(.controlC): navigation.stop()
-        default: return false
-        }
+        guard case .unhandledKey(.controlC) = action else { return false }
+        application.stop()
         return true
     }
 }

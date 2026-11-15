@@ -56,7 +56,7 @@ let package = Package(
         .testTarget(name: "TerminalUIComponentsTests", dependencies: ["TerminalUI", "TerminalUIEngine", "TerminalUIBridge", "TerminalUIRuntime", "TerminalUILayoutEngine"]),
         .testTarget(name: "TerminalUIComponentMacrosTests", dependencies: ["TerminalUIComponentMacroSupport", .product(name: "SwiftSyntaxMacrosTestSupport", package: "swift-syntax")]),
         .testTarget(name: "TerminalUILayoutTests", dependencies: ["TerminalUIEngine"]),
-        .testTarget(name: "LayoutDemoTests", dependencies: ["LayoutDemoSupport", "TerminalUI", "TerminalUIEngine", "TerminalUIBridge", "TerminalUIRuntime"]),
+        .testTarget(name: "LayoutDemoTests", dependencies: ["LayoutDemoSupport", "TerminalUI"]),
         .testTarget(name: "RepositoryDemoTests", dependencies: ["RepositoryDemo", "TerminalUIEngine"]),
         .testTarget(
             name: "TerminalUITests",

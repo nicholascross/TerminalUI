@@ -104,6 +104,7 @@ struct MenuBarWidget: CustomWidget {
         case .character(let character):
             guard let item = items.first(where: { $0.shortcut.map { String($0).lowercased() } == String(character).lowercased() })
             else { return .unhandled }
+            guard item.unavailableReason == nil else { return .consumed }
             return .action(.activated(item.id))
         default: return .unhandled
         }

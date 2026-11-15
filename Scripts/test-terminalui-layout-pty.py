@@ -55,10 +55,13 @@ def wait_for(value, row=None, absent=False):
 try:
     wait_for('TerminalUILayout')
     wait_for('Inspector')
+    wait_for('> Negotiated layout')
+    wait_for('select a topic')
     assert (b'\x1b[?1000h' in history) == mouse_enabled
     assert (b'\x1b[?1006h' in history) == mouse_enabled
     os.write(master, b'\x1b3')
     wait_for('Focus: Command')
+    wait_for('Shift+Enter newline')
     os.write(master, b'\x1b[200~hello\nworld\x1b[201~')
     wait_for('hello')
     wait_for('world')
@@ -66,6 +69,7 @@ try:
     wait_for('Focus: Topics')
     os.write(master, b'\x1b2')
     wait_for('Focus: Inspector')
+    wait_for('PgUp/PgDn page')
     # CSI-u reports Control+3 distinctly. Plain and pasted digits remain editor data.
     os.write(master, b'\x1b[51;5u')
     wait_for('Focus: Command')
@@ -92,7 +96,8 @@ try:
     wait_for('Submitted 20 characters')
     fcntl.ioctl(slave, termios.TIOCSWINSZ, struct.pack('HHHH', 18, 60, 0, 0))
     os.kill(process.pid, signal.SIGWINCH)
-    wait_for('Submitted 20 characters', row=15)
+    wait_for('Submitted 20 characters', row=14)
+    wait_for('Ctrl-C quit', row=17)
     # Click the persistent toolbar after resize, using its current cell coordinates.
     if mouse_enabled:
         column = screen().splitlines()[2].index('2 Inspector') + 2
@@ -108,7 +113,7 @@ try:
         assert sequence in history
     if mouse_enabled:
         assert b'\x1b[?1000l' in history and b'\x1b[?1006l' in history
-    print(f'LayoutDemo PTY (mouse={mouse_enabled}): pane navigation, command search/dismissal, draft preservation, paste/submit, resize and terminal restoration passed')
+    print(f'LayoutDemo PTY (mouse={mouse_enabled}): initial focus, contextual hints, pane navigation, command search/dismissal, draft preservation, paste/submit, resize and terminal restoration passed')
 finally:
     if process.poll() is None:
         process.terminate()

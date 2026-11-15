@@ -2,12 +2,18 @@ import Foundation
 import TerminalUICore
 
 package struct LocalIdentity: Hashable {
-    package enum Key: Hashable {
-        case explicit(AnyHashable)
-        case structural([CompositionAddress])
-    }
-    package let key: Key
+    package let path: [CompositionAddress]
     package let type: ObjectIdentifier
+}
+
+package struct ObservedFocusValue: Equatable {
+    package let type: ObjectIdentifier
+    package let value: AnyHashable?
+}
+
+private struct FocusSelection: Equatable {
+    var value: ViewID?
+    var scopes: [String] = []
 }
 
 @MainActor
@@ -28,6 +34,9 @@ package final class MountedComponent {
     package var actionHandlers: [@MainActor (UIAction) -> Bool] = []
     package var localIDs: [String: String] = [:]
     package var actionIDs: [String: String] = [:]
+    package var focusTargets: [(value: ViewID, id: String)] = []
+    package var focusValueObservers: [FocusValueObserver] = []
+    package var observedFocusValues: [Int: ObservedFocusValue] = [:]
 
     package init(identity: String, parent: MountedComponent?, descriptor: (any ComponentDescriptor)? = nil) {
         self.identity = identity
@@ -59,6 +68,9 @@ package final class MountedComponent {
         actionHandlers.removeAll()
         localIDs.removeAll()
         actionIDs.removeAll()
+        focusTargets.removeAll()
+        focusValueObservers.removeAll()
+        observedFocusValues.removeAll()
         content = .spacer()
         output = .spacer()
     }
@@ -76,6 +88,8 @@ package final class ComponentRuntime {
     private let makeRoot: () -> Element
     package let driver: UpdateDriver
     private var initialized = false
+    private var currentFocus: ScopedFocusTarget?
+    private var focusSelection: StateSlot<FocusSelection>?
     private var generation: UInt64 = 0
     package private(set) var revision: UInt64 = 0
     package var hasPendingUpdates: Bool {
@@ -110,6 +124,8 @@ package final class ComponentRuntime {
         } else if refresh(root) {
             revision &+= 1
         }
+        focusSelection?.write(currentFocusSelection())
+        for notify in focusValueNotifications(root) { notify() }
         return root.output
     }
 
@@ -119,6 +135,8 @@ package final class ComponentRuntime {
         record.actionHandlers.removeAll()
         record.localIDs.removeAll()
         record.actionIDs.removeAll()
+        record.focusTargets.removeAll()
+        record.focusValueObservers = record.envelope.focusValueObservers
         driver.dirty.remove(record.identity)
         let raw: Element
         if let descriptor = record.descriptor {
@@ -135,14 +153,14 @@ package final class ComponentRuntime {
         }
         var nextChildren: [LocalIdentity: MountedComponent] = [:]
         var order: [MountedComponent] = []
-        var keys: Set<AnyHashable> = []
         let decorated = record.envelope.deferredModifiers.reduce(raw) { $0.applyingDeferredModifier($1) }
-        record.content = mount(decorated, owner: record, path: [], next: &nextChildren, order: &order, keys: &keys)
+        record.content = mount(decorated, owner: record, path: [], next: &nextChildren, order: &order)
         for (id, old) in record.children where nextChildren[id] == nil {
             old.unmount(driver: driver)
         }
         record.children = nextChildren
         record.orderedChildren = order
+        record.observedFocusValues = record.observedFocusValues.filter { $0.key < record.focusValueObservers.count }
         record.bodyRevision &+= 1
         revise(record)
     }
@@ -153,16 +171,10 @@ package final class ComponentRuntime {
         path: [CompositionAddress],
         next: inout [LocalIdentity: MountedComponent],
         order: inout [MountedComponent],
-        keys: inout Set<AnyHashable>,
     ) -> Element {
         let path = element.compositionPath ?? path
         if case .component(let descriptor) = element.kind {
-            if let key = descriptor.key, element.compositionPath == nil {
-                precondition(keys.insert(key).inserted, "Duplicate sibling component key '\(key)'")
-            }
-            let local = LocalIdentity(
-                key: element.compositionPath != nil ? .structural(path) : descriptor.key.map { .explicit($0) } ?? .structural(path),
-                type: descriptor.componentType)
+            let local = LocalIdentity(path: path, type: descriptor.componentType)
             let child: MountedComponent
             if let old = owner.children[local] {
                 child = old
@@ -184,7 +196,7 @@ package final class ComponentRuntime {
         var value = scope(element, owner: owner)
         value = value.replacingChildren(
             element.children.enumerated().map { index, child in
-                mount(child, owner: owner, path: path + [.slot(index)], next: &next, order: &order, keys: &keys)
+                mount(child, owner: owner, path: path + [.slot(index)], next: &next, order: &order)
             })
         return value
     }
@@ -219,13 +231,37 @@ package final class ComponentRuntime {
     }
 
     package func focusDidChange(_ target: ScopedFocusTarget?) {
+        currentFocus = target
+        focusSelection?.write(currentFocusSelection())
         let address = BehaviorAddress(event: .focus, id: "")
         func handlers(_ record: MountedComponent) -> [ElementBehavior] {
             let own = record.registrations[address].map { [$0] } ?? []
             return own + record.orderedChildren.flatMap(handlers)
         }
-        // A callback may resolve new output. Snapshot registrations before delivering it.
-        for handler in handlers(root) { handler.invoke(target?.engineID) }
+        // A callback may resolve new output. Snapshot registrations and values before delivery.
+        let raw = handlers(root)
+        let typed = focusValueNotifications(root)
+        for handler in raw { handler.invoke(target?.engineID) }
+        for notify in typed { notify() }
+    }
+
+    private func focusValueNotifications(_ record: MountedComponent) -> [@MainActor () -> Void] {
+        let targets = record.focusValueObservers.isEmpty ? [] : records(from: record).flatMap(\.focusTargets)
+        var notifications: [@MainActor () -> Void] = []
+        for (index, observer) in record.focusValueObservers.enumerated() {
+            let value = targets.first {
+                $0.id == currentFocus?.engineID && $0.value.type == observer.valueType
+            }?.value.value
+            let observed = ObservedFocusValue(type: observer.valueType, value: value)
+            guard record.observedFocusValues[index] != observed else { continue }
+            record.observedFocusValues[index] = observed
+            notifications.append { [weak record] in
+                // An earlier callback can unmount this observer or request newer focus.
+                guard record?.observedFocusValues[index] == observed else { return }
+                observer.invoke(value)
+            }
+        }
+        return notifications + record.orderedChildren.flatMap(focusValueNotifications)
     }
 
     package func handle(_ action: UIAction) -> Bool {
@@ -253,6 +289,7 @@ package final class ComponentRuntime {
         }
         func dispatch(_ record: MountedComponent) -> Bool {
             if let handler = record.registrations[BehaviorAddress(event: event, id: id)] {
+                for observe in handler.beforeInvoke { observe() }
                 handler.invoke(payload)
                 if handler.requiresRefresh {
                     driver.dirty.insert(record.identity)
@@ -267,8 +304,9 @@ package final class ComponentRuntime {
     }
 
     private func dispatchFallback(_ action: UIAction, id: String?) -> Bool {
+        let ownerID = id ?? currentFocus?.engineID
         func owner(_ record: MountedComponent) -> MountedComponent? {
-            if let id, record.actionIDs[id] != nil { return record }
+            if let ownerID, record.actionIDs[ownerID] != nil { return record }
             return record.orderedChildren.lazy.compactMap { owner($0) }.first
         }
         var record: MountedComponent? = owner(root) ?? (root.orderedChildren.count == 1 ? root.orderedChildren.first : root)
@@ -304,8 +342,40 @@ package final class ComponentRuntime {
 
     private func lookupRoot(_ scope: ViewScope?) -> MountedComponent? {
         if let scope { return records(from: root).first { $0.identity == scope.identity } }
-        if root.orderedChildren.count == 1 { return root.orderedChildren.first }
         return root
+    }
+
+    private func currentFocusSelection() -> FocusSelection {
+        for record in records(from: root) {
+            guard let value = record.focusTargets.first(where: { $0.id == currentFocus?.engineID })?.value else { continue }
+            var scopes: [String] = []
+            var ancestor: MountedComponent? = record
+            while let current = ancestor {
+                scopes.append(current.identity)
+                ancestor = current.parent
+            }
+            return FocusSelection(value: value, scopes: scopes)
+        }
+        return FocusSelection()
+    }
+
+    package func focusedValue(of type: ObjectIdentifier, in scope: ViewScope?) -> AnyHashable? {
+        let selection = focusSelection ?? StateSlot(currentFocusSelection(), driver: driver, equals: ==)
+        focusSelection = selection
+        let focused = selection.read()
+        if let scope, !focused.scopes.contains(scope.identity) { return nil }
+        guard focused.value?.type == type else { return nil }
+        return focused.value?.value
+    }
+
+    package func focusTarget(value: ViewID, in scope: ViewScope?) -> ScopedFocusTarget? {
+        guard let start = lookupRoot(scope) else { return nil }
+        let matches = records(from: start).flatMap(\.focusTargets).filter { $0.value == value }
+        guard matches.count <= 1 else {
+            driver.diagnostic("Ambiguous focus target")
+            return nil
+        }
+        return matches.first.map { ScopedFocusTarget(engineID: $0.id) }
     }
 
     package func scope(id: AnyHashable, in parent: ViewScope?) -> ViewScope? {
@@ -320,15 +390,16 @@ package final class ComponentRuntime {
 
     package func focusTarget(path: [AnyHashable], id: String, in scope: ViewScope? = nil) -> ScopedFocusTarget? {
         guard var record = lookupRoot(scope) else { return nil }
-        func keyedChildren(_ record: MountedComponent) -> [MountedComponent] {
+        func identifiedChildren(_ record: MountedComponent) -> [MountedComponent] {
             record.orderedChildren.flatMap { child in
-                child.descriptor?.key == nil ? keyedChildren(child) : [child]
+                child.envelope.viewID == nil ? identifiedChildren(child) : [child]
             }
         }
-        for key in path {
-            let matches = keyedChildren(record).filter { $0.descriptor?.key == key }
+        for id in path {
+            let viewID = AnyHashable(ViewID(id))
+            let matches = identifiedChildren(record).filter { $0.envelope.viewID == viewID }
             guard matches.count <= 1 else {
-                driver.diagnostic("Ambiguous component key path")
+                driver.diagnostic("Ambiguous view ID path")
                 return nil
             }
             guard let child = matches.first else { return nil }
@@ -336,7 +407,7 @@ package final class ComponentRuntime {
         }
         func controls(_ record: MountedComponent) -> [String] {
             let own = record.localIDs[id].map { [$0] } ?? []
-            return own + record.orderedChildren.filter { $0.descriptor?.key == nil }.flatMap(controls)
+            return own + record.orderedChildren.filter { $0.envelope.viewID == nil }.flatMap(controls)
         }
         let matches = controls(record)
         guard matches.count <= 1 else {
@@ -368,5 +439,8 @@ package final class ComponentRuntime {
         driver.dirty.removeAll()
         driver.consume()
         initialized = false
+        currentFocus = nil
+        focusSelection?.detach()
+        focusSelection = nil
     }
 }

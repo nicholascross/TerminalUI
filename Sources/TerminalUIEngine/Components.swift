@@ -43,7 +43,6 @@ public func Table(id: String, columns: [TableColumn], rows: [TableRow], selectio
 public func Spacer() -> Element { .spacer() }
 public func Divider() -> Element { .divider().layoutSizing(width: .flexible(), height: .fixed(1)) }
 public func StatusBar(_ value: String) -> Element { .statusBar(value).layoutSizing(width: .flexible(), height: .fixed(1)) }
-public func KeyHints(_ value: String) -> Element { .keyHints(value).layoutSizing(width: .flexible(), height: .fixed(1)) }
 public func Progress(_ value: Double) -> Element { .progress(value) }
 public func Custom(_ widget: any CustomWidget) -> Element { .custom(widget) }
 public func Tabs(id: String, tabs: [Tab], selection: String?) -> Element {

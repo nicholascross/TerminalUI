@@ -73,6 +73,7 @@ public struct AnyTerminalView: PrimitiveView {
     package func lower(path: [CompositionAddress]) -> [Element] { resolve(path) }
 }
 
+/// Item IDs preserve state across reorder and identify subtrees for focus and reveal.
 public struct ForEach<Items: RandomAccessCollection, ID: Hashable, Content: TerminalView>: PrimitiveView {
     public typealias Body = Never
     let items: Items
@@ -86,10 +87,11 @@ public struct ForEach<Items: RandomAccessCollection, ID: Hashable, Content: Term
     package func lower(path: [CompositionAddress]) -> [Element] {
         var keys: Set<AnyHashable> = []
         return items.map { item in
-            let key = AnyHashable(item[keyPath: id])
-            precondition(keys.insert(key).inserted, "Duplicate sibling component key '\(key)'")
-            var element = Element.component(ViewDescriptor(value: content(item), key: key))
+            let key = AnyHashable(ViewID(item[keyPath: id]))
+            precondition(keys.insert(key).inserted, "Duplicate ForEach item ID '\(item[keyPath: id])'")
+            var element = Element.component(ViewDescriptor(value: content(item)))
             element.compositionPath = path + [.key(key)]
+            element.viewID = key
             return element
         }
     }

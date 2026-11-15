@@ -16,6 +16,13 @@ package final class FocusManager {
         focusedID = id
     }
 
+    package func reset() {
+        focusedID = nil
+        previousFocus = nil
+        modalActive = false
+        previousOrder = []
+    }
+
     package func requestFocus(_ id: String, in root: Element) -> Bool {
         guard tree.focusables(tree.modal(root) ?? root).contains(where: { $0.0 == id }) else { return false }
         focusedID = id
@@ -26,11 +33,16 @@ package final class FocusManager {
     package func synchronize(_ root: Element) -> Bool {
         let previous = focusedID
         let activeModal = tree.modal(root)
-        if activeModal != nil, !modalActive { previousFocus = focusedID }
+        let enteringModal = activeModal != nil && !modalActive
+        if enteringModal { previousFocus = focusedID }
         if activeModal == nil, modalActive { focusedID = previousFocus; previousFocus = nil }
         modalActive = activeModal != nil
         let controls = tree.focusables(activeModal ?? root)
         let order = controls.map(\.0)
+        let startingScope = !order.contains(where: { $0 == focusedID }) && !previousOrder.contains(where: { order.contains($0) })
+        if (startingScope || enteringModal), let preferred = controls.first(where: { $0.1.prefersInitialFocus }) {
+            focusedID = preferred.0
+        }
         if !order.contains(where: { $0 == focusedID }) {
             let oldIndex = focusedID.flatMap { previousOrder.firstIndex(of: $0) } ?? 0
             let successors = previousOrder.dropFirst(min(oldIndex + 1, previousOrder.count))

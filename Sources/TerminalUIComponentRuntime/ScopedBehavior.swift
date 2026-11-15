@@ -12,21 +12,40 @@ extension ComponentRuntime {
             owner.actionIDs[result] = id
             return result
         }
+        if let focusValue = element.focusValue, let id = element.controlID {
+            owner.focusTargets.append((focusValue, scoped(id)))
+        }
+        owner.focusValueObservers.append(contentsOf: element.focusValueObservers)
+        value.focusValue = nil
+        value.focusValueObservers.removeAll()
         switch element.kind {
         case .button(let title, let id): value.kind = .button(title, scoped(id))
         case .field(let id, let text, let placeholder, let multiline): value.kind = .field(scoped(id), text, placeholder, multiline)
-        case .list(let id, let rows, let selection): value.kind = .list(scoped(id), rows, selection)
+        case .list(let id, let rows, let selection):
+            value.kind = .list(scoped(id), rows.map { row in
+                guard let action = row.activationID, let local = element.localMenuActionIDs[action] else { return row }
+                return ListRow(id: row.id, title: row.title, isEnabled: row.isEnabled, activationID: scoped(local))
+            }, selection)
         case .table(let id, let columns, let rows, let selection, let bordered): value.kind = .table(scoped(id), columns, rows, selection, bordered)
         case .dialog(let id, let title, let child): value.kind = .dialog(scoped(id), title, child)
         case .scroll(let id, let child): value.kind = .scroll(scoped(id), child)
         case .custom(let widget):
-            if let id = widget.id { value.kind = .custom(ScopedWidget(base: widget, id: scoped(id))) }
+            if let id = widget.id {
+                let actions = element.localMenuActionIDs.mapValues(scoped)
+                value.kind = .custom(ScopedWidget(base: widget, id: scoped(id), actions: actions))
+            }
         default: break
         }
         if let id = value.visibilityID { value.visibilityID = scoped(id) }
         if let id = value.menuResultsID { value.menuResultsID = scoped(id) }
-        if let id = value.submitID { value.submitID = scoped(id) }
-        value.keyActions = value.keyActions.map { ($0.key, scoped($0.actionID)) }
+        if let id = value.submitID { value.submitID = scoped(element.localMenuActionIDs[id] ?? id) }
+        value.menuShortcutItems = element.menuShortcutItems.map { item in
+            let buttonID: String? = if case .button(_, let id) = element.kind { id } else { nil }
+            guard let local = element.localMenuActionIDs[item.id] ?? (item.id == buttonID ? buttonID : nil) else { return item }
+            return MenuItem(id: scoped(local), title: item.title, shortcut: item.shortcut,
+                            unavailableReason: item.unavailableReason, globalShortcuts: item.globalShortcuts)
+        }
+        value.keyActions = value.keyActions.map { ($0.key, scoped(element.localMenuActionIDs[$0.actionID] ?? $0.actionID)) }
         for behavior in element.behaviors {
             let event: ElementBehaviorEvent
             let id: String
@@ -41,17 +60,24 @@ extension ComponentRuntime {
                 event = behavior.event
                 id = scoped(behavior.controlID)
             }
-            owner.registrations[BehaviorAddress(event: event, id: id)] = behavior
+            var registration = behavior
+            if event == .activate, element.localMenuActionIDs.values.contains(behavior.controlID) {
+                registration.beforeInvoke = element.menuActivationObservers
+            }
+            owner.registrations[BehaviorAddress(event: event, id: id)] = registration
         }
         value.behaviors.removeAll()
+        value.menuActivationObservers.removeAll()
+        value.isCollectionMenu = false
         return value
     }
 }
 
-/// Only the widget's control address changes; row/action payloads retain their application meaning.
+/// Control addresses and declared callback actions are scoped; other payloads retain their application meaning.
 private struct ScopedWidget: CustomWidget {
     let base: any CustomWidget
     let id: String?
+    let actions: [String: String]
     var isFocusable: Bool {
         base.isFocusable
     }
@@ -81,7 +107,7 @@ private struct ScopedWidget: CustomWidget {
         switch action {
         case .selectionChanged(let control, let value) where control == old: return .action(.selectionChanged(id, value))
         case .textChanged(let control, let value) where control == old: return .action(.textChanged(id, value))
-        case .activated(old): return .action(.activated(id))
+        case .activated(let action): return .action(.activated(actions[action] ?? (action == old ? id : action)))
         default: return result
         }
     }

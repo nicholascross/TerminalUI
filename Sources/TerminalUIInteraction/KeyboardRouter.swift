@@ -56,7 +56,12 @@ package struct KeyboardRouter {
             focus.setFocus(resultsID)
             return .rebuild(action: nil)
         }
-        if let binding = control.keyActions.first(where: { $0.key == key }) { return .rebuild(action: .activated(binding.actionID)) }
+        if let binding = control.keyActions.first(where: { $0.key == key }) {
+            if active.menuShortcutItems.contains(where: { $0.id == binding.actionID && $0.unavailableReason != nil }) {
+                return .rebuild(action: nil)
+            }
+            return .rebuild(action: .activated(binding.actionID))
+        }
         return handleControl(key, control: control, theme: theme)
     }
 

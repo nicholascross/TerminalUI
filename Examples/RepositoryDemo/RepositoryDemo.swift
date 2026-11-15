@@ -112,7 +112,7 @@ final class RepositoryApp: TerminalApplication {
                 .button("Quit", id: "quit")]),
             .row(spacing: 1, [.statusBar(status).width(.fill()),
                 .text(themeNames[themeIndex]).role(.accent)]),
-            .keyHints("Alt+1–4: panes · Tab: focus · Enter: activate · wheel: scroll · Ctrl-P: commands · Ctrl-C: quit")
+            .text("Alt+1–4: panes · Tab: focus · Enter: activate · wheel: scroll · Ctrl-P: commands · Ctrl-C: quit").role(.secondary)
         ]).background(host.theme.normal.background).overlay(overlay)
     }
 

@@ -75,6 +75,11 @@ public final class UIEngine {
         if focusedID == id { focusManager.setFocus(nil) }
     }
 
+    package func resetFocus() {
+        focusManager.reset()
+        pointer.cancelPress()
+    }
+
     public func handle(_ key: KeyEvent, in root: Element) -> UIAction? {
         handleEvent(key, in: root).action
     }

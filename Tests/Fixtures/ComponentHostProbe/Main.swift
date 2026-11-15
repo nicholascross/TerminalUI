@@ -28,15 +28,15 @@ private struct ProbeEditor: TerminalView {
 private struct ProbeRoot: TerminalView {
     @ApplicationContext private var application
     let probe: Probe
-    private func focus(_ key: String) {
-        if let target = application.focusTarget(path: [key], id: "draft") { application.focus(target) }
+    private func focus(_ id: String) {
+        if let target = application.focusTarget(path: [id], id: "draft") { application.focus(target) }
     }
     private func stop() { application.stop() }
     var body: some TerminalView {
         Column {
             Text("Component idle probe")
-            Component(ProbeEditor(name: "First", probe: probe), key: "first")
-            Component(ProbeEditor(name: "Second", probe: probe), key: "second")
+            ProbeEditor(name: "First", probe: probe).id("first")
+            ProbeEditor(name: "Second", probe: probe).id("second")
         }.onAction { action in
             switch action {
             case .unhandledKey(.altCharacter("1")): focus("first")

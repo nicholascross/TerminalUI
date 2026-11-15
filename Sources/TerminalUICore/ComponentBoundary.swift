@@ -9,7 +9,6 @@ package enum CompositionAddress: Hashable {
 @MainActor
 package protocol ComponentDescriptor {
     var componentType: ObjectIdentifier { get }
-    var key: AnyHashable? { get }
     func body(context: AnyObject) -> Element
 }
 
@@ -30,10 +29,20 @@ package struct ElementBehavior {
     package let event: ElementBehaviorEvent
     package let controlID: String
     package var requiresRefresh = false
+    package var beforeInvoke: [@MainActor () -> Void] = []
     package let invoke: @MainActor (String?) -> Void
     package init(_ event: ElementBehaviorEvent, id: String, invoke: @escaping @MainActor (String?) -> Void) {
         self.event = event
         controlID = id
+        self.invoke = invoke
+    }
+}
+
+package struct FocusValueObserver {
+    package let valueType: ObjectIdentifier
+    package let invoke: @MainActor (AnyHashable?) -> Void
+    package init(valueType: ObjectIdentifier, invoke: @escaping @MainActor (AnyHashable?) -> Void) {
+        self.valueType = valueType
         self.invoke = invoke
     }
 }
@@ -74,8 +83,10 @@ package struct ViewID: Hashable {
     package let type: ObjectIdentifier
     package let value: AnyHashable
     package init<ID: Hashable>(_ id: ID) {
-        type = ObjectIdentifier(ID.self)
         value = AnyHashable(id)
+        // Focus paths erase their elements to AnyHashable. Use the underlying type
+        // so the same ID compares equally before and after that erasure.
+        type = ObjectIdentifier(Swift.type(of: value.base))
     }
 }
 

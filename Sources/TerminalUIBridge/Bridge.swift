@@ -37,7 +37,7 @@ public final class ViewPresentation<Root: TerminalView>: TerminalPresentationSou
 /// Converts typed composition to deferred engine content for explicit mixed applications.
 @MainActor
 public func engineElement(_ view: some TerminalView) -> Element {
-    .component(ViewDescriptor(value: view, key: nil))
+    .component(ViewDescriptor(value: view))
 }
 
 extension ElementBuilder {

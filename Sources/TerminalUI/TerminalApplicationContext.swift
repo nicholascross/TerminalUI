@@ -10,8 +10,29 @@ public struct TerminalApplicationContext {
         self.services = services
     }
 
+    /// Finds a control through a path of view IDs or ForEach item IDs.
+    /// Unidentified views are transparent; each identified subtree needs a path entry.
     public func focusTarget(path: [AnyHashable] = [], id: String) -> ScopedFocusTarget? {
         services?.focusTarget(path: path, id: id)
+    }
+
+    /// Resolves a value registered by a control's `.focusTarget(value)` modifier.
+    /// Use a mounted scope to distinguish repeated values in independent workspaces.
+    public func focusTarget<Value: Hashable>(_ value: Value, in scope: ViewScope? = nil) -> ScopedFocusTarget? {
+        services?.focusTarget(value: ViewID(value), in: scope)
+    }
+
+    /// The registered value for actual focus. Reads in a view subscribe that view to focus changes.
+    /// Returns nil outside the requested type or mounted scope; this is not a writable focus mirror.
+    public func focusedValue<Value: Hashable>(of type: Value.Type, in scope: ViewScope? = nil) -> Value? {
+        services?.focusedValue(of: ObjectIdentifier(type), in: scope)?.base as? Value
+    }
+
+    /// Focuses a registered typed target, respecting visibility, availability and modal boundaries.
+    @discardableResult
+    public func focus<Value: Hashable>(_ value: Value, in scope: ViewScope? = nil) -> Bool {
+        guard let target = focusTarget(value, in: scope) else { return false }
+        return focus(target)
     }
 
     @discardableResult
@@ -27,6 +48,7 @@ public struct TerminalApplicationContext {
         services?.scope(id: AnyHashable(ViewID(id)), in: parent)
     }
 
+    /// Finds a control through view/item IDs relative to a named scope.
     public func focusTarget(path: [AnyHashable] = [], id: String, in scope: ViewScope) -> ScopedFocusTarget? {
         services?.focusTarget(path: path, id: id, in: scope)
     }

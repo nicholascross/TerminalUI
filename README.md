@@ -24,13 +24,13 @@ struct Workspace: TerminalView {
                 TextEditor(id: "draft", text: $draft)
                     .onSubmit { draft = "" }
             }.height(.fit(maximum: 8))
-            Button("Quit", id: "quit").onActivate { application.stop() }
+            Button("Quit").onActivate { application.stop() }
         }
     }
 }
 ```
 
-State is installed before body evaluation. Conditional branches have separate lifetimes, fixed sibling slots remain stable, and `ForEach(items, id: \.id)` preserves item state across reorder. `.id(value)` establishes subtree identity and a scoped reveal target; changing it resets the subtree. Local control IDs remain separate from view IDs.
+Views mount automatically, and state is installed before body evaluation. Conditional branches have separate lifetimes, fixed sibling slots remain stable, and `ForEach(items, id: \.id)` preserves item state across reorder. `.id(value)` establishes subtree identity; changing it resets the subtree. View IDs and `ForEach` item IDs also support focus paths and reveal. Local control IDs remain separate from view IDs.
 
 Run the examples and terminal-independent previews:
 

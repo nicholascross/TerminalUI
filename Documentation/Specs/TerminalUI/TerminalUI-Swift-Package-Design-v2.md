@@ -388,7 +388,7 @@ The *intended* result is that normal screen implementation contains no `Rect` ca
 | `TextEditor` | Multiline editing, wrapping, selection/caret and paste | App text; UI-local caret/viewport | Yes |
 | `Button` | Focusable labelled command; Enter/Space activation | Stateless | Yes |
 | `Dialog` | Overlay, focus trap, cancellation request, child controls | UI-local focus; app decides visible | Yes |
-| `StatusBar` / `KeyHints` | Compact status and shortcut hints | Stateless | Yes |
+| `StatusBar` | Compact status; shortcut hints use secondary `Text` | Stateless | Yes |
 | `Table` | Columns, fixed/flex widths, row selection | App selection; UI viewport | Phase 2 if demo requires |
 | `Tabs` | Switchable named sections | App selection | Phase 2 |
 | Progress/Spinner | Optional passive activity indicator | Provided value / UI clock | Phase 2 |

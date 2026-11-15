@@ -45,6 +45,14 @@ struct MenuTests {
         #expect(engine.handle(.character("1"), in: menu) == .activated("chat"))
     }
 
+    @Test func unavailableCharacterShortcutsConsumeWithoutActivation() {
+        let engine = UIEngine()
+        let menu = Element.menu(id: "menu", title: "Menu", items: items, query: "", selection: nil)
+        #expect(engine.handle(.character("3"), in: menu) == nil)
+        #expect(engine.handle(.down, in: menu) == nil)
+        #expect(engine.handle(.character("3"), in: menu) == nil)
+    }
+
     @Test(arguments: [40, 80])
     func unavailableAndEmptyResultsCannotSubmit(width: Int) {
         let engine = UIEngine()

@@ -34,10 +34,8 @@ package protocol PrimitiveView: TerminalView where Body == Never {
 @MainActor
 package struct ViewDescriptor<View: TerminalView>: ComponentDescriptor {
     package let value: View
-    package let key: AnyHashable?
-    package init(value: View, key: AnyHashable?) {
+    package init(value: View) {
         self.value = value
-        self.key = key
     }
     package var componentType: ObjectIdentifier { ObjectIdentifier(View.self) }
     package func body(context: AnyObject) -> Element {
@@ -52,7 +50,7 @@ package struct ViewDescriptor<View: TerminalView>: ComponentDescriptor {
 @MainActor
 package func lowerView<V: TerminalView>(_ view: V, path: [CompositionAddress] = []) -> [Element] {
     if let primitive = view as? any PrimitiveView { return primitive.lower(path: path) }
-    var element = Element.component(ViewDescriptor(value: view, key: nil))
+    var element = Element.component(ViewDescriptor(value: view))
     element.compositionPath = path
     return [element]
 }
@@ -61,20 +59,4 @@ package func lowerView<V: TerminalView>(_ view: V, path: [CompositionAddress] = 
 package func rootElement(_ elements: [Element]) -> Element {
     if elements.count == 1 { return elements[0] }
     return .column(elements)
-}
-
-/// An explicit keyed component boundary. Ordinary child views need no wrapper.
-public struct Component<Content: TerminalView>: PrimitiveView {
-    public typealias Body = Never
-    let content: Content
-    let key: AnyHashable?
-    public init(_ content: Content, key: AnyHashable? = nil) {
-        self.content = content
-        self.key = key
-    }
-    package func lower(path: [CompositionAddress]) -> [Element] {
-        var element = Element.component(ViewDescriptor(value: content, key: key))
-        element.compositionPath = key.map { path + [.key($0)] } ?? path
-        return [element]
-    }
 }

@@ -1,7 +1,7 @@
 import TerminalUICore
 
 @MainActor
-private func bound(
+func bound(
     _ element: Element,
     event: ElementBehaviorEvent,
     id: String,
@@ -88,46 +88,6 @@ extension Table {
 
 extension Tabs {
     public init(id: String, tabs: [Tab], selection: Binding<String>) { self.init(id: id, tabs: tabs, selection: selection.optionalSelection) }
-}
-
-extension Menu {
-    public init(
-        id: String,
-        title: String,
-        items: [MenuItem],
-        query: Binding<String>,
-        selection: Binding<String?>,
-        notice: String? = nil,
-    ) {
-        self.makeElement = {
-            let menu = bound(
-                .menu(
-                    id: id, title: title, items: items, query: query.wrappedValue,
-                    selection: selection.wrappedValue, notice: notice),
-                event: .text, id: id + ".search", tracked: query.tracksState
-            ) { query.wrappedValue = $0 }
-            return bound(menu, event: .selection, id: id + ".items", tracked: selection.tracksState) { selection.wrappedValue = $0 }
-        }
-    }
-}
-
-extension MenuBar {
-    public init(
-        id: String,
-        items: [MenuItem],
-        selection: String?,
-        focusedItem: Binding<String?>,
-        compact: Bool = false,
-    ) {
-        self.makeElement = {
-            bound(
-                .menuBar(id: id, items: items, selection: selection, focusedItem: focusedItem.wrappedValue, compact: compact)
-                    .layoutSizing(width: .flexible(), height: .fixed(1)), event: .selection, id: id, tracked: focusedItem.tracksState
-            ) {
-                focusedItem.wrappedValue = $0
-            }
-        }
-    }
 }
 
 extension Binding where Value == String {
