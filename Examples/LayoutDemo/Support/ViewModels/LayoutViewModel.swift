@@ -3,7 +3,7 @@ import TerminalUI
 /// Shared presentation state and commands. The screen stores this value in one mounted @State slot.
 public struct LayoutViewModel: Equatable, Sendable {
     public var status = "Ready"
-    public var barFocus: String? = Pane.topics.actionID
+    public var barFocus: String? = Pane.topics.id
     public var focusedPane: Pane?
     public var commandsOpen = false
 
@@ -33,13 +33,13 @@ public struct LayoutViewModel: Equatable, Sendable {
 
     public var paneCommands: [MenuItem] {
         Pane.allCases.map { pane in
-            MenuItem(id: pane.actionID, title: "Focus " + pane.title, shortcut: pane.shortcut)
+            MenuItem(id: pane.id, title: "Focus " + pane.title, shortcut: pane.shortcut)
         }
     }
 
     public var navigationItems: [MenuItem] {
         Pane.allCases.map { pane in
-            MenuItem(id: pane.actionID, title: pane.title, shortcut: pane.shortcut,
+            MenuItem(id: pane.id, title: pane.title, shortcut: pane.shortcut,
                      globalShortcuts: [.altCharacter(pane.shortcut), .controlCharacter(pane.shortcut)])
         } + [MenuItem(id: "commands", title: "Commands", globalShortcuts: [.controlP])]
     }

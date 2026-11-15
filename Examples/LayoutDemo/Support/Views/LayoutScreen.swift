@@ -12,7 +12,7 @@ public struct LayoutScreen: TerminalView {
     public var body: some TerminalView {
         Column(spacing: 1) {
             Component(HeaderView(), key: "header")
-            Component(NavigationView(items: model.navigationItems, selection: model.focusedPane?.actionID,
+            Component(NavigationView(items: model.navigationItems, selection: model.focusedPane?.id,
                                      focusedItem: $model.barFocus), key: "navigation")
             Component(WorkspaceView(topics: model.topics, submit: { model.submit($0) }), key: "workspace")
             StatusBar(model.status)

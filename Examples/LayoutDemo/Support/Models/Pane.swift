@@ -1,5 +1,5 @@
 /// Destinations shared by navigation commands, component keys and scoped focus requests.
-public enum Pane: String, CaseIterable, Sendable {
+public enum Pane: String, CaseIterable, Sendable, Identifiable {
     case topics, inspector, command
 
     public var title: String {
@@ -18,12 +18,12 @@ public enum Pane: String, CaseIterable, Sendable {
         }
     }
 
-    var actionID: String {
+    public var id: String {
         "pane." + rawValue
     }
 
     init?(actionID: String) {
-        guard let pane = Self.allCases.first(where: { $0.actionID == actionID }) else { return nil }
+        guard let pane = Self.allCases.first(where: { $0.id == actionID }) else { return nil }
         self = pane
     }
 }

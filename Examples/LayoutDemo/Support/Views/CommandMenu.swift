@@ -7,7 +7,7 @@ struct CommandMenu: TerminalView {
     let items: [MenuItem]
     init(items: [MenuItem], initialSelection: Pane?) {
         self.items = items
-        _selection = State(wrappedValue: (initialSelection ?? .topics).actionID)
+        _selection = State(wrappedValue: (initialSelection ?? .topics).id)
     }
 
     var body: some TerminalView {
