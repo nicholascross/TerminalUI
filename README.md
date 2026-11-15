@@ -6,7 +6,8 @@ Compose screens from rows, columns, panels and interactive controls. Describe ho
 
 - **Readable layouts.** Nest views to express the structure of your screen, with sizing and styling alongside the content they affect.
 - **Flexible sizing.** Combine fixed sidebars, expanding workspaces and content that grows within a limit. Sizes and spacing use terminal cells.
-- **Interactive by default.** Use text editors, lists, tables, menus and dialogs with keyboard navigation, scrolling and optional mouse support.
+- **Interactive by default.** Use text editors, lists, tables, menus and dialogs with keyboard navigation and scrolling.
+- **Mouse support.** Click to focus controls, activate buttons, select list and table rows, and position the text cursor. Use the mouse wheel to scroll the content under the pointer.
 - **Reusable Swift views.** Extract components, share state and use ordinary Swift conditionals to build dynamic screens.
 
 ![A TerminalUI workspace with navigation, an inspector and a multiline command editor](Documentation/Images/layout-workspace.png)
@@ -25,6 +26,7 @@ import TerminalUI
 struct NotesApp {
     var root: some TerminalView { NotesView() }
     var theme: Theme { .nord() }
+    var configuration: TerminalConfiguration { .init(mouseEnabled: true) }
 }
 
 @TerminalComponent
@@ -59,6 +61,8 @@ struct NotesView: TerminalView {
 ```
 
 `@TerminalApplication` supplies the application entry point. `@TerminalComponent` connects local `@State` to the view; passing `$draft` to the editor keeps the preview in sync as you type.
+
+The example enables mouse input through `configuration`. Plain applications default to mouse input disabled to preserve normal terminal text selection. The demos below enable it by default; pass `--no-mouse` to disable it.
 
 ## Layout that reads like your screen
 
