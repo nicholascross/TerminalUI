@@ -1,6 +1,21 @@
 # TerminalUI
 
-Build declarative terminal applications in Swift with `import TerminalUI`. Views compose with opaque bodies, mounted state and bindings; the framework owns terminal hosting, input and rendering. Swift 6.3 is required. The package retains its macOS 13 and iOS 15 deployment targets; interactive terminal integration is exercised on Linux.
+**Build terminal interfaces with a declarative Swift layout DSL.**
+
+Compose screens from rows, columns, panels and interactive controls. Describe how content should fit, grow and align, bind controls to your state, and let TerminalUI handle layout and interaction as the terminal resizes.
+
+- **Readable layouts.** Nest views to express the structure of your screen, with sizing and styling alongside the content they affect.
+- **Flexible sizing.** Combine fixed sidebars, expanding workspaces and content that grows within a limit. Sizes and spacing use terminal cells.
+- **Interactive by default.** Use text editors, lists, tables, menus and dialogs with keyboard navigation, scrolling and optional mouse support.
+- **Reusable Swift views.** Extract components, share state and use ordinary Swift conditionals to build dynamic screens.
+
+![A TerminalUI workspace with navigation, an inspector and a multiline command editor](Documentation/Images/layout-workspace.png)
+
+Requires **Swift 6.3**. Add the `TerminalUI` library product to your Swift Package Manager executable target. Interactive terminal support is tested on Linux.
+
+## A small app, a complete screen
+
+This notes app binds an editor to a live preview. The draft panel grows to eight rows, while the preview fills the remaining space and scrolls when needed.
 
 ```swift
 import TerminalUI
@@ -8,73 +23,104 @@ import TerminalUI
 @main
 @TerminalApplication
 struct NotesApp {
-    var root: some TerminalView { Workspace() }
-    var theme: Theme { .dusk() }
+    var root: some TerminalView { NotesView() }
+    var theme: Theme { .nord() }
 }
 
 @TerminalComponent
-struct Workspace: TerminalView {
+struct NotesView: TerminalView {
     @State private var draft = ""
     @ApplicationContext private var application
 
     var body: some TerminalView {
         Column(spacing: 1) {
-            Text("Notes").role(.heading)
-            Panel("Command") {
+            Row {
+                Text("Notes").role(.heading)
+                Spacer()
+                Button("Quit").onActivate { application.stop() }
+            }
+
+            Panel("Draft") {
                 TextEditor(id: "draft", text: $draft)
-                    .onSubmit { draft = "" }
-            }.height(.fit(maximum: 8))
-            Button("Quit").onActivate { application.stop() }
+                    .initialFocus()
+            }
+            .height(.fit(maximum: 8))
+
+            Panel("Preview") {
+                ScrollView(id: "preview") {
+                    Paragraph(draft.isEmpty ? "Your notes appear here." : draft)
+                }
+            }
+
+            StatusBar("Tab: move focus · Shift+Enter: new line")
         }
     }
 }
 ```
 
-Views mount automatically, and state is installed before body evaluation. Conditional branches have separate lifetimes, fixed sibling slots remain stable, and `ForEach(items, id: \.id)` preserves item state across reorder. `.id(value)` establishes subtree identity; changing it resets the subtree. View IDs and `ForEach` item IDs also support focus paths and reveal. Local control IDs remain separate from view IDs.
+`@TerminalApplication` supplies the application entry point. `@TerminalComponent` connects local `@State` to the view; passing `$draft` to the editor keeps the preview in sync as you type.
 
-Built-in themes include `.terminalNative`, `.dark`, `.light`, `.dusk()`, `.tokyoNight()`, `.dracula()`, `.nord()`, `.ayuLight()` and `.everforest()`. Light and Ayu Light paint their own light backgrounds; Everforest uses a dark green-grey palette. The named presets include backgrounds, control states and syntax colours, with automatic colour capability detection. Applications select their theme when creating `TerminalApp`.
+## Layout that reads like your screen
 
-Run the examples and terminal-independent previews:
+Use `Column` for vertical sections and `Row` for side-by-side panes. Wrap related content in a `Panel`, add a `ScrollView` for longer content, and use `Spacer` to push controls apart.
+
+```swift
+Row(spacing: 1) {
+    Panel("Navigation") {
+        Column(spacing: 1) {
+            Text("Overview").role(.heading)
+            Text("Activity")
+            Text("Settings")
+        }
+    }
+    .width(.fixed(24))
+
+    Panel("Workspace") {
+        ScrollView(id: "workspace") {
+            Paragraph("The workspace uses the remaining width and height.")
+        }
+    }
+}
+```
+
+Most views choose a useful size automatically: text fits its content, while lists, tables and scroll views expand. Override sizing where the design calls for it:
+
+| Intent | Modifier |
+| --- | --- |
+| Keep a sidebar 24 cells wide | `.width(.fixed(24))` |
+| Let a panel grow up to eight rows | `.height(.fit(maximum: 8))` |
+| Keep a list as tall as its content | `.height(.content)` |
+
+Add padding, alignment and text styles where you need them. Layouts adjust to the available terminal space as the window resizes.
+
+## From a screen to an application
+
+Extract any part of a screen into a `TerminalView` with a `body: some TerminalView`. Keep local values in `@State` and use `@Binding` when views share editable data.
+
+Add lists, tables, tabs or searchable menus as your application grows. Controls support keyboard navigation and callbacks for actions such as activating a button or submitting text.
+
+![A searchable command menu for navigating between panes](Documentation/Images/layout-commands.png)
+
+Choose a built-in theme at the application level, as the example does with `.nord()`. Text roles such as `.heading` and `.secondary` keep styling consistent across the screen.
+
+## Try it
+
+From a checkout of this repository:
 
 ```sh
+# Explore layouts and interactive controls.
 swift run LayoutDemo
-swift run LayoutDemo --preview
+
+# Browse a Git repository.
 swift run RepositoryDemo --repo /path/to/repository
-swift run RepositoryDemo --preview
-swift run EngineDemo
-swift run EngineDemo --preview
 ```
 
-The examples have distinct roles:
+The [layout demo](Examples/LayoutDemo/README.md) is a starting point for composing your own screen. The [repository browser](Examples/RepositoryDemo/README.md) shows how to organise a larger application into views and shared state.
 
-| Example | Purpose |
-| --- | --- |
-| [LayoutDemo](Examples/LayoutDemo/README.md) | Layout, state, bindings and typed pane navigation. |
-| [RepositoryDemo](Examples/RepositoryDemo/README.md) | A read-only Git browser structured as a component application. |
-| [EngineDemo](Examples/EngineDemo/README.md) | A small raw-engine application using `Element` and `TerminalHost`. |
+![The repository browser with branches, commits, files and a detail inspector](Documentation/Images/repository-browser.png)
 
-Public API consumers and interaction probes live under `Tests/Fixtures`; they are validation fixtures rather than runnable package examples.
+## Learn more
 
-Use `TerminalApp(root:)` to run or preview a screen directly. `ApplicationHarness(root:)` supports previews, keyboard/mouse input, transactions, invalidation, focus and reveal without acquiring a terminal.
-
-| Product | Use |
-| --- | --- |
-| `TerminalUI` | Views, controls, containers, modifiers, macros, state, bindings, application services and testing. |
-| `TerminalUIArgumentParser` | Optional typed application arguments, generated initialization, shared terminal flags and help. |
-| `TerminalUIEngine` | Raw elements, legacy applications, hosting, rendering, decoding, drawing and custom widgets. |
-| `TerminalUIBridge` | Explicit engine/declarative interoperability in both directions. |
-| `TerminalUIChroma` | Optional syntax highlighting returning shared semantic text spans. |
-
-Neither public entry point re-exports implementation modules. Engine-only consumers do not depend on the high-level module or macro tooling. Chroma spans work with `Paragraph(spans)` and engine `Element.paragraph(spans)`.
-
-See [components and mounted state](Documentation/Components.md), [application arguments](Documentation/Arguments.md), [negotiated layout](Documentation/Negotiated-Layout.md), [architecture](Documentation/Architecture.md), and the [engine guide](Documentation/Engine.md). This is a breaking API migration: follow the [migration guide](Documentation/High-Level-API-Migration.md). The [implementation plan](Documentation/Specs/TerminalUI/High-Level-API-Architecture-Plan.md) records the boundary, identity contract and validation.
-
-```sh
-swift test -j 4
-bash Scripts/test-terminalui-components-consumer.sh
-python3 Scripts/test-terminalui-components-pty.py
-python3 Scripts/test-terminalui-layout-pty.py
-python3 Scripts/test-terminalui-layout-pty.py --no-mouse
-python3 Scripts/test-terminalui-pty.py
-python3 Scripts/test-terminalui-engine-pty.py
-```
+- [Layout and sizing](Documentation/Layout.md)
+- [Views, state, bindings and focus](Documentation/Components.md)
+- [All guides](Documentation/README.md)

@@ -1,33 +1,36 @@
 # Layout demo
 
-Run `swift run LayoutDemo` for the interactive demo, or `swift run LayoutDemo --preview` for a plain-text snapshot. Pass `--no-mouse` to preserve the terminal's normal text selection.
+A workspace built with the TerminalUI layout DSL: a fixed sidebar, a scrolling inspector, a growing command editor and searchable pane navigation.
 
-```text
-LayoutDemo/
-├── App/                 # LayoutDemo executable: entry point, theme and configuration
-└── Support/             # LayoutDemoSupport module, imported by the app and tests
-    ├── Models/          # Shared pane destinations
-    ├── ViewModels/      # Shared presentation state and commands
-    └── Views/           # Root screen and individual view components
+```sh
+swift run LayoutDemo
 ```
 
-`LayoutScreen` composes the demo's views and owns `LayoutViewModel`. Use the framework's `MenuBar` and `Menu` directly; extracted views group meaningful layout or behavior rather than forward a control's arguments.
+![Layout demo workspace](../../Documentation/Images/layout-workspace.png)
 
-Both menus take `Pane.allCases` directly and focus the activated pane by default. `Pane` conforms to `MenuItemDefinition` for its title; shortcut numbers and the bar's Alt/Control aliases are automatic. A separate adjacent button opens Commands with `.keyboardShortcut(.controlP)`.
+## Using the demo
 
-| Owner | State and responsibilities |
+| Input | Action |
 | --- | --- |
-| `LayoutScreen` / `LayoutViewModel` | Status and command-menu presentation. The current pane is read reactively from the application context. |
-| Application context / focus runtime | Actual focused destination, exposed through `focusedValue(of:)`; views register typed targets. |
-| `WorkspaceView` | Selected topic, shared through a binding with `TopicsView` and passed as a read-only value to `InspectorView`. |
-| `CommandPane` | Draft text. Submitting reports the draft to the screen and clears the local editor. |
-| `Menu` | Search text and highlighted result. Removing the conditional menu discards these; reopening starts a new search. |
-| `MenuBar` | Keyboard highlight, separate from the current pane supplied by the screen. |
+| Alt+1 / Alt+2 / Alt+3 | Focus Topics, Inspector or Command. |
+| Ctrl-P | Open the searchable command menu. |
+| Escape | Close the menu and restore focus. |
+| Tab | Move between controls. |
+| Enter in Command | Submit and clear the draft. |
+| Shift+Enter in Command | Insert a newline when the terminal reports the key distinctly. |
+| Ctrl-C | Quit. |
 
-Each pane control registers its typed destination with `.focusTarget(Pane.command)` (or the corresponding pane). Menus use `application.focus(pane)` internally. The screen reads `application.focusedValue(of: Pane.self)` for active-item display and hints, and uses `.onFocusChange(of: Pane.self)` for status messages. There is no navigation wrapper, view-path mapping or mirrored focus state. View IDs still supply subtree identity and reveal addressing. All child views mount automatically; no component wrapper is needed.
+Focus starts on Topics. Selecting a topic updates the inspector; moving between panes preserves the selection and command draft. Pasted multiline text stays in the editor without submitting.
 
-The command menu demonstrates a conditional modal overlay. `.onActivate` dismisses it before default focus moves to the selected pane. Escape and its Return button use the same `.onDismiss` callback. Pane shortcuts, menu activation and pointer input preserve the workspace selection and command draft. Status follows actual pane focus changes, including Tab and pointer input.
+Mouse clicks and wheel scrolling are enabled. Run `swift run LayoutDemo --no-mouse` to preserve normal terminal text selection. Control+1–3 also navigate when the terminal reports those combinations distinctly.
 
-The Topics list requests `.initialFocus()`, so startup focus is in the workspace. Contextual hints explain topic selection, inspector scrolling or command input above a persistent shortcut line. Both hint lines fit a 60-column terminal. The Quit button uses an activation callback without an explicit ID; only controls that need focus lookup have application-defined control IDs.
+## Reading the code
 
-The SwiftPM targets use separate source directories so the support module can be tested without the executable entry point. Demo tests live in `Tests/LayoutDemoTests` and use the public `ApplicationHarness` without importing the engine or runtime. Run `swift test --filter LayoutNavigationTests`; after building, run `python3 Scripts/test-terminalui-layout-pty.py` from the repository root for terminal interaction checks.
+`App/` contains the entry point and theme. `Support/` contains the reusable screen, model and views.
+
+- [LayoutScreen](Support/Views/LayoutScreen.swift) composes the screen, opens the command menu and reads the focused pane.
+- [WorkspaceView](Support/Views/WorkspaceView.swift) owns topic selection and shares it with the sidebar and inspector.
+- [CommandPane](Support/Views/CommandPane.swift) owns the editor draft.
+- [LayoutViewModel](Support/ViewModels/LayoutViewModel.swift) supplies topics, status and commands.
+
+For the APIs used here, see [layout and sizing](../../Documentation/Layout.md) and [views, state and focus](../../Documentation/Components.md).

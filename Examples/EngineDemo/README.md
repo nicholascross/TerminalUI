@@ -1,15 +1,13 @@
 # Engine demo
 
-A small, single-file example for consumers of `TerminalUIEngine`. Most application authors should start with LayoutDemo or RepositoryDemo and `import TerminalUI`.
+A single-file application using raw `Element` values and an explicit `TerminalHost`. For the declarative layout DSL, start with the [layout demo](../LayoutDemo/README.md).
 
 ```sh
 swift run EngineDemo
-swift run EngineDemo --preview
-swift run EngineDemo --no-mouse
 ```
 
-`EngineApplication` composes raw `Element` values for a topic list, a scrolling detail pane, an in-memory text field and a Quit button. `handle(_:)` applies selection and text actions to application values. `TerminalHost` owns terminal acquisition, rendering and input, retaining focus, caret and scrolling through stable control IDs.
+Tab moves between controls, arrows select topics and scroll details, and Ctrl-C quits. Mouse input is enabled; use `--no-mouse` to preserve normal terminal text selection.
 
-Tab moves between controls, arrows select topics and scroll details, and Ctrl-C quits. Mouse input is enabled by default; `--no-mouse` preserves normal terminal selection. `--preview` prints a snapshot without a controlling TTY.
+[EngineDemo.swift](EngineDemo.swift) shows how to compose a topic list, scrolling detail pane, text field and Quit button. Its action handler applies text and selection changes to application values, while the host retains focus, caret position and scrolling through stable control IDs.
 
-After building, run `python3 Scripts/test-terminalui-engine-pty.py` for the example and private engine interaction checks. Regression-only controls are kept in `Tests/Fixtures/EngineInteractionProbe`, outside this example.
+See [engine and custom controls](../../Documentation/Engine.md) for the API and [architecture and development](../../Documentation/Architecture.md#repository-checks) for validation commands.

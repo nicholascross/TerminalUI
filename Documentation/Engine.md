@@ -1,151 +1,132 @@
-# TerminalUI engine
+# Engine and custom controls
 
-`TerminalUIEngine` is the lower-level entry point for raw elements, hosting, rendering and input. Most applications should use the component API in `TerminalUI`; see [RepositoryDemo](../Examples/RepositoryDemo/README.md) for an application example. Run the small engine example from the package directory in a supported interactive terminal:
+Use `TerminalUIEngine` when you need raw elements, an explicit terminal host or a custom widget. For declarative applications, start with [views and state](Components.md).
 
-```sh
-swift run EngineDemo
-swift run EngineDemo --preview
-```
+## A raw-element application
 
-Compose an `Element` tree from application-owned values. `TerminalHost` acquires the controlling terminal, renders the tree, and dispatches keyboard input to the focused control. Apply actions synchronously in `handle(_:)` before the next view is drawn; call `invalidate()` for changes originating outside an action. The host retains the current tree: built-in scroll navigation with unchanged focus repaints the affected viewport without calling `view()` or reconciling layout. Unrelated screen content is retained. Enclosing scroll views and overlays repaint together to preserve clipping, focus reveal and compositing. Application actions, focus changes, resizing and explicit invalidation rebuild the view; custom-widget input also conservatively rebuilds, even when consumed without an action. Input batches rebuild as needed before dispatching the next event so it sees the latest application state. Keep legitimate `view()` calls inexpensive by caching application projections where appropriate. Stop the host when the application chooses to exit.
+An engine application returns an `Element` tree and applies actions to its own values. The host manages terminal input, rendering, focus, caret position and scrolling.
 
 ```swift
 import TerminalUIEngine
 
 @MainActor
-final class App: TerminalApplication {
+final class NotesApplication: TerminalApplication {
     let host = TerminalHost()
     var draft = ""
 
     func view() -> Element {
         .column(spacing: 1, [
             .panel(title: "Note", content: .textEditor(id: "draft", value: draft))
-                .height(.fill(weight: 1)),
-            .button("Quit", id: "quit"),
-            .statusBar("Tab: focus · Ctrl-C: quit")
+                .height(.fill()),
+            .button("Quit", id: "quit")
         ])
     }
 
     func handle(_ action: UIAction) {
         switch action {
-        case .textChanged("draft", let value): draft = value
-        case .activated("quit"), .unhandledKey(.controlC): host.stop()
-        default: break
+        case .textChanged("draft", let value):
+            draft = value
+        case .activated("quit"), .unhandledKey(.controlC):
+            host.stop()
+        default:
+            break
         }
+    }
+}
+
+@main
+struct NotesMain {
+    @MainActor
+    static func main() async throws {
+        let application = NotesApplication()
+        try await application.host.run(application)
     }
 }
 ```
 
-See the demo entry point for calling `host.run(app)`. Text and list selection are controlled by the application; focus, caret and viewport are retained by the engine using stable IDs. Call `host.resetState(for:)` before reusing an ID for a different document. `host.focus(id, in: view)` requests focus for an enabled, visible control in the active tree; enclosing scroll views bring the focused control into view on the next render. The engine retains at most 256 inactive widget state entries. Identify non-focusable content with `.id("target")` and call `host.keepVisible("target")` to reveal it in enclosing scroll views on the next render. Tab and back-tab change focus; arrow keys navigate controls, including cursor keys reported with Caps Lock or Num Lock modifiers; Enter inserts a newline in a multiline editor or activates a focused button. For a submission box, append `.onSubmit("action-id")` to a text editor: Enter emits `.activated("action-id")` and Shift+Enter inserts a newline when the terminal reports that key distinctly. On terminals that do not support extended keyboard reporting, Shift+Enter may be indistinguishable from Enter; multiline paste remains available. Lists and tables also support `.onSubmit("action-id")`: Enter emits that action when the control is enabled and nonempty; selection alone does not submit. A dialog traps focus and Escape emits a dismissal request. Paste is data, not a button activation; `.pasteTruncated` reports a paste exceeding the configured byte limit.
+Apply text and selection actions synchronously in `handle(_:)`. Call `host.invalidate()` when data changes outside an action. Keep `view()` free of side effects and inexpensive to rebuild.
 
-Single-line text truncates with an ellipsis; use `paragraph` for wrapped text. Styled paragraphs accept `[TextSpan]` values with semantic roles. Text and stacks accept `.alignment(.leading)`, `.alignment(.center)` or `.alignment(.trailing)`. Aligned stacks use content or fixed cross-axis dimensions; fill occupies the available cross axis. Rows and columns also support content, fixed, and weighted fill sizes, padding, visibility and enabled state. Panels, paragraphs, lists, scroll views, fields, editors, buttons, dialogs, status text and custom widgets can be composed without terminal escape sequences. `UIEngine`, `Canvas` and `CellGrid` also permit deterministic rendering and testing without a TTY.
+Run `swift run EngineDemo` for a complete example; its [README](../Examples/EngineDemo/README.md) describes the controls.
 
-Scroll views allocate drawing storage for their viewport and clip offscreen content while preserving focus reveal and follow-end behavior. The engine retains intrinsic measurements for the active element tree, reusing them across rebuilt views until content or sizing inputs change. Each node remembers up to four proposed widths. Changes invalidate the affected node and its ancestors; custom widget measurements refresh when the tree is rebuilt because they can depend on live state or theme. Plain and styled paragraph wrapping is shared by measurement and drawing, with a cache that retains up to 4 MiB of estimated text and layout storage and 4096 entries across frames, evicting the least recently used layouts. Unchanged paragraph nodes reuse their cached wrapping directly without hashing the text again. Offscreen content remains eligible for reuse; nodes hold weak references so they cannot pin evicted layouts. Cache keys include text, span boundaries and available width. Only visible paragraph rows are painted. Span roles, overrides and theme styles are applied when drawing. Repainting retains the previous screen grid and skips unrelated branches of the tree during built-in scrolling. Initial rendering, changes to terminal dimensions, and view rebuilds paint a complete frame. Terminal output still compares complete visible grids and writes only changed cells; scrolling unchanged content does not require measuring the full document again. `UIEngine.handleEvent(_:in:)` returns `.repaint` for built-in scrolling with unchanged focus or `.rebuild(action:)` for input requiring a fresh application view; `handle(_:in:)` retains its action-only API.
+## IDs, input and scrolling
 
-`TerminalHostRenderingTests` checks view-call counts and cached measurements through the host's dispatch and paint path. `TerminalHostLatencyTests` reports median and p95 scroll input-to-output durations for a retained 500-entry document at 80×24 cells, including decoding, dispatch, painting, encoding and writes to a memory sink. It asserts zero additional `view()` calls and correct output, without timing thresholds that depend on the machine. These measurements exclude terminal I/O and scheduling.
+Keep control IDs stable while they refer to the same content. The host retains focus, caret and viewport state by ID. Call `host.resetState(for:)` before reusing an ID for a different document.
 
-Create a persistent horizontal menu with `.menuBar(id:items:selection:focusedItem:compact:)`, reusing `MenuItem` values. `selection` marks the current destination with `*`; `focusedItem` is the application-owned keyboard choice, marked with `>` when the bar has focus. Apply `.selectionChanged(barID, itemID)` to `focusedItem`. Left/Right and Home/End move that choice; Enter or Space emits `.activated(itemID)` for an available item. Item shortcut characters also activate while the bar is focused; global modifier shortcuts are opt-in through `MenuItem.globalShortcuts`. Unavailable items are dimmed and remain selectable for prerequisite inspection, but Enter does not activate them. Shortcut activation emits the item ID so the application can explain an unavailable destination. Paste never activates an entry. Compact mode removes the space between shortcut and title; applications supply abbreviated titles where needed. The bar keeps the focused/current item visible if its contents exceed the available width.
+- `host.focus(id, in: tree)` focuses an enabled, visible control.
+- `.id("target")` identifies content for `host.keepVisible("target")`, which reveals it through enclosing scroll views.
+- Tab and back-tab traverse controls. Dialogs trap focus; Escape emits a dismissal request.
+- Editors insert newlines on Enter by default. With `.onSubmit("action")`, Enter emits that action and Shift+Enter inserts a newline when reported distinctly.
+- Lists and tables emit selection changes as navigation moves. `.onSubmit("action")` adds Enter activation; `ListRow(activationID:)` supplies a row-specific action.
+- Paste inserts text without activating controls. `.pasteTruncated` reports input exceeding the configured byte limit.
 
-Declare global menu shortcuts on items when they should work while another control has focus:
+Scroll views support arrows, Page Up/Down, Home and End. They reveal focused children, clamp after resizing and optionally follow the end of content with `followsEnd: true`.
+
+Tables use `TableColumn` and `TableRow`. Columns accept fixed widths, weighted fill or content width based on the header. Pass `bordered: true` for an outline and separators. Row IDs must be unique.
+
+## Menus and shortcuts
+
+Raw menus use `MenuItem` values and application-owned search and selection.
+
+| Control | State to apply | Activation |
+| --- | --- | --- |
+| `.menuBar(id:items:selection:focusedItem:compact:)` | `.selectionChanged(barID, itemID)` updates the keyboard highlight. | `.activated(itemID)` |
+| `.menu(id:title:items:query:selection:notice:)` | `.textChanged(id + ".search", value)` and `.selectionChanged(id + ".items", itemID)` | `.activated(itemID)` |
+
+A menu bar's `selection` marks the current destination separately from `focusedItem`. Searchable menus filter titles; Escape emits `.dismissRequested(id)`, while their Return button emits `.activated(id + ".back")`. Close the overlay in response to either dismissal action.
+
+Set `MenuItem.shortcut` for a local character shortcut and `globalShortcuts` for modified keys that work elsewhere in the active screen. A global shortcut emits an action; the application chooses whether to move focus. Dialogs restrict global shortcuts to their contents. Duplicate shortcuts take the first matching item; an unavailable match does not fall through.
+
+`.onKey(key, activate: id)` binds a key on the focused control. Paste, Tab traversal and dialog Escape retain their built-in meanings.
+
+## Custom widgets and layouts
+
+Implement [`CustomWidget`](../Sources/TerminalUICore/CustomWidget.swift) and wrap it with `Element.custom(...)`. The context-based methods provide:
+
+| Method | Purpose |
+| --- | --- |
+| `measure(context:)` | Return the desired size in cells. |
+| `draw(in:context:)` | Paint into the assigned clipped canvas. |
+| `respond(to:context:)` | Handle a keyboard or mouse event. |
+| `mouseTarget(at:context:)` | Return stable item IDs for matching pointer presses and releases. |
+
+Responses are `.consumed`, `.unhandled` or `.action(...)`. Mouse coordinates are local to the widget's content canvas; contexts also supply focus, theme and assigned size.
+
+For a custom layout, implement [`ElementLayout`](../Sources/TerminalUICore/ElementLayout.swift) and use `Element.layout(_:children:)`. It measures and places ordinary child elements, preserving their controls and interaction. Layout methods must be pure and must not retain the supplied subviews outside a call.
+
+## Integrating with declarative views
+
+Add the `TerminalUIBridge` product and import both APIs explicitly. Qualify overlapping names such as `Text` when needed.
 
 ```swift
-.menuBar(id: "navigation", items: [
-    MenuItem(id: "files", title: "Files", shortcut: "1",
-             globalShortcuts: [.altCharacter("1"), .controlCharacter("1")])
-], selection: "files")
-```
-
-Alt+1 or a distinctly reported Control+1 emits `.activated("files")`; the application can then call `host.focus` or switch screens. `shortcut` remains a character shortcut used only while the menu has focus. Global shortcuts support `.altCharacter`, `.controlCharacter` and the dedicated `.controlC`, `.controlD`, `.controlP` cases. Other key types in `globalShortcuts` are ignored, preserving typing, paste, traversal and Escape. Shortcuts do not move focus themselves. They take priority over focused-control key bindings; duplicate bindings use the first matching item in tree order. A matching unavailable item consumes the key without activation or fallthrough. Hidden/disabled menus and their descendants do not register global shortcuts.
-
-An open dialog scopes global matching to that dialog, blocking workspace menu shortcuts. A searchable `.menu` registers only its currently matching results, including when the search field has focus. Existing focused character shortcuts retain their unavailable-item inspection behavior. Global shortcuts are empty by default, so existing applications retain their shortcut handling.
-
-Create a searchable modal menu with `.menu(id:title:items:query:selection:notice:)` and `MenuItem(id:title:shortcut:unavailableReason:)` values. The menu composes a dialog, search field and list; query and selection remain application-owned. Apply `.textChanged("menu.search", value)` and `.selectionChanged("menu.items", itemID)` when using `id: "menu"`. Search filters titles without case sensitivity and falls back to the first match if the selected item no longer matches. Enter emits `.activated(itemID)` for an available selection. Down moves focus from search into the results, where the usual list navigation applies. Character shortcuts apply in search and results only when the query is empty; paste remains search text. A shortcut emits the item ID even when unavailable, allowing the application to explain its prerequisite. Unavailable items remain selectable and show their reason, but Enter cannot activate them. No matches displays an empty-state message. Escape emits `.dismissRequested("menu")`; Return emits `.activated("menu.back")`. The application closes the overlay for either action, and the engine restores prior focus. Applications own destination behavior and any shortcuts not declared on menu items.
-
-The separate `TerminalUIChroma` product converts [Chroma](https://github.com/onevcat/Chroma) syntax tokens to semantic text spans, so the active TerminalUI theme and terminal colour settings control their appearance. Add the product to your target and use it as follows:
-
-```swift
+import TerminalUI
 import TerminalUIEngine
-import TerminalUIChroma
+import TerminalUIBridge
 
-let highlighter = SyntaxHighlighter()
-let spans = try highlighter.spans("let answer = 42", language: "swift")
-let view = Element.paragraph(spans)
+@MainActor
+func mixedContent() -> some TerminalView {
+    TerminalUI.Column {
+        EngineContent(Element.text("Custom engine content"))
+        TerminalUI.Text("Declarative content")
+    }
+}
 ```
 
-Pass a Chroma language identifier, such as `swift`, `python`, or `markdown`; a nil language returns plain spans and an unknown language throws. Keywords, types, functions and properties (including JSON keys) use the theme's `syntaxKeyword`, `syntaxType`, `syntaxFunction` and `syntaxProperty` styles, which applications can customize. Chroma's language rules determine which identifiers receive those classifications; it does not perform semantic type analysis. Markdown is syntax-highlighted, including recognized fenced code, rather than laid out as formatted Markdown. Paragraph wrapping and whitespace handling still apply. The package requires macOS 13 or later, matching Chroma's minimum deployment target. Both `Paragraph(spans)` in `TerminalUI` and `Element.paragraph(spans)` in the engine accept these shared spans. The external public API checks validate both integrations.
-
-Scroll views respond to arrows, Page Up/Down, Home and End; they keep a focused child visible and clamp their position after resizing. Focus moves to the next surviving control when the focused control disappears, and returns to the previous control after a dialog closes when possible. Pasted CRLF and CR line endings become newlines in editors and spaces in fields. Pass a `Theme` to `TerminalHost` to customize semantic styles. Custom widgets can use measurement, draw, and event contexts with the available width, assigned canvas size, focus and theme. They return `.consumed`, `.unhandled`, or `.action` from event handling. The earlier themed methods remain available.
-
-`KeyEvent.altCharacter` and `.controlCharacter` represent modified printable ASCII keys; Control-C/D/P retain their dedicated cases. The decoder accepts legacy Escape-prefixed Alt keys where they do not collide with control-sequence prefixes, and Alt/Control keys in CSI-u and modifyOtherKeys encodings, including keyboard lock flags. It does not infer ambiguous legacy Ctrl-number combinations. Standalone Escape retains the configured timeout; a later digit after that timeout is ordinary text. Modified character events reach the application as unhandled keys from built-in editors without changing their text, caret or selection. Terminal/desktop shortcut interception still requires validation in the target environment.
-
-Use `.onKey(.character("3"), activate: "activity")` to bind a key on a focused control, such as numbered choices in an empty menu search. The engine emits `.activated("activity")` instead of the control's usual response for that key. Only the active, enabled, focused control's bindings apply; Tab traversal and dialog Escape retain their built-in handling. Bracketed paste remains a separate event and does not activate a character binding. Applications own destination meanings; menu global shortcuts use the active dialog scope described above.
-
-The host requires a controlling TTY and rejects `TERM=dumb`. It temporarily installs process-wide signal handlers and uses raw terminal settings, an alternate screen, bracketed paste and a hidden cursor; it restores saved settings on ordinary exit, cancellation and handled termination signals. Forced termination and process crashes cannot guarantee restoration; `stty sane` and `reset` can recover a damaged shell. `NO_COLOR` disables ANSI colors. The host requests extended keyboard reporting to distinguish Shift+Enter where supported. Job-control suspension and full bidirectional layout are not implemented.
-
-Enable mouse input with `TerminalHost(configuration: TerminalConfiguration(mouseEnabled: true))`. It defaults to disabled to preserve terminal text selection. EngineDemo enables mouse input by default; use `swift run EngineDemo --no-mouse` to preserve terminal text selection. The host requests normal button tracking with SGR cell coordinates and disables those modes during cleanup. Actual emulator and multiplexer behavior still requires validation in the target terminal.
-
-Primary presses focus controls. Buttons and available menu items activate once on a matching release over the same visible target; releasing elsewhere cancels activation. Menu results select on press and activate the clicked row on release. Disabled rows remain selectable for inspection but cannot activate. Ordinary list and table clicks select without submitting; Enter retains submission behavior. `ListRow(activationID:)` opts a row into its own Enter/click action, taking precedence over a list-level `.onSubmit`. Tabs select on press. Panel title, border and empty-background clicks keep an already focused descendant, or focus the first enabled descendant. Panels have no separate window focus state. Dialogs trap mouse input as well as keyboard focus; outside clicks do not dismiss them.
-
-Fields and editors place the caret at the nearest displayed grapheme boundary and clear text selection on a primary press. Wheel input scrolls the deepest enabled viewport under the pointer by up to three rows per report, without changing keyboard focus, selected rows or the caret. Nested scrolling falls back to an enclosing viewport at a boundary. A manual scroll may hide focused content; keyboard interaction, programmatic focus and `keepVisible` reveal it again. Scrolling to the bottom resumes `followsEnd`. Horizontal wheel gestures, drag selection, double clicks and continuous hover effects are not implemented.
-
-For terminal-independent input, use `InputDecoder.feedEvents` to receive ordered `TerminalEvent.key` and `.mouse` values; `feed` keeps its keyboard-only contract and consumes mouse packets without returning them. `MouseEvent` uses zero-based cells and records press/release or vertical wheel direction, button and modifiers. Render the current tree before calling `UIEngine.handleMouseEvent`; refresh rendering after geometry-changing input. Without current geometry, mouse input is ignored. `TerminalHost` refreshes geometry as needed between events in a batch, while retaining application views for built-in wheel scrolling.
-
-Custom widgets can implement `respond(to: MouseEvent, context: WidgetMouseContext)` using local cell coordinates and the assigned size, focus and theme. The default is `.unhandled`. `mouseTarget(at:context:)` defaults to the widget ID; return stable item IDs for independent press/release targets, or nil for noninteractive cells. The engine enforces clipping, enabled state and matching primary releases. The [original investigation](Specs/TerminalUI/Mouse-Support-Investigation.md) records the design reasoning.
-
-Rendering and measurement are bounded to the first 100,000 graphemes of a text value. Scrollable content is limited to 4,096 rows. Shift-arrow keys extend editor selection when the terminal reports them.
-
-The editor retains its viewport as the caret moves and handles clipped wide characters; Unicode and wrapping behavior still needs validation in real terminals. Output coalesces changed cell runs and redraws complete wide-character footprints. Terminal failure recovery and teardown have not been verified across the full target platform matrix. The repository application example stacks its panes in narrow terminals and has PTY resize checks. Rich Markdown, job control and full bidirectional layout remain deferred.
-
-Unicode cell widths vary by emulator. The width policy is conservative and should be checked in the target terminal, especially for emoji and mixed-direction text. Linux PTY lifecycle, keyboard and mouse interaction checks are available through `python3 Scripts/test-terminalui-engine-pty.py` after running `swift build`. Repository workflows are checked separately by `python3 Scripts/test-terminalui-pty.py`. This does not replace validation in macOS Terminal, Foot, tmux or other real environments. The [design specification](Specs/TerminalUI/TerminalUI-Swift-Package-Design-v2.md) includes future work and validation targets beyond the implementation.
-
-The [internal architecture](Architecture.md) describes the SwiftPM targets and dependency composition. The [module migration review](Module-Migration-Review.md) records the public type ownership changes; existing source imports and qualified names remain available through the `TerminalUI` facade.
-
-The declarative entry point is documented in the [package README](../README.md). Engine content can be embedded in a declarative screen through the opt-in `TerminalUIBridge` product. See the [migration guide](High-Level-API-Migration.md).
+`ViewPresentation(root:)` adapts a declarative view to an engine-owned host. `engineElement(view)` embeds a declarative view in a raw tree. Resolve a presentation before passing its elements directly to a renderer.
 
 ## Styling and terminal capabilities
 
-`Theme.terminalNative` uses terminal-default text and background where practical. `Theme.dark` supplies a foreground palette intended for dark terminal backgrounds; `Theme.light` paints an opaque light background, layered surfaces and explicit text and control-state colours, so it works with a dark terminal default too. `Theme.dusk()` supplies the Parallax harness palette directly: an opaque dark background, layered surfaces, violet accents, tinted badges and rounded borders. It detects colour capability by default; pass `Theme.dusk(colorCapability: .ansi16)` when the host uses an explicit override. Its ANSI variant uses neutral named backgrounds to avoid mapping dark surfaces to bright colours in customised terminal palettes. Select a theme with `TerminalHost(theme:)`, or assign `host.theme` at runtime to redraw. A theme is a value: copy a built-in and change its semantic properties, for example:
+Pass a `Theme` to `TerminalHost`, or assign `host.theme` to change it while running. Raw elements support the same semantic roles, text spans and style modifiers described in [styling](Components.md#styling).
 
-```swift
-var theme = Theme.dark
-theme.warning = TextStyle(foreground: .rgb(255, 190, 80), bold: true)
-let host = TerminalHost(theme: theme)
-let label = Element.text("Warning: unsaved").role(.warning).underline()
-let content = Element.column([
-    label,
-    .text("Details").foreground(.default),
-    .paragraph([TextSpan("Status: "), TextSpan("ready", role: .success)])
-]).foreground(.cyan)
-```
+Colour detection uses `TERM`, `COLORTERM` and `NO_COLOR`. A nonempty `NO_COLOR` disables colour; `COLORTERM=truecolor` or `24bit` enables RGB, and `TERM` containing `256color` selects indexed colour. Override detection with `TerminalConfiguration(colorCapability:)`. An explicit override takes precedence over `NO_COLOR`. Enable `extendedAttributes` to emit dim and italic styles.
 
-`Theme.tokyoNight()`, `Theme.dracula()` and `Theme.nord()` add opaque dark presets based on the [Tokyo Night Night palette](https://github.com/folke/tokyonight.nvim), [Dracula palette](https://github.com/dracula/dracula-theme#color-palette-oss) and [Nord palette](https://www.nordtheme.com/docs/colors-and-palettes/). Each includes semantic control states, syntax colours and rounded borders. Like Dusk, they accept `colorCapability:` and use neutral backgrounds in their ANSI 16-colour variants. For example, use `.tokyoNight(colorCapability: .trueColor)` with a host explicitly configured for true colour.
+Mouse input is opt-in through `TerminalConfiguration(mouseEnabled: true)`. Primary clicks focus controls; buttons activate on a matching release. List and table clicks select rows, while wheel input scrolls the viewport under the pointer. Dialogs block background pointer input. Drag selection, double clicks, horizontal wheel and hover are not implemented.
 
-`Theme.ayuLight()` and `Theme.everforest()` adapt the palettes bundled with Chroma's Base46 presets to TerminalUI roles. Ayu Light paints an opaque light background with orange and blue syntax colours; Everforest uses dark green-grey backgrounds with warm text and green accents. Both include control states, rounded borders and a `colorCapability:` override. Ayu Light uses dark text on neutral light backgrounds in its ANSI 16-colour variant; Everforest uses neutral dark backgrounds.
+The host requires a controlling TTY and rejects `TERM=dumb`. It restores terminal settings on normal exit, cancellation and handled termination signals. Unicode widths and modified key reporting depend on the emulator; Shift+Enter requires distinct terminal reporting. Job-control suspension and full bidirectional text layout are not implemented. Text measurement is limited to 100,000 graphemes and scrollable content to 4,096 rows.
 
-The harness appearance uses public styling APIs, with no custom renderer required:
+## Rendering without a terminal
 
-```swift
-let theme = Theme.dusk()
-let host = TerminalHost(theme: theme)
-let workspace = Element.panel(title: "Repository", content: .column(spacing: 1, [
-    .text("Working tree").role(.heading),
-    .textField(id: "filter", value: "", placeholder: "Filter files")
-        .background(theme.field.background),
-    .text("Ready to inspect").role(.success)
-]).padding(.init(leading: 1, trailing: 1)))
-    .background(theme.surface.background)
-```
+Use `UIEngine.render(_:width:height:)` for cell output and `InputDecoder.feedEvents` for ordered keyboard and mouse events. Render before dispatching mouse input so hit testing has current geometry, and render again after geometry changes. `TerminalHost` handles that ordering during interactive execution.
 
-Roles include primary (`normal`), `secondary`, `muted`, `heading`, `accent`, `highlighted`, `info`, `success`, `warning`, `error`, `border`, `activeBorder`, `surface`, `field`, `cursor`, `dialog`, `action`, `focused`, `selection`, and `disabled`. Built-ins use the relevant roles for their presentation; applications and custom widgets can use any role. Focus and selection also use markers, and disabled buttons have a textual label. `ListRow(id:title:isEnabled:)` defaults to enabled; disabled rows use the disabled style and a leading `[disabled]` label, including when selected. They remain selectable for inspection but Enter does not emit the list's submit action. There is no persistent pressed state or built-in validation model; use an error role and explanatory text for validation.
+Built-in scrolling can repaint a viewport without rebuilding the application view. `UIEngine.handleEvent(_:in:)` distinguishes `.repaint` from `.rebuild(action:)` for callers managing rendering themselves.
 
-Styles have foreground, background, bold, dim, italic, underline and reverse properties. Colours include terminal default, standard and bright ANSI colours, `.indexed(UInt8)` and `.rgb(UInt8, UInt8, UInt8)`. `style(StyleOverride(...))` or the `foreground`, `background`, `bold`, `dim`, `italic` and `underline` modifiers override individual properties. An omitted property inherits; `.default` explicitly requests the terminal default. Container overrides are inherited by descendants; an explicit `.background(...)` also fills the container’s empty cells. Resolution starts with the element's semantic role, applies inherited properties, replaces that style with a focused, selected or disabled state style when applicable, then applies local overrides. Explicit local overrides can therefore deliberately override state styling. Rich paragraph spans apply their own role and overrides last and retain them across wrapping. Custom widgets receive `context.theme`, `context.style`, and `context.enabled`; they can use these with their canvas.
-
-The host detects colour from `TERM`, `COLORTERM` and `NO_COLOR`. The [NO_COLOR convention](https://no-color.org/) suppresses colour when the variable is nonempty but retains supported emphasis. `COLORTERM=truecolor` or `24bit` selects RGB; `TERM` containing `256color` selects the indexed palette; other nonempty, non-dumb terminals use 16 colours. The host requires a controlling terminal and rejects `TERM=dumb`. RGB and indexed values are mapped to the nearest available fixed xterm palette when needed; a user's customised ANSI palette can change the result. Detection cannot verify multiplexer passthrough. Override it with `TerminalConfiguration(colorCapability: .trueColor)` or restrict it with `.indexed256`, `.ansi16`, or `.none`; an explicit override takes precedence over `NO_COLOR`. Bold, underline and reverse are emitted by default; set `extendedAttributes: true` to opt into dim and italic when the terminal supports them. This is a conservative policy, not terminal feature probing.
-
-[EngineDemo](../Examples/EngineDemo/README.md) keeps the raw application lifecycle visible in one file: create a host, compose an element tree from application values, apply selection and text actions in `handle(_:)`, and run the host. It includes a list, scrolling detail pane, in-memory field and Quit button. `--preview` renders without a TTY; `--no-mouse` preserves normal terminal selection.
-
-The [repository browser](../Examples/RepositoryDemo/README.md) uses `TerminalUI` components, bindings, typed focus and a state-owned view model. Its Git query tests and PTY checks use temporary repositories and verify that browsing preserves the index, working files and checked-out branch. It contains repository functionality only.
-
-Run `swift test -j 4`, then the PTY scripts listed in the root README. Engine interaction checks compile the private `Tests/Fixtures/EngineInteractionProbe` to exercise nested scrolling, Unicode caret placement, multiline paste and live theme changes without exposing regression controls in the public examples. The unit tests additionally cover clipped targets, wide characters, input packet boundaries, modifiers, stale geometry and follow-end scrolling. These checks do not establish compatibility with a particular emulator or multiplexer. Drag selection, double-click, horizontal wheel and hover remain unimplemented.
-
-Tables display a persistent header and a vertically scrolling selection. Construct one with `.table(id:columns:rows:selection:)`, using `TableColumn("Name", width: .fill())` and `TableRow(id: "one", cells: ["First"])`. Columns accept `.fixed` cell widths, weighted `.fill`, or `.content` (the header width). Fixed and content columns are allocated first; remaining space is shared by fill columns, with a single space between columns. Narrow tables clip later columns and truncate cell text with an ellipsis. Missing cells are blank and extra cells are ignored. Row IDs must be unique. The application applies `.selectionChanged` to its selection; Up/Down, Page Up/Down, Home and End navigate, and the engine keeps the selected row visible as the table resizes or rows change. The header occupies one row. Pass `bordered: true` to add an outline, column dividers and a header separator; the outline and separator occupy three more rows and two more columns. Any remaining height displays data. Reset the ID with `resetState(for:)` when reusing it for another table. RepositoryDemo uses an interactive table for its commit history.
+See [architecture and development](Architecture.md) for package structure and validation commands.
