@@ -1,7 +1,7 @@
-import TerminalUIComponents
+import TerminalUI
 
 struct HeaderView: TerminalView {
-    var body: Element {
+    var body: some TerminalView {
         Row {
             Text("TerminalUILayout").role(.heading)
             Spacer()

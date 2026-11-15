@@ -1,4 +1,6 @@
-import TerminalUIComponents
+@testable import TerminalUI
+import TerminalUIEngine
+import TerminalUIBridge
 import Testing
 
 @MainActor
@@ -14,17 +16,17 @@ private struct Selections: TerminalView {
     @State private var table = "a"
     @State private var tabs: String? = "a"
     let probe: SelectionProbe
-    var body: Element {
+    var body: some TerminalView {
         probe.list = $list; probe.table = $table; probe.tabs = $tabs
         return Column {
-            List(id: "list", rows: [ListRow(id: "a", title: "Alpha"), ListRow(id: "b", title: "Beta")], selection: $list).height(.fixed(2))
-            Table(
+            TerminalUI.List(id: "list", rows: [ListRow(id: "a", title: "Alpha"), ListRow(id: "b", title: "Beta")], selection: $list).height(.fixed(2))
+            TerminalUI.Table(
                 id: "table",
                 columns: [TableColumn("Title")],
                 rows: [TableRow(id: "a", cells: ["Alpha"]), TableRow(id: "b", cells: ["Beta"])],
                 selection: $table,
             ).height(.fixed(3))
-            Tabs(id: "tabs", tabs: [Tab(id: "a", title: "Alpha"), Tab(id: "b", title: "Beta")], selection: $tabs)
+            TerminalUI.Tabs(id: "tabs", tabs: [Tab(id: "a", title: "Alpha"), Tab(id: "b", title: "Beta")], selection: $tabs)
         }
     }
 }

@@ -1,5 +1,3 @@
-import TerminalUICore
-
 /// Integer-cell size negotiation shared by builder rows/columns and custom layout users.
 public struct StackLayout: ElementLayout {
     public enum Axis: Sendable { case horizontal, vertical }
@@ -15,8 +13,10 @@ public struct StackLayout: ElementLayout {
 
     public func sizing(subviews: [LayoutSubview]) -> (width: LayoutPreference, height: LayoutPreference) {
         // Expansion propagates through nested containers; compact-only stacks remain compact.
-        (subviews.contains { isFlexible($0.width) && !($0.isSpacer && axis == .vertical) } ? .flexible() : .content,
-         subviews.contains { isFlexible($0.height) && !($0.isSpacer && axis == .horizontal) } ? .flexible() : .content)
+        (
+            subviews.contains { isFlexible($0.width) && !($0.isSpacer && axis == .vertical) } ? .flexible() : .content,
+            subviews.contains { isFlexible($0.height) && !($0.isSpacer && axis == .horizontal) } ? .flexible() : .content
+        )
     }
 
     public func sizeThatFits(_ proposal: LayoutProposal, subviews: [LayoutSubview]) -> WidgetSize {
@@ -54,9 +54,10 @@ public struct StackLayout: ElementLayout {
 
         // In a row, allocated widths affect wrapping and therefore the row's preferred height.
         let measured = subviews.enumerated().map { index, child in
-            child.sizeThatFits(vertical
-                ? LayoutProposal(width: offeredCross, height: sizes[index])
-                : LayoutProposal(width: sizes[index], height: offeredCross))
+            child.sizeThatFits(
+                vertical
+                    ? LayoutProposal(width: offeredCross, height: sizes[index])
+                    : LayoutProposal(width: sizes[index], height: offeredCross))
         }
         let crossSizes = measured.enumerated().map { index, size in
             let ideal = vertical ? size.width : size.height
@@ -82,10 +83,12 @@ public struct StackLayout: ElementLayout {
             case .center: crossOffset = free / 2
             case .trailing: crossOffset = free
             }
-            let placement = LayoutPlacement(index: index, x: vertical ? crossOffset : offset,
-                                            y: vertical ? offset : crossOffset,
-                                            size: WidgetSize(width: vertical ? crossSizes[index] : sizes[index],
-                                                             height: vertical ? sizes[index] : crossSizes[index]))
+            let placement = LayoutPlacement(
+                index: index, x: vertical ? crossOffset : offset,
+                y: vertical ? offset : crossOffset,
+                size: WidgetSize(
+                    width: vertical ? crossSizes[index] : sizes[index],
+                    height: vertical ? sizes[index] : crossSizes[index]))
             offset = min(4096, offset + sizes[index] + gap)
             return placement
         }
@@ -95,9 +98,9 @@ public struct StackLayout: ElementLayout {
     private func preferred(_ ideal: Int, policy: LayoutPreference, offered: Bool) -> Int {
         switch policy {
         case .automatic, .content: return ideal
-        case let .fixed(value): return bounded(value)
-        case let .fit(maximum): return min(ideal, bounded(maximum))
-        case let .flexible(minimum, _, _):
+        case .fixed(let value): return bounded(value)
+        case .fit(let maximum): return min(ideal, bounded(maximum))
+        case .flexible(let minimum, _, _):
             return min(upperBound(policy), max(bounded(minimum), offered ? 0 : ideal))
         }
     }
@@ -146,11 +149,11 @@ public struct StackLayout: ElementLayout {
         return false
     }
     private func upperBound(_ policy: LayoutPreference) -> Int {
-        if case let .flexible(minimum, maximum, _) = policy { return max(bounded(minimum), bounded(maximum ?? 4096)) }
+        if case .flexible(let minimum, let maximum, _) = policy { return max(bounded(minimum), bounded(maximum ?? 4096)) }
         return 4096
     }
     private func weight(_ policy: LayoutPreference) -> Int {
-        if case let .flexible(_, _, value) = policy { return max(1, min(4096, value)) }
+        if case .flexible(_, _, let value) = policy { return max(1, min(4096, value)) }
         return 1
     }
 }

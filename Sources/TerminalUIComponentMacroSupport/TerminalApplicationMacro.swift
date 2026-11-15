@@ -6,7 +6,7 @@ import SwiftSyntaxMacros
 private struct ApplicationDiagnostic: DiagnosticMessage {
     let message: String
     var diagnosticID: MessageID {
-        MessageID(domain: "TerminalUIComponents", id: "application")
+        MessageID(domain: "TerminalUI", id: "application")
     }
 
     var severity: DiagnosticSeverity {
@@ -71,6 +71,6 @@ public struct TerminalApplicationMacro: MemberMacro, MemberAttributeMacro, Exten
         in _: some MacroExpansionContext,
     ) throws -> [ExtensionDeclSyntax] {
         guard declaration.is(StructDeclSyntax.self) else { return [] }
-        return try [ExtensionDeclSyntax("extension \(type): TerminalUIComponents.TerminalApplicationDefinition {}")]
+        return try [ExtensionDeclSyntax("extension \(type): TerminalUI.TerminalApplicationDefinition {}")]
     }
 }

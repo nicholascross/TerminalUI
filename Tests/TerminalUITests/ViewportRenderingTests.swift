@@ -1,4 +1,4 @@
-import TerminalUI
+import TerminalUIEngine
 import Testing
 
 struct ViewportRenderingTests {

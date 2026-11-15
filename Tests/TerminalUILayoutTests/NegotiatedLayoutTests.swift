@@ -1,5 +1,5 @@
 import Foundation
-import TerminalUILayout
+import TerminalUIEngine
 import Testing
 
 struct NegotiatedLayoutTests {

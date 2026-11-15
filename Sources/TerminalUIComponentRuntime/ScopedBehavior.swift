@@ -13,18 +13,20 @@ extension ComponentRuntime {
             return result
         }
         switch element.kind {
-        case let .button(title, id): value.kind = .button(title, scoped(id))
-        case let .field(id, text, placeholder, multiline): value.kind = .field(scoped(id), text, placeholder, multiline)
-        case let .list(id, rows, selection): value.kind = .list(scoped(id), rows, selection)
-        case let .table(id, columns, rows, selection, bordered): value.kind = .table(scoped(id), columns, rows, selection, bordered)
-        case let .dialog(id, title, child): value.kind = .dialog(scoped(id), title, child)
-        case let .scroll(id, child): value.kind = .scroll(scoped(id), child)
-        case let .custom(widget):
+        case .button(let title, let id): value.kind = .button(title, scoped(id))
+        case .field(let id, let text, let placeholder, let multiline): value.kind = .field(scoped(id), text, placeholder, multiline)
+        case .list(let id, let rows, let selection): value.kind = .list(scoped(id), rows, selection)
+        case .table(let id, let columns, let rows, let selection, let bordered): value.kind = .table(scoped(id), columns, rows, selection, bordered)
+        case .dialog(let id, let title, let child): value.kind = .dialog(scoped(id), title, child)
+        case .scroll(let id, let child): value.kind = .scroll(scoped(id), child)
+        case .custom(let widget):
             if let id = widget.id { value.kind = .custom(ScopedWidget(base: widget, id: scoped(id))) }
         default: break
         }
         if let id = value.visibilityID { value.visibilityID = scoped(id) }
         if let id = value.menuResultsID { value.menuResultsID = scoped(id) }
+        if let id = value.submitID { value.submitID = scoped(id) }
+        value.keyActions = value.keyActions.map { ($0.key, scoped($0.actionID)) }
         for behavior in element.behaviors {
             let event: ElementBehaviorEvent
             let id: String
@@ -75,10 +77,10 @@ private struct ScopedWidget: CustomWidget {
     }
 
     private func translate(_ result: WidgetResponse) -> WidgetResponse {
-        guard case let .action(action) = result, let old = base.id, let id else { return result }
+        guard case .action(let action) = result, let old = base.id, let id else { return result }
         switch action {
-        case let .selectionChanged(control, value) where control == old: return .action(.selectionChanged(id, value))
-        case let .textChanged(control, value) where control == old: return .action(.textChanged(id, value))
+        case .selectionChanged(let control, let value) where control == old: return .action(.selectionChanged(id, value))
+        case .textChanged(let control, let value) where control == old: return .action(.textChanged(id, value))
         case .activated(old): return .action(.activated(id))
         default: return result
         }

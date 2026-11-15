@@ -1,4 +1,4 @@
-import TerminalUIComponents
+import TerminalUI
 
 /// Shared presentation state and commands. The screen stores this value in one mounted @State slot.
 public struct LayoutViewModel: Equatable, Sendable {

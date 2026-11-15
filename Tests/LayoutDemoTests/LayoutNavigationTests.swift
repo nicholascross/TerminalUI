@@ -1,5 +1,7 @@
 @testable import LayoutDemoSupport
-import TerminalUIComponents
+@testable import TerminalUI
+import TerminalUIEngine
+import TerminalUIBridge
 @testable import TerminalUIRuntime
 import Testing
 

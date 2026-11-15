@@ -1,4 +1,6 @@
-import TerminalUIComponents
+@testable import TerminalUI
+import TerminalUIEngine
+import TerminalUIBridge
 import Testing
 
 @MainActor
@@ -16,7 +18,7 @@ private struct SharedState: TerminalView {
     @State private var second = "second"
     @State private var useFirst = true
     let probe: Dependencies
-    var body: Element {
+    var body: some TerminalView {
         probe.parentCalls += 1
         probe.first = $first; probe.second = $second; probe.useFirst = $useFirst
         return BindingReader(first: $first, second: $second, useFirst: $useFirst, probe: probe).bodyBoundary
@@ -28,13 +30,13 @@ private struct BindingReader: TerminalView {
     @Binding var second: String
     @Binding var useFirst: Bool
     let probe: Dependencies
-    var bodyBoundary: Element {
-        Component(self)
+    var bodyBoundary: some TerminalView {
+        TerminalUI.Component(self)
     }
 
-    var body: Element {
+    var body: some TerminalView {
         probe.childCalls += 1
-        return Text(useFirst ? first : second)
+        return TerminalUI.Text(useFirst ? first : second)
     }
 }
 

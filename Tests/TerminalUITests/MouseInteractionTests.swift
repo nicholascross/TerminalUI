@@ -1,4 +1,4 @@
-import TerminalUI
+import TerminalUIEngine
 @testable import TerminalUIRendering
 import Testing
 

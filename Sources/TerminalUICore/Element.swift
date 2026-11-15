@@ -1,13 +1,29 @@
 /// A value describing a terminal interface. Rebuild it from application state after actions.
 public struct Element {
     package indirect enum Kind {
-        case text(String), paragraph(String), styledParagraph([TextSpan]), column(Int, [Element]), row(Int, [Element]), panel(String, Element)
-        case button(String, String), field(String, String, String, Bool)
-        case list(String, [ListRow], String?), table(String, [TableColumn], [TableRow], String?, Bool), dialog(String, String, Element), overlay(Element, Element)
-        case scroll(String, Element), custom(any CustomWidget), spacer, divider
+        case text(String)
+        case paragraph(String)
+        case styledParagraph([TextSpan])
+        case column(Int, [Element])
+        case row(Int, [Element])
+        case panel(String, Element)
+        case button(String, String)
+        case field(String, String, String, Bool)
+        case list(String, [ListRow], String?)
+        case table(String, [TableColumn], [TableRow], String?, Bool)
+        case dialog(String, String, Element)
+        case overlay(Element, Element)
+        case scroll(String, Element)
+        case custom(any CustomWidget)
+        case spacer, divider
         case layout(any ElementLayout, [Element])
-        case component(any ComponentDescriptor), boundary(ComponentBoundary, Element)
+        case component(any ComponentDescriptor)
+        case boundary(ComponentBoundary, Element)
     }
+    package var deferredModifiers: [@MainActor (Element) -> Element] = []
+    package var compositionPath: [CompositionAddress]?
+    package var viewID: AnyHashable?
+    package var scopeID: AnyHashable?
     package var kind: Kind
     package var actionHandlers: [@MainActor (UIAction) -> Bool] = []
     package var behaviors: [ElementBehavior] = []
@@ -53,7 +69,11 @@ public struct Element {
     public static func textField(id: String, value: String, placeholder: String = "") -> Self { .init(kind: .field(id, value, placeholder, false)) }
     public static func textEditor(id: String, value: String, placeholder: String = "") -> Self { .init(kind: .field(id, value, placeholder, true)) }
     /// Makes Enter activate the supplied action in this editor. Shift+Enter inserts a newline when reported by the terminal.
-    public func onSubmit(_ id: String) -> Self { var copy = self; copy.submitID = id; return copy }
+    public func onSubmit(_ id: String) -> Self {
+        var copy = self
+        copy.submitID = id
+        return copy
+    }
     /// Activates an action for this key when the control has focus. Paste remains a separate event.
     public func onKey(_ key: KeyEvent, activate id: String) -> Self {
         var copy = self
@@ -90,10 +110,18 @@ public struct Element {
     public static func divider() -> Self { .init(kind: .divider) }
     public func overlay(_ element: Self?) -> Self { element.map { .init(kind: .overlay(self, $0)) } ?? self }
     public func width(_ rule: LayoutSize) -> Self {
-        var copy = self; copy.widthRule = rule; copy.hasExplicitWidth = true; copy.layoutWidth = .automatic; return copy
+        var copy = self
+        copy.widthRule = rule
+        copy.hasExplicitWidth = true
+        copy.layoutWidth = .automatic
+        return copy
     }
     public func height(_ rule: LayoutSize) -> Self {
-        var copy = self; copy.heightRule = rule; copy.hasExplicitHeight = true; copy.layoutHeight = .automatic; return copy
+        var copy = self
+        copy.heightRule = rule
+        copy.hasExplicitHeight = true
+        copy.layoutHeight = .automatic
+        return copy
     }
     /// Supplies preferences to negotiated parents without changing ordinary stack sizing.
     public func layoutSizing(width: LayoutPreference = .automatic, height: LayoutPreference = .automatic) -> Self {
@@ -102,20 +130,48 @@ public struct Element {
         copy.layoutHeight = height
         return copy
     }
-    public func padding(_ insets: Insets) -> Self { var copy = self; copy.insets = insets; return copy }
+    public func padding(_ insets: Insets) -> Self {
+        var copy = self
+        copy.insets = insets
+        return copy
+    }
     /// Identifies content for a programmatic keep-visible request.
-    public func id(_ value: String) -> Self { var copy = self; copy.visibilityID = value; return copy }
+    public func id(_ value: String) -> Self {
+        var copy = self
+        copy.visibilityID = value
+        return copy
+    }
     /// Aligns text within its width or children across a stack.
-    public func alignment(_ value: Alignment) -> Self { var copy = self; copy.alignment = value; return copy }
-    public func role(_ value: TextRole) -> Self { var copy = self; copy.textRole = value; return copy }
+    public func alignment(_ value: Alignment) -> Self {
+        var copy = self
+        copy.alignment = value
+        return copy
+    }
+    public func role(_ value: TextRole) -> Self {
+        var copy = self
+        copy.textRole = value
+        return copy
+    }
     /// Overrides only specified properties; on containers these properties are inherited.
-    public func style(_ value: StyleOverride) -> Self { var copy = self; copy.styleOverride = copy.styleOverride.merging(value); return copy }
+    public func style(_ value: StyleOverride) -> Self {
+        var copy = self
+        copy.styleOverride = copy.styleOverride.merging(value)
+        return copy
+    }
     public func foreground(_ value: TextStyle.Color) -> Self { style(.init(foreground: value)) }
     public func background(_ value: TextStyle.Color) -> Self { style(.init(background: value)) }
     public func bold(_ value: Bool = true) -> Self { style(.init(bold: value)) }
     public func dim(_ value: Bool = true) -> Self { style(.init(dim: value)) }
     public func italic(_ value: Bool = true) -> Self { style(.init(italic: value)) }
     public func underline(_ value: Bool = true) -> Self { style(.init(underline: value)) }
-    public func visible(_ value: Bool) -> Self { var copy = self; copy.isVisible = value; return copy }
-    public func enabled(_ value: Bool) -> Self { var copy = self; copy.isEnabled = value; return copy }
+    public func visible(_ value: Bool) -> Self {
+        var copy = self
+        copy.isVisible = value
+        return copy
+    }
+    public func enabled(_ value: Bool) -> Self {
+        var copy = self
+        copy.isEnabled = value
+        return copy
+    }
 }

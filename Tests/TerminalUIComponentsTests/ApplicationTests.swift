@@ -1,4 +1,6 @@
-import TerminalUIComponents
+@testable import TerminalUI
+import TerminalUIEngine
+import TerminalUIBridge
 @testable import TerminalUIRuntime
 import Testing
 
@@ -13,19 +15,19 @@ private struct ApplicationScreen: TerminalView {
     @ApplicationContext private var application
     let probe: ApplicationProbe
 
-    var body: Element {
+    var body: some TerminalView {
         probe.context = application
         probe.bodies += 1
         return Column {
-            Button("Quit", id: "quit").onActivate { application.stop() }
-            TextField(id: "draft", text: .constant("Hello"))
+            TerminalUI.Button("Quit", id: "quit").onActivate { application.stop() }
+            TerminalUI.TextField(id: "draft", text: .constant("Hello"))
         }
     }
 }
 
 private struct PlainScreen: TerminalView {
-    var body: Element {
-        Text("Default application")
+    var body: some TerminalView {
+        TerminalUI.Text("Default application")
     }
 }
 

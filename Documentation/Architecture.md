@@ -1,51 +1,57 @@
-TerminalUI uses separate SwiftPM targets to enforce dependency direction. The `TerminalUI` product remains the consumer entry point; its module contains explicit public aliases for the types owned by the implementation modules. `TerminalUIChroma` remains an optional adapter.
+# Architecture
+
+`TerminalUI` owns the high-level declarative API. `TerminalUIEngine` owns the low-level facade. Neither depends on the other or re-exports implementation modules. `TerminalUIBridge` is an explicit opt-in target depending on both; engine-only consumers avoid high-level and macro compilation. `TerminalUIChroma` depends directly on shared semantic text models in Core.
 
 | Target | Responsibility | Direct dependencies |
 | --- | --- | --- |
-| `TerminalUICore` | Element model, actions and events, styles, canvas/grid, display width, geometry values and custom-widget contracts. Includes the small self-contained tab/menu widgets used by element factories. | None |
-| `TerminalUIText` | Wrapping, bounded text-layout caching, text metrics and editor coordinates. | Core |
-| `TerminalUIInput` | Incremental keyboard, paste and mouse packet decoding. | Core |
-| `TerminalUILayoutEngine` | Retained nodes, measurement, allocation, mouse geometry and node-to-text-cache adaptation. | Core, Text |
-| `TerminalUIInteraction` | Keyboard/pointer routing, shortcuts, transient state, editing, collection navigation, focus and tree-query policies. | Core, Text, Layout |
-| `TerminalUIRendering` | Engine composition, built-in painters, retained repainting, frame differencing and ANSI style encoding. | Core, Text, Layout, Interaction |
-| `TerminalUIRuntime` | Application host, escape deadlines, frame transmission and native terminal session lifecycle. | Core, Input, Rendering, CTerminalSupport |
-| `TerminalUI` | Consumer facade with explicit aliases for the existing public names. | Core, Input, Rendering, Runtime |
-| `TerminalUILayout` | Optional builder API, component factories and negotiated stack strategies. | TerminalUI, Core |
-| `TerminalUIComponentRuntime` | Mounted identities, typed slots, dependencies, scoped callbacks and the update driver. | Core |
-| `TerminalUIComponents` | Optional declarative applications and runner, struct views, state/bindings, application context, bound controls, repetition and presentation adapter. | Core, Runtime, Layout composition, ComponentRuntime, ComponentMacros |
-| `TerminalUIComponentMacros` / `TerminalUIComponentMacroSupport` | Compiler plugin entry point, application entry/conformance/isolation and testable property-registration expansion. | SwiftSyntax, compiler plugin support |
-| `TerminalUIChroma` | Optional Chroma-to-semantic-text adapter. | TerminalUI, Chroma |
-
-The manifest lists all direct dependencies explicitly. No implementation target imports the facade, and the core does not depend on any implementation target. The existing `TerminalUI` and `TerminalUIChroma` library products are retained; the implementation targets are not additional published products. The optional `TerminalUILayout` product adds negotiated composition; its implementation is separate from the internal `TerminalUILayoutEngine` target.
+| `TerminalUICore` | Elements, shared developer models, drawing contracts, composition addresses, negotiated stack strategy and opaque handles. | None |
+| `TerminalUIText` | Wrapping, text metrics, editor coordinates and bounded text cache. | Core |
+| `TerminalUIInput` | Incremental keyboard, paste and mouse decoding. | Core |
+| `TerminalUILayoutEngine` | Retained nodes, measurements, allocation and geometry. | Core, Text |
+| `TerminalUIInteraction` | Keyboard/pointer routing, focus, widget mechanics and tree queries. | Core, Text, Layout |
+| `TerminalUIRendering` | Rendering composition, painters, frames and encoding. | Core, Text, Layout, Interaction |
+| `TerminalUIRuntime` | Host, presentation services, wakeups and terminal lifecycle. | Core, Input, Rendering, CTerminalSupport |
+| `TerminalUIComponentRuntime` | Mount identity, state slots, dependencies, scopes and scheduling. | Core |
+| `TerminalUI` | Public typed views, builders, modifiers, macros, runner and harness. | Core, Runtime, ComponentRuntime, ComponentMacros |
+| `TerminalUIEngine` | Raw facade, legacy element builder and factories. | Core, Input, Rendering, Runtime |
+| `TerminalUIBridge` | Raw content in views and views as engine presentations. | TerminalUI, TerminalUIEngine, Core |
+| `TerminalUIComponentMacros` / `TerminalUIComponentMacroSupport` | Compiler plugin, application entry/conformance/isolation and state registration. | SwiftSyntax and compiler plugin tooling |
+| `TerminalUIChroma` | Syntax tokens converted to semantic spans. | Core, Chroma |
 
 ```mermaid
 flowchart TD
-    Components[TerminalUIComponents] --> Composition
-    Components --> ComponentRuntime
-    Components --> Macros[Component macros]
-    ComponentRuntime --> Core
-    Composition[TerminalUILayout composition] --> Facade[TerminalUI facade]
-    Composition --> Core
-    Facade --> Runtime
-    Facade --> Rendering
-    Facade --> Input
-    Facade --> Core
+    Bridge[TerminalUIBridge] --> UI[TerminalUI]
+    Bridge --> Engine[TerminalUIEngine]
+    UI --> Mount[ComponentRuntime]
+    UI --> Runtime
+    UI --> Macros
+    UI --> Core
+    Engine --> Runtime
+    Engine --> Rendering
+    Engine --> Input
+    Engine --> Core
+    Mount --> Core
     Runtime --> Rendering
     Runtime --> Input
     Runtime --> Core
     Runtime --> Native[CTerminalSupport]
-    Rendering --> Layout
+    Rendering --> Layout[LayoutEngine]
     Rendering --> Interaction
     Rendering --> Text
     Rendering --> Core
+    Interaction --> Layout
+    Interaction --> Text
+    Interaction --> Core
     Layout --> Text
     Layout --> Core
-    Interaction --> Text
-    Interaction --> Layout
-    Interaction --> Core
-    Input --> Core
     Text --> Core
+    Input --> Core
+    Chroma --> Core
 ```
+
+`TerminalView` has an associated body; parameter-pack tuples, optionals, branches and repetition retain concrete composition types. Package-only primitive lowering runs inside the installed owner's dependency-recording and mutation-restriction scope. It emits unevaluated descriptors for user children. Structural addresses reach mounted matching before layout children are flattened. Identity wrappers reset their entire subtree; scope wrappers provide generation-scoped lookup without resetting state when a scope name changes. The renderer sees resolved elements and revision boundaries only.
+
+Public aliases are curated. The runner's host and presentation remain package-only; `ApplicationHarness` returns snapshots and accepts high-level input rather than raw elements or presentation services. External compilation fixtures and public symbol inspection enforce the boundary. See the [migration guide](High-Level-API-Migration.md) and [implementation plan](Specs/TerminalUI/High-Level-API-Architecture-Plan.md).
 
 `UIEngine` is the composition root and public coordinator. Its renderer, keyboard router, pointer router, focus manager and state store are private collaborators. Rendering and input behaviour no longer live in engine extensions. Components receive specific services through initializers and never receive a reference back to the engine.
 
@@ -77,9 +83,9 @@ All extracted services use instance composition. Existing public factories/const
 
 The [module migration review](Module-Migration-Review.md) records the nominal type ownership changes and compatibility checks. Run `swift test` for all tests, including captured-geometry expiry and press/release continuity through a rebuilt view. Input, interaction and runtime-policy tests also have their own test targets; mixed engine/host tests remain in `TerminalUITests`. `TerminalUICompatibilityTests` depends only on the facade and uses ordinary imports. After building the demo, run `python3 Scripts/test-terminalui-pty.py` for terminal lifecycle and integration checks.
 
-Negotiated layout uses a Core-owned `ElementLayout` container contract. The optional composition module supplies strategies; the renderer measures and places ordinary element children through that contract, preserving their focus, pointer, modal and retained-scroll behavior. Existing array-based stacks keep their original allocator. See [negotiated layout](Negotiated-Layout.md) for the public API and sizing semantics.
+Negotiated layout uses a Core-owned `ElementLayout` container contract. Core supplies the shared negotiated stack strategy; the engine supports custom strategies; the renderer measures and places ordinary element children through that contract, preserving their focus, pointer, modal and retained-scroll behavior. Existing array-based stacks keep their original allocator. See [negotiated layout](Negotiated-Layout.md) for the public API and sizing semantics.
 
-The optional component layer is implemented. Core owns the presentation source and opaque descriptor/boundary contracts; the host consumes those contracts without depending on `TerminalUIComponents`. Resolved boundaries are transparent to focus, mouse, modal discovery, measurement and painting. Layout nodes match keyed boundaries by generation identity and skip unchanged subtree revisions.
+The mounted component layer is implemented. Core owns the presentation source and opaque descriptor/boundary contracts; the host consumes those contracts without depending on `TerminalUI`. Resolved boundaries are transparent to focus, mouse, modal discovery, measurement and painting. Layout nodes match keyed boundaries by generation identity and skip unchanged subtree revisions.
 
 `TerminalUIComponentRuntime` owns mount-local state and state-read subscriptions separately from `WidgetStateStore`. It updates cached output paths after child-only changes, replaces callbacks with fresh body captures, and schedules coalesced main-actor wakeups. A dedicated application-update pipe is observed by Linux polling and the Darwin select helper. Input consistency barriers precede subsequent dispatch; terminal output receives immutable snapshots. Teardown joins the input read before closing descriptors.
 

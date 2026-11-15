@@ -1,6 +1,6 @@
 import Foundation
 import LayoutDemoSupport
-import TerminalUIComponents
+import TerminalUI
 
 @main
 @TerminalApplication

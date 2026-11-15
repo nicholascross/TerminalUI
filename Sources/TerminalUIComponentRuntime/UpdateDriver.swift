@@ -16,7 +16,8 @@ package final class UpdateDriver {
     private var ticket: UInt64 = 0
 
     package init(schedule: @escaping Scheduler, diagnostic: @escaping @MainActor (String) -> Void) {
-        self.schedule = schedule; self.diagnostic = diagnostic
+        self.schedule = schedule
+        self.diagnostic = diagnostic
     }
 
     package func changed(_ subscribers: Set<String>) {
@@ -27,7 +28,10 @@ package final class UpdateDriver {
     }
 
     package func requestFlush() {
-        if transactionDepth > 0 { deferredRequest = true; return }
+        if transactionDepth > 0 {
+            deferredRequest = true
+            return
+        }
         guard !pending else { return }
         pending = true
         ticket &+= 1
@@ -59,6 +63,8 @@ package final class UpdateDriver {
 
 /// Counts distinct kinds of component work; terminal painting/output are measured separately.
 public struct ComponentMetrics: Equatable, Sendable {
+    public package(set) var mounts = 0
+    public package(set) var unmounts = 0
     public package(set) var stateWrites = 0
     public package(set) var scheduledFlushes = 0
     public package(set) var bodyEvaluations = 0

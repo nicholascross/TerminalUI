@@ -1,5 +1,5 @@
 import Foundation
-import TerminalUI
+import TerminalUIEngine
 import TerminalUIChroma
 
 /// A read-only repository browser with accessible theme and component examples.

@@ -47,8 +47,8 @@ public struct State<Value> {
     }
 }
 
-private extension Equatable {
-    func _componentEquals(_ other: Any) -> Bool {
+extension Equatable {
+    fileprivate func _componentEquals(_ other: Any) -> Bool {
         (other as? Self).map { self == $0 } ?? false
     }
 }

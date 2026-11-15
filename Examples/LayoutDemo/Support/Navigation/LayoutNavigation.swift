@@ -1,4 +1,4 @@
-import TerminalUIComponents
+import TerminalUI
 
 /// Bridges typed demo destinations to the host's opaque, generation-scoped focus handles.
 @MainActor

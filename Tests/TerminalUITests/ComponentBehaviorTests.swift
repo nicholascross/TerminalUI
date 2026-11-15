@@ -1,5 +1,5 @@
 import Foundation
-import TerminalUI
+import TerminalUIEngine
 import Testing
 
 struct ComponentBehaviorTests {

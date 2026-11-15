@@ -1,6 +1,6 @@
 import Foundation
 import Testing
-import TerminalUI
+import TerminalUIEngine
 @testable import RepositoryDemo
 
 struct GitRepositoryTests {

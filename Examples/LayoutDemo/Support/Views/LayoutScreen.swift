@@ -1,4 +1,4 @@
-import TerminalUIComponents
+import TerminalUI
 
 @TerminalComponent
 public struct LayoutScreen: TerminalView {
@@ -9,7 +9,7 @@ public struct LayoutScreen: TerminalView {
 
     private var navigation: LayoutNavigation { LayoutNavigation(application: application) }
 
-    public var body: Element {
+    public var body: some TerminalView {
         Column(spacing: 1) {
             Component(HeaderView(), key: "header")
             Component(NavigationView(items: model.navigationItems, selection: model.focusedPane?.actionID,

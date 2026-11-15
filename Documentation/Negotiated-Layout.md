@@ -1,11 +1,11 @@
 # Negotiated layout
 
-Add the `TerminalUILayout` product to your target and `import TerminalUILayout`. It re-exports `TerminalUI`, adding named component factories, a result builder and negotiated rows/columns. Every component returns an ordinary `Element`; application state, actions, stable IDs and the terminal host work as before.
+Import `TerminalUI` for typed declarative composition. Containers lower to the existing negotiated layout engine; application bodies return `some TerminalView`. Raw element factories, the legacy `ElementBuilder`, and custom layout contracts are available through `TerminalUIEngine`.
 
 ```swift
-import TerminalUILayout
+import TerminalUI
 
-func workspace(draft: String, rows: [ListRow], selection: String?) -> Element {
+func workspace(draft: String, rows: [ListRow], selection: String?) -> some TerminalView {
     Column(spacing: 1) {
         Row {
             Text("Workspace").role(.heading)
@@ -45,13 +45,11 @@ In the command editor, Enter submits and clears the draft, while Shift+Enter ins
 
 ## Composition
 
-`Column` and `Row` accept multiple children, `if`, `if/else`, `switch`, `for`, availability checks and `[Element]` collections. Component functions simply return `Element`; there is no component state protocol or global widget registry. Builders collect their children locally.
+`Column` and `Row` accept multiple typed children, conditionals, switches, loops and availability checks. Generic builders preserve structural slots and branch identity. Use `ForEach` for keyed collections; ordinary loops have positional identity. Extract helpers returning `some TerminalView`.
 
-`Panel`, `ScrollView` and `Dialog` take one root child. Put a row or column inside when arranging several children. Named factories are intentional: Swift parses adjacent leading-dot expressions such as `.text("A")` followed by `.text("B")` as a method chain. `Text("A")` followed by `Text("B")` gives unambiguous sibling declarations.
+`Panel`, `ScrollView` and `Dialog` accept builder content. A single root is used directly; multiple roots are grouped vertically. Put an explicit row or column inside when choosing arrangement and spacing.
 
-Closure overloads also exist on `Element.column`, `Element.row`, `Element.panel`, `Element.scrollView` and `Element.dialog`. Within those builders, use named factories or explicitly qualified `Element.text(...)` expressions.
-
-Named helpers cover the existing controls, including `MenuBar`, searchable `Menu`, `Tabs`, `Progress`, `KeyHints` and `Custom`. Menu bars, tabs and key hints use one row and flexible width; they retain the underlying controls' shortcut, modal and input semantics. For example:
+Named helpers cover the existing controls, including `MenuBar`, searchable `Menu`, `Tabs`, `Progress`, `KeyHints` and engine `Custom`. Menu bars, tabs and key hints use one row and flexible width; they retain the underlying controls' shortcut, modal and input semantics. For example:
 
 ```swift
 MenuBar(id: "navigation", items: [
@@ -60,17 +58,21 @@ MenuBar(id: "navigation", items: [
 ], selection: nil)
 ```
 
-Handle `.activated("pane.files")` by calling `host.focus("files", in: view())`. The application owns navigation destinations; the layout module uses the existing engine's shortcuts and focus management.
+Handle activation with `.onAction` and request focus through an installed `@ApplicationContext`. The application owns destinations.
 
-Existing arrays keep their existing sizing behavior and can be used in either direction:
+The engine retains array-based layout and raw negotiated factories. Explicit bridge consumers can mix typed and raw content:
 
 ```swift
+import TerminalUI
+import TerminalUIEngine
+import TerminalUIBridge
+
 let legacy = Element.column([.text("Existing"), .button("Open", id: "open")])
-let composed = Column {
-    legacy
-    Text("New composition")
+let composed = TerminalUI.Column {
+    EngineContent(legacy)
+    TerminalUI.Text("New composition")
 }
-let existingRoot = Element.column([composed, .statusBar("Ready")])
+let existingRoot = Element.column([engineElement(composed), .statusBar("Ready")])
 ```
 
 An ordinary stack's own allocation rules remain in force. For example, use `.height(.fill())` when a negotiated container should expand as a child of an ordinary column. Negotiated parents recognize explicit `.width`/`.height` rules on ordinary children.
@@ -125,9 +127,9 @@ Preferences are `.automatic`, `.content`, `.fixed`, `.fit(maximum:)` and `.flexi
 
 ## Module and engine boundary
 
-The former internal `TerminalUILayout` target is now `TerminalUILayoutEngine`. It still owns retained nodes, measurement, geometry and the ordinary stack allocator. The new public `TerminalUILayout` product depends on `TerminalUI` and `TerminalUICore`. The renderer never imports the optional public composition module.
+`TerminalUILayoutEngine` owns retained nodes, measurement, geometry and the ordinary stack allocator. The declarative module and engine facade both use Core's negotiated stack strategy. The renderer depends on neither facade.
 
-The lower-level `Element.layout(_:children:)` factory accepts an `ElementLayout` strategy. The shared contract lives in Core and is also exposed through the `TerminalUI` facade:
+The lower-level `Element.layout(_:children:)` factory and `ElementLayout` contracts are exposed by `TerminalUIEngine`:
 
 - `LayoutProposal` represents the offered width/height.
 - `LayoutSubview` supplies sizing preferences and synchronous measurement of an ordinary child.

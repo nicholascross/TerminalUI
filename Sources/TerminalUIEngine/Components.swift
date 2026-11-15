@@ -3,13 +3,17 @@ import TerminalUICore
 // Named factories avoid Swift parsing adjacent leading-dot expressions as one method chain.
 // Every factory returns an ordinary Element, so existing modifiers and application actions apply.
 
-public func Column(spacing: Int = 0, alignment: Alignment = .leading,
-                   @ElementBuilder content: () -> [Element]) -> Element {
+public func Column(
+    spacing: Int = 0, alignment: Alignment = .leading,
+    @ElementBuilder content: () -> [Element]
+) -> Element {
     .column(spacing: spacing, alignment: alignment, content: content)
 }
 
-public func Row(spacing: Int = 0, alignment: Alignment = .leading,
-                @ElementBuilder content: () -> [Element]) -> Element {
+public func Row(
+    spacing: Int = 0, alignment: Alignment = .leading,
+    @ElementBuilder content: () -> [Element]
+) -> Element {
     .row(spacing: spacing, alignment: alignment, content: content)
 }
 
@@ -45,12 +49,16 @@ public func Custom(_ widget: any CustomWidget) -> Element { .custom(widget) }
 public func Tabs(id: String, tabs: [Tab], selection: String?) -> Element {
     .tabs(id: id, tabs: tabs, selection: selection).layoutSizing(width: .flexible(), height: .fixed(1))
 }
-public func MenuBar(id: String, items: [MenuItem], selection: String?, focusedItem: String? = nil,
-                    compact: Bool = false) -> Element {
+public func MenuBar(
+    id: String, items: [MenuItem], selection: String?, focusedItem: String? = nil,
+    compact: Bool = false
+) -> Element {
     .menuBar(id: id, items: items, selection: selection, focusedItem: focusedItem, compact: compact)
         .layoutSizing(width: .flexible(), height: .fixed(1))
 }
-public func Menu(id: String, title: String, items: [MenuItem], query: String,
-                 selection: String?, notice: String? = nil) -> Element {
+public func Menu(
+    id: String, title: String, items: [MenuItem], query: String,
+    selection: String?, notice: String? = nil
+) -> Element {
     .menu(id: id, title: title, items: items, query: query, selection: selection, notice: notice)
 }

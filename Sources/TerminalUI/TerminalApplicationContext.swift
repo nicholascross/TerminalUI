@@ -23,6 +23,19 @@ public struct TerminalApplicationContext {
         services?.keepVisible(target)
     }
 
+    public func scope<ID: Hashable>(_ id: ID, in parent: ViewScope? = nil) -> ViewScope? {
+        services?.scope(id: AnyHashable(ViewID(id)), in: parent)
+    }
+
+    public func focusTarget(path: [AnyHashable] = [], id: String, in scope: ViewScope) -> ScopedFocusTarget? {
+        services?.focusTarget(path: path, id: id, in: scope)
+    }
+
+    @discardableResult
+    public func reveal<ID: Hashable>(_ id: ID, in scope: ViewScope? = nil) -> Bool {
+        services?.reveal(id: AnyHashable(ViewID(id)), in: scope) ?? false
+    }
+
     public func stop() {
         services?.stop()
     }

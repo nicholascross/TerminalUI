@@ -4,17 +4,23 @@ import TerminalUIRuntime
 /// Owns the host and mounted presentation for one application, including terminal-independent previews.
 @MainActor
 public final class TerminalApp<Root: TerminalView> {
-    public let host: TerminalHost
-    public let presentation: ComponentApplication
+    package let host: TerminalHost
+    package let presentation: ComponentApplication
     public var context: TerminalApplicationContext {
         presentation.context
     }
 
-    public init(root: Root, configuration: TerminalConfiguration = .init(), theme: Theme = .init()) {
+    public init(root: Root, configuration: TerminalConfiguration = .init(), theme: Theme = .init(), diagnostic: (@MainActor (String) -> Void)? = nil)
+    {
         host = TerminalHost(configuration: configuration, theme: theme)
-        presentation = ComponentApplication(root: root)
+        presentation = ComponentApplication(root: root, diagnostic: diagnostic ?? ComponentApplication.reportDiagnostic)
         host.connect(presentation)
     }
+
+    public func invalidate() { presentation.invalidate() }
+    public func stop() { presentation.stop() }
+    @discardableResult
+    public func transaction<Result>(_ work: () throws -> Result) rethrows -> Result { try presentation.transaction(work) }
 
     public func run() async throws {
         try await host.run(presentation)

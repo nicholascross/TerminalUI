@@ -1,6 +1,6 @@
 import Chroma
 import Foundation
-import TerminalUI
+import TerminalUICore
 
 /// Converts Chroma tokens into semantic spans rendered by TerminalUI.
 public final class SyntaxHighlighter {

@@ -1,4 +1,4 @@
-import TerminalUIComponents
+import TerminalUI
 
 @TerminalComponent
 struct CommandMenu: TerminalView {
@@ -10,7 +10,7 @@ struct CommandMenu: TerminalView {
         _selection = State(wrappedValue: (initialSelection ?? .topics).actionID)
     }
 
-    var body: Element {
+    var body: some TerminalView {
         Menu(id: "commands", title: "Layout commands", items: items, query: $query, selection: $selection)
     }
 }

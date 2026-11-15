@@ -2,6 +2,8 @@
 
 Status: implemented (2026-11-15). The existing negotiated layout module remains the foundation. The sections below retain the design and acceptance criteria; see [Components.md](../../Components.md) for the delivered API and validation commands. The implementation includes the optional product, macro-generated private-state registration, scoped bindings/callbacks, scheduled transactions and update wakeups, dependency-driven resolution, retained boundaries, and the cleaned-up LayoutDemo with its view model.
 
+The proposed [high-level API architecture plan](High-Level-API-Architecture-Plan.md) supersedes this plan's public module ownership, fixed `body: Element`, flattened builder and conditional-key requirements for the next breaking migration. The behavior described below remains the current implementation until that migration is delivered.
+
 ## Outcome
 
 Add an optional component layer with four capabilities:

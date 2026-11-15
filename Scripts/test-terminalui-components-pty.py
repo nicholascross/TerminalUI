@@ -18,8 +18,7 @@ os.chdir(root)
 bin_path = subprocess.check_output(['swift', 'build', '--show-bin-path'], text=True).strip()
 modules = ['CTerminalSupport', 'TerminalUICore', 'TerminalUIText', 'TerminalUIInput',
            'TerminalUILayoutEngine', 'TerminalUIInteraction', 'TerminalUIRendering',
-           'TerminalUIRuntime', 'TerminalUI', 'TerminalUILayout',
-           'TerminalUIComponentRuntime', 'TerminalUIComponents']
+           'TerminalUIRuntime', 'TerminalUI', 'TerminalUIComponentRuntime']
 objects = [path for module in modules for path in glob.glob(f'{bin_path}/{module}.build/*.o')]
 with tempfile.TemporaryDirectory(prefix='terminalui-components-') as directory:
     executable = f'{directory}/ComponentHostProbe'

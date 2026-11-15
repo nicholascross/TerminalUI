@@ -1,4 +1,4 @@
-import TerminalUIComponents
+import TerminalUI
 
 struct InspectorView: TerminalView {
     @Binding var selection: String
@@ -10,7 +10,7 @@ struct InspectorView: TerminalView {
         }
     }
 
-    var body: Element {
+    var body: some TerminalView {
         Panel("Inspector") {
             ScrollView(id: Pane.inspector.rawValue) {
                 Column(spacing: 1) {

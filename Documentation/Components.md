@@ -1,166 +1,77 @@
-# Components and mounted state
+# Views and mounted state
 
-`TerminalUIComponents` is an optional product that re-exports `TerminalUILayout`. Existing `TerminalApplication`, controlled-value controls and array-based layouts remain supported. The component product adds declarative applications, struct views, mounted state, bindings and scheduled updates.
+`TerminalUI` owns the declarative application API. Import it for concrete controls, generic containers, `@ViewBuilder`, state, bindings and application services. Engine operations require an explicit `TerminalUIEngine` import; mixing the APIs also requires `TerminalUIBridge`.
 
-## Declarative applications
-
-Use `@main` and `@TerminalApplication` on a struct to declare the root screen. The macro supplies `static main() async throws`, main-actor isolation for application members and conformance to `TerminalApplicationDefinition`:
+## Applications and previews
 
 ```swift
-import TerminalUIComponents
+import TerminalUI
 
 @main
 @TerminalApplication
-struct MyApp {
+struct NotesApp {
     var root: some TerminalView { Workspace() }
     var theme: Theme { .dusk() }
     var configuration: TerminalConfiguration { .init(mouseEnabled: true) }
 }
-```
 
-Only `root` is required. Omitted settings use `Theme()` and `TerminalConfiguration()`; mouse input stays disabled by default. The entry point constructs the definition with `Self()`, so stored application properties must have defaults or an initializer callable without arguments. Keep `@main` explicit on the executable's entry type. The `@TerminalApplication` macro and the existing `TerminalApplication` protocol occupy different usage contexts; legacy application conformances continue to work.
-
-The generated method delegates to `TerminalApp`, which owns the host and mounted presentation and connects their services. `--preview` prints an 80×24 plain-text snapshot without opening a TTY. Application-specific flags remain in the definition; LayoutDemo checks `--no-mouse` in its configuration.
-
-For tests and embedding, use `MyApp().makeApplication()` or `TerminalApp(root: Workspace())`. The runner exposes `host`, `presentation`, `context`, `run()` and `preview(width:height:)`. Construction connects services without evaluating component bodies. Previews use the host's theme and current focus and do not write terminal output. Each call to `makeApplication()` creates an independent mounted tree.
-
-Mounted screens access lifecycle and focus services without constructor wiring:
-
-```swift
 @TerminalComponent
-struct ApplicationControls: TerminalView {
+struct Workspace: TerminalView {
+    @State private var draft = ""
     @ApplicationContext private var application
 
-    var body: Element {
-        Button("Quit", id: "quit").onActivate { application.stop() }
-    }
-}
-```
-
-`@TerminalComponent` installs `@ApplicationContext` alongside `@State`. The context offers `focusTarget(path:id:)`, `focus(_:)`, `keepVisible(_:)` and `stop()`, scoped to the containing presentation. Focus targets retain the existing explicit-key path and generation semantics. Contexts reference the presentation weakly; after it is released, lookups return nil and focus requests return false. Standalone `ComponentApplication` harnesses can inject `PresentationServices`, including a `stop:` callback. `TerminalHost.connect(_:)` connects services before a run without acquiring a TTY.
-
-## Components
-
-```swift
-import TerminalUIComponents
-
-@TerminalComponent
-struct CommandPane: TerminalView {
-    @State private var draft = ""
-    let submit: (String) -> Void
-
-    var body: Element {
-        Panel("Command") {
-            TextEditor(id: "draft", text: $draft)
-                .onSubmit { submit(draft); draft = "" }
-        }.height(.fit(maximum: 8))
-    }
-}
-
-struct Workspace: TerminalView {
-    var body: Element {
+    var body: some TerminalView {
         Column {
-            Text("Workspace")
-            Component(CommandPane(submit: { print($0) }), key: "command")
+            TextEditor(id: "draft", text: $draft).onSubmit { draft = "" }
+            Button("Quit", id: "quit").onActivate { application.stop() }
         }
     }
 }
 ```
 
-`TerminalView` is a main-actor protocol with an `Element` body. Stateless views need no macro. A view expression inside `ElementBuilder` inserts an unkeyed component boundary; `Component(_:key:)` makes its identity explicit. Bodies stay unevaluated until a `ComponentApplication` mounts them.
+Only the root is required. The application macro supplies conformance, main-actor isolation and `main()`. Keep `@main` explicit. Definitions must support `Self()` with no arguments. `--preview` prints a snapshot without opening a terminal. `TerminalApp(root:configuration:theme:)` offers `run`, `preview`, `context`, `invalidate`, `transaction` and `stop`; host and presentation storage are package implementation details.
 
-```swift
-@MainActor
-func runWorkspace() async throws {
-    let source = ComponentApplication(root: Workspace())
-    try await TerminalHost().run(source)
-}
-```
+`TerminalView` has an associated `Body: TerminalView`. Opaque bodies preserve concrete composition types. Explicit types also work: `var body: Text { return Text("Ready") }`. Generic containers store a `Content: TerminalView` constructed by a `@ViewBuilder` closure. Primitive controls use `Body == Never`; normal resolution never reads their `body`. Application views need no rendering hooks.
 
-Use `source.resolve()` to obtain ordinary, resolved elements for `UIEngine` tests and previews. Passing an unresolved component to the ordinary renderer is a programming error. `Examples/ComponentConsumer/Consumer.swift` is a compiled example of this API outside the package access boundary. Run it with `swift run ComponentConsumer`, or use `swift run ComponentConsumer --preview` for a terminal-independent snapshot. It shows two independent command editors; Tab moves focus, Enter submits and clears a draft, and Ctrl-C or the Quit button exits.
+The builder preserves fixed slots, branches, optional content and repetitions. Ordinary `for` loops use positional identity; use `ForEach` for keyed collections. Parameter-pack tuples have no fixed child-count limit. `AnyTerminalView` provides deliberate heterogeneous storage and availability erasure; normal composition remains generic.
 
 ## State and bindings
 
-`@TerminalComponent` generates `_installState(_:)`, connecting each backing `@State` and `@ApplicationContext` wrapper using its declaration name, including private declarations. Its SwiftSyntax 603.0.0 dependency is build-time tooling matched to the package's Swift 6.3 toolchain. The ordinary facade and layout products do not depend on the macro target.
+`@TerminalComponent` registers private `@State` and `@ApplicationContext` properties before evaluation. State initializers run once per mount generation. Recreated views reconnect to authoritative typed slots. The public installation support exists for external macro expansions; it is compiler support, not an application service.
 
-State initializers run once per mount. Recreated values reconnect before their bodies run. State setters update synchronously, including writes through captured view values and bindings. Equal assignments to `Equatable` values do not schedule work; other assignments invalidate subscribers. Mutating a reference object's properties does not observe that object automatically. Replace the stored value or explicitly invalidate the source for external model changes.
+State writes are synchronous. Equal `Equatable` assignments suppress updates. Writes through bindings and captured callbacks follow the same rules. `Binding(get:set:)` supports normalization, `Binding.constant` ignores writes, and writable key-path projection supports value models such as `$model.title`. Reference objects are not automatically observed: replace their stored value or invalidate the application when needed.
 
-A binding is also a property wrapper:
+Bound overloads cover text fields/editors, lists, tables, tabs, menus and menu bars. `@Binding` lets an extracted view consume an owner's binding. Primitive binding reads occur during lowering under the current component's dependency scope. Child bodies remain deferred, so a child-only write does not evaluate unrelated bodies. Dependencies are replaced on every evaluation.
+
+`.onSubmit`, `.onActivate` and `.onDismiss` register current callbacks; `.onAction` consumes otherwise unclaimed actions when it returns true. Inputs and callback captures refresh while matched components retain their slots. Enter submits configured editors; Shift+Enter and paste remain multiline data. Input barriers resolve state changes before the next event in a batch.
+
+Transactions defer resolution and terminal output, while reads see writes immediately. Throwing from a transaction still schedules applied changes. A coalesced wakeup also renders background updates while the terminal is idle. State mutation during body evaluation, lowering, measurement or drawing is rejected.
+
+## Identity, focus and reveal
+
+Identity combines the mounted parent, concrete component type, structural slots, branch discriminators and collection keys. Two same-type conditional branches have separate lifetimes; one component with changing input preserves its lifetime. Optional siblings do not shift later fixed slots. `ForEach` keys are local to their repetition scope; duplicate keys within a collection are invalid, while equal keys in different collections are independent.
+
+Removal releases state, subscriptions and callback registrations. Reappearance starts a new generation. `.visible(false)` retains state. Detached bindings, callbacks and handles never reconnect to replacement generations. Component state is independent of the engine's bounded retention of inactive caret/viewport mechanics.
+
+`.id(value)` accepts a stable `Hashable` value, resets the modified subtree when the value changes, and registers a reveal target. ID equality preserves the concrete ID type. IDs do not override parent/branch scopes or become control IDs. Engine `Element.id(String)` remains reveal-only.
+
+`Component(view, key:)` is an explicit keyed component boundary; ordinary views need no wrapper. Context focus paths list component/item keys. `.scope(value)` names a lookup scope without making its changing name an identity reset:
 
 ```swift
-struct FilterField: TerminalView {
-    @Binding var filter: String
-    var body: Element { TextField(id: "filter", text: $filter) }
+Column {
+    ForEach(leftItems, id: \.id) { item in Editor(item: item).id(item.id) }.scope("left")
+    ForEach(rightItems, id: \.id) { item in Editor(item: item).id(item.id) }.scope("right")
 }
 ```
 
-An owning component passes `$filter` to that initializer. `Binding(get:set:)` supports custom validation/normalization, and `Binding.constant(_:)` ignores writes. Writable key-path projection supports value view models: `$model.title` reads and writes `title` through the model's storage boundary. A custom setter is invoked once per action and its authoritative value is read on resolution.
+From an installed context, use `application.scope("left")`, then `application.focusTarget(path: [itemID], id: "draft", in: scope)`, `application.focus(target)`, or `application.reveal(itemID, in: scope)`. Scopes and focus handles are opaque and generation-scoped. Ambiguous scope names, key paths and reveal IDs diagnose and fail. Absent/hidden reveal targets fail without retaining a request. Revealing an unchanged ID preserves state and reveals through nested enclosing scroll containers.
 
-Bound factory overloads include `TextField`, `TextEditor`, `List`, `Table`, `Tabs`, `Menu`, and `MenuBar`. Selection overloads support both `Binding<String?>` and, for lists/tables/tabs, `Binding<String>`. The existing `value:` and ordinary `selection:` overloads are unchanged. `.onSubmit {}`, `.onActivate {}`, and `.onDismiss {}` register one current callback per event. `.onAction { action in ... }` handles otherwise unclaimed actions in the owning scope; return `true` to consume an action.
+`.onFocusChange` observes focus outside evaluation and may update state. Contexts reference their presentation weakly; after release, lookups fail and stop is harmless.
 
-The routers still emit `UIAction`. A bound action is consumed once; it is not also delivered to legacy application handling. Enter submits an editor with `.onSubmit`, Shift+Enter inserts a newline, and paste remains data.
+## Testing and explicit engine integration
 
-## Identity and focus
+`ApplicationHarness(root:)` drives the real host and mounted runtime without a TTY. Use `preview`, `send(KeyEvent)`, `send(TerminalEvent)`, `context`, `focusedTarget`, `metrics`, `hasPendingUpdates`, `invalidate`, `transaction` and `unmount`. It neither returns elements nor accepts raw presentation services. Metrics distinguish state writes, scheduled flushes, evaluations, reconciliations, mounts and unmounts.
 
-A component's identity combines its owning parent, type and explicit key or structural slot. `ForEach(items, id: \.id) { item in ... }` supplies keyed boundaries and accepts either views or elements. Reorder preserves keyed state and retained layout nodes. Duplicate keys beneath one owner are invalid and produce a diagnostic. Keys for different conditional instances must be distinct; the flattened builder does not infer branch identities.
+Use `EngineContent(element)` from `TerminalUIBridge` to embed raw content. `ViewPresentation(root:)` implements the engine presentation-source contract for an engine-owned host. Import both entry points explicitly and qualify overlapping control names. The bridge also enables raw `Element` values as view bodies and `engineElement(view)` for deferred mixed composition. Resolve presentations before passing their elements to a renderer.
 
-Removal or a change of type/key unmounts the old generation and releases state/subscriptions/callback registrations. Re-adding starts fresh. `.visible(false)` retains a mounted component's state. Old bindings/callbacks cannot change a replacement generation. Writes to detached state are ignored and diagnosed in debug builds. Mutation during body evaluation, measurement or custom-widget painting is rejected.
-
-Local control IDs and `.id(...)` reveal IDs are translated beneath the mounted generation. Two editors may both use `id: "draft"`. Literal IDs outside component scopes retain their legacy meaning. Use an explicit focus handle rather than a local string:
-
-```swift
-@MainActor
-func focusCommand(host: TerminalHost, source: ComponentApplication) {
-    if let target = source.focusTarget(path: ["command"], id: "draft") {
-        host.focus(target, in: source)
-        source.keepVisible(target)
-    }
-}
-```
-
-`host.focusedTarget` exposes current focus as an opaque handle. `.onFocusChange { target in ... }` observes host focus changes and may update component state. The host delivers callbacks outside body evaluation and resolves their changes before painting or dispatching subsequent input. Presentation sources without component observers retain the default no-op behavior.
-
-The path starts at the root view and lists explicit component keys. The root itself is implicit. For a legacy adapter the path starts in the legacy tree. Handles carry the mount generation and stop matching after replacement. `source.focus(_:)` uses the currently connected host service; `host.focus(_:in:)` can be used directly before running the host.
-
-## Scheduling and selective resolution
-
-Writes mark subscribed bodies dirty and schedule one update wakeup for a burst. A dedicated descriptor wakes an idle terminal independently of process signals. `ComponentApplication` accepts an injected `schedule:` closure and `diagnostic:` sink for deterministic tests. `resolve()` is an explicit consistency barrier for terminal-independent consumers.
-
-```swift
-@MainActor
-func rename(source: ComponentApplication, title: Binding<String>, status: Binding<String>) {
-    source.transaction {
-        title.wrappedValue = "New name"
-        status.wrappedValue = "Renamed"
-    }
-}
-```
-
-Transactions defer resolution/output, not writes. Reads inside the handler see the latest values. Throwing exits close the scope and schedule applied changes. Bodies record slot reads; reading a parent binding from a child subscribes the child. Dependencies are replaced on each body evaluation. Newly supplied inputs always reevaluate a child, including fresh callback captures.
-
-The host resolves changes before the next input event and prepares pointer geometry when needed. Typing `a`, then `b`, then Enter in one input read therefore submits `ab`. Interaction barriers may evaluate bodies several times before one terminal frame. Child-only changes update cached ancestor output paths without calling unaffected ancestor bodies. Boundary revisions let layout skip untouched subtrees while invalidating ancestor measurements when size changes. Existing scroll repainting and full visible-grid comparison remain in use.
-
-`source.metrics` reports actual state writes, scheduled flushes, body evaluations and component reconciliations. `engine.metrics` reports retained reconciliation, measurement, painting and frame counts; `host.frameWriteCount` counts transmitted frame transactions. These are separate measurements, not promises of widget-only layout or painting.
-
-## Incremental migration and the demo
-
-Wrap an existing application with `ComponentApplication(legacy: app)` and pass the adapter to `host.run`. Its `view()` can return ordinary elements mixed with `Component` values. Component state changes reuse the mounted legacy output. `host.invalidate()` or `source.invalidate()` conservatively rebuilds the root. Unclaimed actions are translated back to local IDs and forwarded to the legacy handler.
-
-LayoutDemo uses a value `LayoutViewModel` stored in `LayoutScreen`'s `@State`. The model owns shared presentation state and commands. `WorkspaceView` shares topic selection with `TopicsView` and `InspectorView` through `@Binding`; `CommandPane` owns its draft locally. `CommandMenu` owns search/selection state. `Pane` supplies typed destinations and component keys. `LayoutNavigation` translates those destinations to scoped focus handles using the screen's `@ApplicationContext`; focus notifications update the screen's view model, keeping toolbar selection current for shortcuts, Tab, pointer input and modal restoration. The executable in `Examples/LayoutDemo/App` declares its root, theme and configuration with `@main @TerminalApplication`. There is no application-owned assembly initializer or connection step. Reusable demo code is in the `LayoutDemoSupport` module under `Examples/LayoutDemo/Support`, grouped into models, navigation, view models and views, so tests can import it and construct `TerminalApp(root: LayoutScreen(), ...)` directly. See the [demo folder guide](../Examples/LayoutDemo/README.md).
-
-## Validation
-
-Run after building:
-
-```sh
-swift test -j 4
-bash Scripts/test-terminalui-components-consumer.sh
-python3 Scripts/test-terminalui-components-pty.py
-python3 Scripts/test-terminalui-layout-pty.py
-python3 Scripts/test-terminalui-layout-pty.py --no-mouse
-python3 Scripts/test-terminalui-pty.py
-```
-
-The compiler check uses an external module without package access. Macro expansion tests exercise private registration and invalid declarations. Component tests cover keyed lifetime, stale writes, dynamic dependencies, selection bindings, normalization, input barriers, transactions and awaited output. A reference comparison checks incremental frames against conservative root reevaluation through edits, Unicode, reorder and resize. The component PTY consumer verifies an idle background write, two independent editors with the same local ID, batched input and terminal restoration.
-
-A representative debug run on Linux with 200 keyed editors and 40 edits at 80×24 took 0.148 seconds: 40 additional bodies, 160 retained-node reconciliations, 280 measurements and 2,920 paints. The legacy root ran once and the untouched last editor ran once. The test reports measurements without machine-dependent timing thresholds.
+LayoutDemo demonstrates a state-owned value model, shared bindings, an independent command draft, modal commands and focus-driven navigation. The compiled external consumer adds helper views, a generic container, explicitly typed bodies, conditionals and both loop forms. Tests and PTY scripts are listed in the [README](../README.md).

@@ -1,4 +1,6 @@
-import TerminalUIComponents
+@testable import TerminalUI
+import TerminalUIEngine
+import TerminalUIBridge
 import TerminalUILayoutEngine
 @testable import TerminalUIRuntime
 import Testing
@@ -27,11 +29,11 @@ private struct Editor: TerminalView {
         _text = State(wrappedValue: probe.initial())
     }
 
-    var body: Element {
+    var body: some TerminalView {
         probe.calls[name, default: 0] += 1
         probe.bindings[name] = $text
         probe.callbacks[name] = { text = "from callback" }
-        return TextEditor(id: "draft", text: $text).onSubmit {
+        return TerminalUI.TextEditor(id: "draft", text: $text).onSubmit {
             probe.submits.append(name + ":" + text)
             text = ""
         }
@@ -49,9 +51,12 @@ private final class Fixture: TerminalApplication {
     func view() -> Element {
         rootCalls += 1
         return Column {
-            ForEach(keys, id: \.self) { key in
-                alternate ? Component(AlternateEditor(name: prefix + key, probe: probe), key: "editor") :
+            TerminalUI.ForEach(keys, id: \.self) { [self] key in
+                if alternate {
+                    TerminalUI.Component(AlternateEditor(name: prefix + key, probe: probe), key: "editor")
+                } else {
                     ComponentEditor(name: prefix + key, probe: probe).element(key: key, visible: !hidden.contains(key))
+                }
             }
         }
     }
@@ -66,8 +71,8 @@ private final class Fixture: TerminalApplication {
 private struct ComponentEditor {
     let name: String
     let probe: Probe
-    func element(key _: String, visible: Bool) -> Element {
-        Component(Editor(name: name, probe: probe), key: "editor").visible(visible)
+    func element(key _: String, visible: Bool) -> some TerminalView {
+        TerminalUI.Component(Editor(name: name, probe: probe), key: "editor").visible(visible)
     }
 }
 
@@ -237,7 +242,7 @@ private final class CustomBindingApplication: TerminalApplication {
     var setterCalls = 0
     var actions: [UIAction] = []
     func view() -> Element {
-        TextField(id: "global", text: Binding(get: { self.value }, set: { self.setterCalls += 1; self.value = $0.uppercased() }))
+        engineElement(TerminalUI.TextField(id: "global", text: Binding(get: { self.value }, set: { self.setterCalls += 1; self.value = $0.uppercased() })))
     }
 
     func handle(_ action: UIAction) {
@@ -286,9 +291,9 @@ private struct AlternateEditor: TerminalView {
     @State private var text = "replacement"
     let name: String
     let probe: Probe
-    var body: Element {
+    var body: some TerminalView {
         probe.bindings[name] = $text
-        return TextField(id: "draft", text: $text)
+        return TerminalUI.TextField(id: "draft", text: $text)
     }
 }
 
@@ -328,5 +333,42 @@ extension ComponentTests {
             + "reconciliations \(engine.metrics.reconciliations - initialLayout.reconciliations), "
             + "measurements \(engine.metrics.measurements - initialLayout.measurements), "
             + "paints \(engine.metrics.paints - initialLayout.paints)")
+    }
+}
+
+extension ComponentTests {
+    @Test func `mixed engine composition keeps equal type children in separate raw structural slots`() {
+        let probe = Probe()
+        let raw = TerminalUIEngine.Column {
+            Editor(name: "first", probe: probe)
+            Editor(name: "second", probe: probe)
+        }
+        let app = ComponentApplication(root: raw, schedule: { _ in })
+        _ = app.resolve()
+        probe.bindings["first"]?.wrappedValue = "one"
+        probe.bindings["second"]?.wrappedValue = "two"
+        _ = app.resolve()
+        #expect(probe.initializations == 2)
+        #expect(probe.bindings["first"]?.wrappedValue == "one")
+        #expect(probe.bindings["second"]?.wrappedValue == "two")
+    }
+
+    @Test func `raw engine reveal identifiers do not reset embedded component state`() {
+        let probe = Probe()
+        var revealID = "before"
+        final class Legacy: TerminalApplication {
+            let content: () -> Element
+            init(content: @escaping () -> Element) { self.content = content }
+            func view() -> Element { content() }
+            func handle(_: UIAction) {}
+        }
+        let legacy = Legacy { engineElement(Editor(name: "raw", probe: probe)).id(revealID) }
+        let app = ComponentApplication(legacy: legacy, schedule: { _ in })
+        _ = app.resolve()
+        probe.bindings["raw"]?.wrappedValue = "retained"
+        revealID = "after"
+        _ = app.resolve(invalidateRoot: true)
+        #expect(probe.initializations == 1)
+        #expect(probe.bindings["raw"]?.wrappedValue == "retained")
     }
 }

@@ -170,7 +170,7 @@ public final class TerminalHost {
         handleInput(event, source: presentation(application))
     }
 
-    func handleInput(_ event: KeyEvent, source: any TerminalPresentationSource) {
+    package func handleInput(_ event: KeyEvent, source: any TerminalPresentationSource) {
         let result = engine.handleEvent(event, in: currentView(source))
         publishFocus(to: source)
         needsRepaint = true
@@ -183,7 +183,7 @@ public final class TerminalHost {
         handleInput(event, source: presentation(application))
     }
 
-    func handleInput(_ event: TerminalEvent, source: any TerminalPresentationSource) {
+    package func handleInput(_ event: TerminalEvent, source: any TerminalPresentationSource) {
         switch event {
         case let .key(key): handleInput(key, source: source)
         case let .mouse(mouse):

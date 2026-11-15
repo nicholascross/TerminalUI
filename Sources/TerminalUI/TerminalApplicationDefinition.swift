@@ -10,16 +10,16 @@ public protocol TerminalApplicationDefinition {
     var theme: Theme { get }
 }
 
-public extension TerminalApplicationDefinition {
-    var configuration: TerminalConfiguration {
+extension TerminalApplicationDefinition {
+    public var configuration: TerminalConfiguration {
         .init()
     }
 
-    var theme: Theme {
+    public var theme: Theme {
         .init()
     }
 
-    func makeApplication() -> TerminalApp<Root> {
+    public func makeApplication() -> TerminalApp<Root> {
         TerminalApp(root: root, configuration: configuration, theme: theme)
     }
 }

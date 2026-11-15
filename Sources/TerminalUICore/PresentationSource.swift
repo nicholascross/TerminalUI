@@ -38,8 +38,8 @@ public protocol TerminalPresentationSource: AnyObject {
     func focusDidChange(_ target: ScopedFocusTarget?)
 }
 
-public extension TerminalPresentationSource {
-    func focusDidChange(_: ScopedFocusTarget?) {}
+extension TerminalPresentationSource {
+    public func focusDidChange(_: ScopedFocusTarget?) {}
 }
 
 /// An explicit, generation-scoped control address obtained from a mounted component root.
@@ -48,4 +48,10 @@ public struct ScopedFocusTarget: Hashable, Sendable {
     package init(engineID: String) {
         self.engineID = engineID
     }
+}
+
+/// A mounted lookup scope. Removed scopes never reconnect to a replacement generation.
+public struct ViewScope: Hashable, Sendable {
+    package let identity: String
+    package init(identity: String) { self.identity = identity }
 }

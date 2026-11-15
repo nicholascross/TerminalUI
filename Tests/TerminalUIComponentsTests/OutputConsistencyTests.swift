@@ -1,4 +1,6 @@
-import TerminalUIComponents
+@testable import TerminalUI
+import TerminalUIEngine
+import TerminalUIBridge
 @testable import TerminalUIRuntime
 import Testing
 
@@ -9,8 +11,8 @@ private final class OutputProbe { var text: Binding<String>? }
 private struct OutputView: TerminalView {
     @State private var text = "before"
     let probe: OutputProbe
-    var body: Element {
-        probe.text = $text; return Text(text)
+    var body: some TerminalView {
+        probe.text = $text; return TerminalUI.Text(text)
     }
 }
 

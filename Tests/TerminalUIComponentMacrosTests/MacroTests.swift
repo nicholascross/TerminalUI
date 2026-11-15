@@ -23,7 +23,7 @@ final class MacroTests: XCTestCase {
             }
         }
 
-        extension Demo: TerminalUIComponents.TerminalApplicationDefinition {
+        extension Demo: TerminalUI.TerminalApplicationDefinition {
         }
         """, macros: ["TerminalApplication": TerminalApplicationMacro.self])
     }

@@ -6,7 +6,7 @@ import SwiftSyntaxMacros
 private struct ComponentDiagnostic: DiagnosticMessage {
     let message: String
     var diagnosticID: MessageID {
-        MessageID(domain: "TerminalUIComponents", id: "state")
+        MessageID(domain: "TerminalUI", id: "state")
     }
 
     var severity: DiagnosticSeverity {
