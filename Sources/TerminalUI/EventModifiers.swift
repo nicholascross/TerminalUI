@@ -2,9 +2,11 @@ import TerminalUICore
 
 extension TerminalView {
     /// Activates a button anywhere in the active workspace or dialog scope.
-    /// Uses the same modified-key policy as menu shortcuts; the first matching binding wins.
+    /// Accepts Alt/Control printable ASCII characters and Control-C/D/P; the first matching binding wins.
+    /// Unsupported events fail a precondition when the modifier is declared.
     @MainActor public func keyboardShortcut(_ key: KeyEvent) -> ModifiedView<Self> {
-        ModifiedView(content: self, deferToBody: true) { element in
+        let key = key.validatedGlobalShortcut()
+        return ModifiedView(content: self, deferToBody: true) { element in
             guard case .button(let title, let id) = element.kind else {
                 preconditionFailure("keyboardShortcut requires a button")
             }

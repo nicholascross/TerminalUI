@@ -75,6 +75,8 @@ Attach `.onActivate { ... }` to buttons and `.onSubmit { ... }` to input or coll
 
 Buttons need an explicit `id:` only when you need to look them up or address a named action. Add a modified shortcut with `.keyboardShortcut(.controlP)` to activate a button from elsewhere in the active screen or dialog.
 
+Button shortcuts accept `.altCharacter(...)` and `.controlCharacter(...)` with printable ASCII (space through `~`), plus `.controlC`, `.controlD` and `.controlP`. The character forms for Control-c/d/p are aliases for those dedicated events. Unsupported declarations, including plain characters, Enter, Tab, Escape, paste and modified Unicode characters, fail a precondition with an explanatory message. Modified character shortcuts require distinct reporting from the terminal.
+
 `List` and `Table` manage selection locally when you omit `selection:`. Pass a binding when another view needs the selected value. `initialSelection:` seeds local selection when the control first appears.
 
 ## Menus and pane navigation
@@ -124,7 +126,7 @@ struct NavigationWorkspace: TerminalView {
 
 `activeItem` marks the actual destination independently of the menu bar's keyboard highlight. Read it from `application.focusedValue(of:)`, which updates when focus changes through the keyboard, mouse or application code.
 
-Menu entries receive numbered access keys for positions 1–9. Menu bars also accept their Alt/Control variants when the terminal reports them distinctly. Override an item's `menuShortcut` with `.key(...)` or `.none` where needed. Searchable menus use local access keys only while the query is empty.
+Menu entries receive numbered access keys for positions 1–9. Menu bars also accept Alt/Control variants of printable ASCII access keys when the terminal reports them distinctly. Override an item's `menuShortcut` with `.key(...)` or `.none` where needed. Both menu bars and searchable menus accept Unicode local access keys; menu bars activate them while focused, and searchable menus use them only while the query is empty. Unicode access keys do not generate global variants.
 
 A `Menu` keeps its search and highlighted result locally. Removing the conditional menu resets them; reopening starts a new search. `.onDismiss` handles both Escape and the built-in Return button.
 

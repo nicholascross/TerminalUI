@@ -4,8 +4,9 @@ public struct MenuItem: Equatable, Sendable {
     public let title: String
     public let shortcut: Character?
     /// Opt-in shortcuts active throughout this menu's dialog or workspace scope.
-    /// Supports Alt/Control characters and the dedicated Control-C/D/P keys.
-    /// Plain typing, paste, Tab and Escape never become global menu shortcuts.
+    /// Supports Alt/Control printable ASCII characters and the dedicated Control-C/D/P keys.
+    /// Control character aliases for c/d/p use their dedicated cases.
+    /// Unsupported events fail a precondition during initialization.
     public let globalShortcuts: [KeyEvent]
     /// Unavailable items remain selectable so their prerequisite can be inspected.
     public let unavailableReason: String?
@@ -15,7 +16,7 @@ public struct MenuItem: Equatable, Sendable {
         self.id = id
         self.title = title
         self.shortcut = shortcut
-        self.globalShortcuts = globalShortcuts
+        self.globalShortcuts = globalShortcuts.map { $0.validatedGlobalShortcut() }
         self.unavailableReason = unavailableReason
     }
 }

@@ -10,6 +10,7 @@ public protocol MenuItemDefinition: Identifiable {
 public enum MenuShortcut: Equatable, Sendable {
     /// The item's original position, numbered 1–9. Later items have no automatic key.
     case automatic
+    /// A local access key, including Unicode. Menu bars also register Alt/Control variants for printable ASCII.
     case key(Character)
     case none
 }
@@ -82,13 +83,9 @@ struct MenuCollection<Item: Identifiable> {
     }
 
     private static func globalShortcuts(_ character: Character) -> [KeyEvent] {
+        // Unicode access keys remain local; their implicit global variants cannot be decoded.
+        guard KeyEvent.altCharacter(character).globalShortcut != nil else { return [] }
         let key = character.lowercased().first ?? character
-        let control: KeyEvent = switch key {
-        case "c": .controlC
-        case "d": .controlD
-        case "p": .controlP
-        default: .controlCharacter(key)
-        }
-        return [.altCharacter(key), control]
+        return [KeyEvent.altCharacter(key), .controlCharacter(key)].compactMap { $0.globalShortcut }
     }
 }

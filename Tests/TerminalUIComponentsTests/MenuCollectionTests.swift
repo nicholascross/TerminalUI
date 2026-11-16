@@ -238,4 +238,56 @@ struct MenuCollectionTests {
         app.send(.controlP)
         #expect(probe.calls == ["inside", "first-first"])
     }
+
+    @Test func `unsupported button shortcuts are diagnosed when declared`() async throws {
+        let result = try await #require(processExitsWith: .failure, observing: [\.standardErrorContent]) {
+            await MainActor.run {
+                _ = Button("Invalid").keyboardShortcut(.enter)
+            }
+        }
+        #expect(String(decoding: result.standardErrorContent, as: UTF8.self)
+            .contains("Unsupported global keyboard shortcut: enter"))
+    }
+
+    @Test func `button control character aliases activate with dedicated input events`() {
+        var calls = 0
+        let app = ApplicationHarness(root: Button("Commands")
+            .keyboardShortcut(.controlCharacter("p"))
+            .onActivate { calls += 1 })
+        app.send(.controlP)
+        #expect(calls == 1)
+    }
+
+    @Test(arguments: ["é", "e\u{301}", "É", "界", "🦊"])
+    func `menu bars preserve Unicode access keys while focused`(shortcut: String) {
+        let key = Character(shortcut)
+        var calls = 0
+        var draft = ""
+        let app = ApplicationHarness(root: Column {
+            TextField(id: "draft", text: Binding(get: { draft }, set: { draft = $0 }))
+            MenuBar(id: "bar", items: [Choice(id: 1, title: "Unicode", menuShortcut: .key(key))]) { _ in
+                calls += 1
+            }
+        })
+        #expect(app.preview().joined().contains("Unicode"))
+        // Unfocused typing stays in the field, and no unsupported global variants are registered.
+        app.send(.character(key))
+        #expect(draft == shortcut)
+        app.send(.altCharacter(key))
+        app.send(.controlCharacter(key))
+        #expect(calls == 0)
+        app.send(.tab)
+        app.send(.character(key))
+        #expect(calls == 1)
+        #expect(draft == shortcut)
+    }
+
+    @Test func `searchable menus still accept local Unicode access keys`() {
+        var calls = 0
+        let app = ApplicationHarness(root: Menu(
+            id: "menu", title: "Unicode", items: [Choice(id: 1, title: "Unicode", menuShortcut: .key("é"))]
+        ) { _ in calls += 1 })
+        app.send(.character("é"))
+        #expect(calls == 1)
+    }
 }

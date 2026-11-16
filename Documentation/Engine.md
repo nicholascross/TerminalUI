@@ -76,6 +76,8 @@ A menu bar's `selection` marks the current destination separately from `focusedI
 
 Set `MenuItem.shortcut` for a local character shortcut and `globalShortcuts` for modified keys that work elsewhere in the active screen. A global shortcut emits an action; the application chooses whether to move focus. Dialogs restrict global shortcuts to their contents. Duplicate shortcuts take the first matching item; an unavailable match does not fall through.
 
+`globalShortcuts` accepts Alt/Control printable ASCII characters (space through `~`) and `.controlC`, `.controlD`, `.controlP`. `.controlCharacter("c")`, `"d"` and `"p"` normalize to those dedicated events. Unsupported events fail a precondition when the `MenuItem` is initialized, with a message describing supported keys. Modified characters require distinct terminal reporting.
+
 `.onKey(key, activate: id)` binds a key on the focused control. Paste, Tab traversal and dialog Escape retain their built-in meanings.
 
 ## Custom widgets and layouts

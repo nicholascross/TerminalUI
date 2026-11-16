@@ -5,10 +5,7 @@ package struct MenuShortcutRouter {
 
     /// Only explicit modified shortcuts participate; data and focus traversal keep their meanings.
     package func route(_ key: KeyEvent, in root: Element, active: Element) -> UIEventResult? {
-        switch key {
-        case .altCharacter, .controlCharacter, .controlC, .controlD, .controlP: break
-        default: return nil
-        }
+        guard let key = key.globalShortcut else { return nil }
         let dialogID: String? = if case let .dialog(id, _, _) = active.kind { id } else { nil }
         return findMenuShortcut(key, in: root, dialogID: dialogID)
     }

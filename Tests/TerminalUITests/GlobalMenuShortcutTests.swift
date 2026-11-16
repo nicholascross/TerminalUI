@@ -84,15 +84,67 @@ struct GlobalMenuShortcutTests {
 
     @Test func globalsNeverCaptureTypingPasteTraversalOrDialogEscape() {
         let engine = UIEngine()
-        let invalid = bar([MenuItem(id: "invalid", title: "Invalid", globalShortcuts:
-            [.character("1"), .paste("1"), .tab, .escape, .enter])])
-        let root = Element.column([.textField(id: "draft", value: ""), invalid])
+        let menu = navigation
+        let root = Element.column([.textField(id: "draft", value: ""), menu])
         #expect(engine.handle(.character("1"), in: root) == .textChanged("draft", "1"))
         #expect(engine.handle(.paste("1"), in: root) == .textChanged("draft", "1"))
         #expect(engine.handle(.tab, in: root) == nil)
         #expect(engine.focusedID == "bar")
-        let modal = root.overlay(.dialog(id: "modal", title: "Modal", content: invalid))
+        let modal = root.overlay(.dialog(id: "modal", title: "Modal", content: menu))
         #expect(engine.handle(.escape, in: modal) == .dismissRequested("modal"))
+    }
+
+    @Test(arguments: 0..<11)
+    func unsupportedGlobalShortcutsAreDiagnosed(index: Int) async throws {
+        let result = try await #require(processExitsWith: .failure, observing: [\.standardErrorContent]) { [index] in
+            let unsupported: [KeyEvent] = [
+                .character("x"), .paste("x"), .tab, .escape, .enter, .up,
+                .altCharacter("é"), .controlCharacter("🦊"), .altCharacter("\n"),
+                .controlCharacter("\u{7f}"), .altCharacter("e\u{301}")
+            ]
+            _ = MenuItem(id: "invalid", title: "Invalid", globalShortcuts: [.controlP, unsupported[index]])
+        }
+        let message = String(decoding: result.standardErrorContent, as: UTF8.self)
+        #expect(message.contains("Unsupported global keyboard shortcut:"))
+        #expect(message.contains("printable ASCII"))
+    }
+
+    @Test func everyAcceptedCharacterShortcutActivatesFromDecodedInput() {
+        for code in 32...126 {
+            let character = Character(UnicodeScalar(code)!)
+            for (modifier, declaration): (Int, KeyEvent) in [
+                (3, .altCharacter(character)), (5, .controlCharacter(character))
+            ] {
+                let root = Element.column([
+                    .textField(id: "draft", value: ""),
+                    bar([MenuItem(id: "action", title: "Action", globalShortcuts: [declaration])])
+                ])
+                // Exercise both supported encodings, including decoder aliases for Control-C/D/P.
+                for sequence in ["\u{1b}[\(code);\(modifier)u", "\u{1b}[27;\(modifier);\(code)~"] {
+                    var decoder = InputDecoder()
+                    let keys = decoder.feed(sequence.utf8)
+                    #expect(keys.count == 1)
+                    let engine = UIEngine()
+                    for key in keys {
+                        #expect(engine.handle(key, in: root) == .activated("action"))
+                        #expect(engine.focusedID == "draft")
+                    }
+                }
+            }
+        }
+    }
+
+    @Test func controlCharacterAliasesUseDedicatedKeysAndKeepFirstMatchPolicy() {
+        let engine = UIEngine()
+        for (character, key): (Character, KeyEvent) in [("c", .controlC), ("d", .controlD), ("p", .controlP)] {
+            let root = Element.column([
+                .textField(id: "draft", value: ""),
+                bar([MenuItem(id: "first", title: "First", globalShortcuts: [.controlCharacter(character)]),
+                     MenuItem(id: "second", title: "Second", globalShortcuts: [key])])
+            ])
+            #expect(engine.handle(key, in: root) == .activated("first"))
+            #expect(engine.handle(.controlCharacter(character), in: root) == .activated("first"))
+        }
     }
 
     @Test func dedicatedControlKeysAndMouseShareTheDeclaredAction() {
