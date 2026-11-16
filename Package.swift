@@ -6,7 +6,7 @@ import CompilerPluginSupport
 let package = Package(
     name: "TerminalUI",
     platforms: [
-        .macOS(.v13),
+        .macOS(.v14),
         .iOS(.v15),
     ],
     products: [
