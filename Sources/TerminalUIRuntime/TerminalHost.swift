@@ -110,7 +110,7 @@ public final class TerminalHost {
             needsViewRebuild = true
         }
         activeSource = source
-        source.connect(PresentationServices(requestUpdate: { [weak self] in
+        var services = PresentationServices(requestUpdate: { [weak self] in
             self?.needsRepaint = true
             self?.updateWakeup?.signal()
         }, focus: { [weak self, weak source] id, root in
@@ -125,7 +125,10 @@ public final class TerminalHost {
             self?.updateWakeup?.signal()
         }, stop: { [weak self] in
             self?.stop()
-        }))
+        })
+        services.theme = { [weak self] in self?.theme ?? .terminalNative }
+        services.setTheme = { [weak self] in self?.theme = $0 }
+        source.connect(services)
     }
 
     /// Resolves a frame using the host's focus and theme without acquiring a TTY.
@@ -253,6 +256,7 @@ public final class TerminalHost {
             try await Task.detached { try session.writeAll(bytes) }.value
         }
         var size = try session.size()
+        connect(source)
         deliver(.resized(size), to: source)
         let clock = ContinuousClock()
         var escapeDeadline = EscapeDeadline(clock: clock, milliseconds: configuration.escapeTimeoutMilliseconds)

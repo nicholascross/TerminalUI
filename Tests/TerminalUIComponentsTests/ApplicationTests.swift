@@ -61,6 +61,22 @@ private struct SizeAwareScreen: TerminalView {
     }
 }
 
+@TerminalComponent
+private struct ThemeAwareScreen: TerminalView {
+    @ApplicationContext private var application
+    @State private var draft = ""
+
+    var body: some TerminalView {
+        Column {
+            TerminalUI.Text(application.theme.normal.background == .default ? "Native" : "Opaque").role(.accent)
+            TerminalUI.TextField(id: "draft", text: $draft).initialFocus()
+            TerminalUI.Button("Light theme")
+                .onActivate { application.theme = .light }
+                .keyboardShortcut(.altCharacter("t"))
+        }
+    }
+}
+
 @TerminalApplication
 private struct DefaultApplication {
     var root: some TerminalView {
@@ -139,6 +155,49 @@ struct ApplicationTests {
         #expect(app.preview(width: 120, height: 40)[0].hasPrefix("120x40"))
         app.host.deliver(.resized(.init(columns: 60, rows: 32)), to: app.presentation)
         #expect(app.preview(width: 60, height: 32)[0].hasPrefix("60x32"))
+    }
+
+    @Test func `changing the active theme updates styles and mounted views while keeping the draft and focus`() throws {
+        let app = TerminalApp(root: ThemeAwareScreen(), theme: .terminalNative)
+        let size = TerminalSize(columns: 30, rows: 4)
+        let initial = try #require(app.host.renderIfNeeded(app.presentation, size: size))
+        #expect(initial.lines[0].hasPrefix("Native"))
+        #expect(initial[0, 0]?.style.foreground == Theme.terminalNative.accent.foreground)
+        let draft = try #require(app.context.focusTarget(id: "draft"))
+        #expect(app.host.focusedTarget == draft)
+        app.host.handleInput(.paste("Keep this draft"), source: app.presentation)
+
+        app.host.handleInput(.altCharacter("t"), source: app.presentation)
+        let light = try #require(app.host.renderIfNeeded(app.presentation, size: size))
+        #expect(light.lines[0].hasPrefix("Opaque"))
+        #expect(light.lines[1].contains("Keep this draft"))
+        #expect(light[0, 0]?.style.foreground == Theme.light.accent.foreground)
+        #expect(light[29, 3]?.style.background == Theme.light.normal.background)
+        #expect(app.host.focusedTarget == draft)
+        #expect(app.theme.normal == Theme.light.normal)
+        #expect(app.host.renderIfNeeded(app.presentation, size: size) == nil)
+
+        app.transaction {
+            app.theme = .terminalNative
+            #expect(app.context.theme.normal == Theme.terminalNative.normal)
+            #expect(app.preview(width: size.columns, height: size.rows)[0].hasPrefix("Opaque"))
+        }
+        let restored = try #require(app.host.renderIfNeeded(app.presentation, size: size))
+        #expect(restored.lines[0].hasPrefix("Native"))
+        #expect(restored.lines[1].contains("Keep this draft"))
+        #expect(restored[29, 3]?.style.background == .default)
+        #expect(app.host.focusedTarget == draft)
+    }
+
+    @Test func `bridged views read and change the host theme`() {
+        let host = TerminalHost(theme: .light)
+        let presentation = ViewPresentation(root: ThemeAwareScreen())
+        #expect(host.preview(presentation)[0].hasPrefix("Opaque"))
+        host.theme = .terminalNative
+        #expect(host.preview(presentation)[0].hasPrefix("Native"))
+        host.handleInput(.altCharacter("t"), source: presentation)
+        #expect(host.theme.normal == Theme.light.normal)
+        #expect(host.preview(presentation)[0].hasPrefix("Opaque"))
     }
 
     @Test func `declarative application defaults preview without terminal access`() {

@@ -18,7 +18,7 @@ def setup():
     fcntl.ioctl(slave, termios.TIOCSCTTY, 0)
 mouse_enabled = '--no-mouse' not in sys.argv
 process = subprocess.Popen(['.build/debug/LayoutDemo', *sys.argv[1:]], stdin=slave, stdout=slave, stderr=slave,
-                           env=dict(os.environ, TERM='xterm-256color'), preexec_fn=setup)
+                           env=dict(os.environ, TERM='xterm-256color', COLORTERM='truecolor', NO_COLOR=''), preexec_fn=setup)
 history = bytearray()
 def screen():
     cells = [[' '] * 100 for _ in range(40)]
@@ -77,6 +77,18 @@ try:
     os.write(master, b'\x1b[200~hello\nworld\x1b[201~')
     wait_for('hello')
     wait_for('world')
+    previous_frame = len(history)
+    os.write(master, b'\x1bt')
+    wait_for('Restore theme')
+    assert b'48;2;248;249;252' in history[previous_frame:]
+    wait_for('Focus: Command')
+    wait_for('world')
+    previous_frame = len(history)
+    os.write(master, b'\x1bt')
+    wait_for('Light theme')
+    assert b'48;2;46;52;64' in history[previous_frame:]
+    wait_for('Focus: Command')
+    wait_for('world')
     os.write(master, b'\x1b1')
     wait_for('Focus: Topics')
     os.write(master, b'\x1b2')
@@ -126,7 +138,7 @@ try:
         assert sequence in history
     if mouse_enabled:
         assert b'\x1b[?1002l' in history and b'\x1b[?1006l' in history
-    print(f'LayoutDemo PTY (mouse={mouse_enabled}): focus, command menu, draft, terminal resize and restoration passed')
+    print(f'LayoutDemo PTY (mouse={mouse_enabled}): focus, command menu, draft, theme swapping, resize and restoration passed')
     if mouse_enabled:
         print('Topics pane drag, release and size retention passed')
 finally:

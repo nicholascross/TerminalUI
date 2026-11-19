@@ -12,6 +12,8 @@ public struct PresentationServices {
     public var focus: (String, Element) -> Bool
     public var reveal: (String) -> Void
     public var stop: () -> Void
+    package var theme: () -> Theme = { .terminalNative }
+    package var setTheme: (Theme) -> Void = { _ in }
 
     public init(
         requestUpdate: @escaping () -> Void = {},

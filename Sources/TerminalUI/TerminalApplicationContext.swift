@@ -16,6 +16,12 @@ public struct TerminalApplicationContext {
         services?.terminalSize ?? TerminalSize(columns: 0, rows: 0)
     }
 
+    /// The active theme. Assign a new theme from an event handler to redraw the application.
+    public var theme: Theme {
+        get { services?.theme ?? .terminalNative }
+        nonmutating set { services?.theme = newValue }
+    }
+
     /// Finds a control through a path of view IDs or ForEach item IDs.
     /// Unidentified views are transparent; each identified subtree needs a path entry.
     public func focusTarget(path: [AnyHashable] = [], id: String) -> ScopedFocusTarget? {

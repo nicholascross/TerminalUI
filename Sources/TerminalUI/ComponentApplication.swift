@@ -69,6 +69,19 @@ package final class ComponentApplication: TerminalPresentationSource {
 
     package var terminalSize: TerminalSize { runtime.terminalSize }
 
+    package var theme: Theme {
+        get { services.theme() }
+        set {
+            if let phase = UIEvaluationPhase.current {
+                runtime.driver.diagnostic("Theme mutation during \(phase) is not allowed")
+                return
+            }
+            services.setTheme(newValue)
+            // Keep the view rebuild pending if a preview runs inside a transaction.
+            invalidate()
+        }
+    }
+
     package func sizeDidChange(_ size: TerminalSize) {
         runtime.sizeDidChange(size)
     }

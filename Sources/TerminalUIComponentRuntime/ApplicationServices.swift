@@ -4,6 +4,7 @@ import TerminalUICore
 @MainActor
 package protocol ApplicationServices: AnyObject {
     var terminalSize: TerminalSize { get }
+    var theme: Theme { get set }
     func focusTarget(path: [AnyHashable], id: String) -> ScopedFocusTarget?
     func focusTarget(value: ViewID, in scope: ViewScope?) -> ScopedFocusTarget?
     func focusedValue(of type: ObjectIdentifier, in scope: ViewScope?) -> AnyHashable?

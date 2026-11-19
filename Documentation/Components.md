@@ -160,6 +160,14 @@ For layouts that change direction, use `Stack(axis:)` to preserve child state an
 
 Select a `Theme` at the application level and use roles such as `.heading`, `.secondary`, `.success` and `.error` on content. The built-in themes include terminal-native, dark and light defaults, plus named presets such as Nord and Dracula.
 
+The application definition's `theme` sets the initial palette. In a mounted component, use `@ApplicationContext` to read and change the active theme.
+
+```swift
+Button("Light theme").onActivate { application.theme = .light }
+```
+
+Code that owns a `TerminalApp` can also assign `app.theme`. The next frame uses the new palette and preserves mounted state and focus.
+
 Apply `.foreground(...)`, `.background(...)`, `.bold()`, `.underline()` or `.style(...)` for local overrides. Container styles pass to descendants, and an explicit background also fills empty cells.
 
 `Paragraph` accepts `[TextSpan]` for styled runs. The optional `TerminalUIChroma` product produces these spans from source code:

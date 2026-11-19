@@ -14,6 +14,7 @@ swift run LayoutDemo
 | --- | --- |
 | Alt+1 / Alt+2 / Alt+3 | Focus Topics, Inspector or Command. |
 | Ctrl-P | Open the searchable command menu. |
+| Alt+T | Switch to the light theme or restore the previous theme. |
 | Drag the marked right border of Topics | Resize the sidebar. |
 | Escape | Cancel the active drag or close the menu and restore focus. |
 | Tab | Move between controls. |

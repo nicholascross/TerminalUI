@@ -10,6 +10,12 @@ public final class TerminalApp<Root: TerminalView> {
         presentation.context
     }
 
+    /// The active theme. Changing it schedules a redraw of the mounted application.
+    public var theme: Theme {
+        get { context.theme }
+        set { context.theme = newValue }
+    }
+
     public init(root: Root, configuration: TerminalConfiguration = .init(), theme: Theme = .init(), diagnostic: (@MainActor (String) -> Void)? = nil)
     {
         host = TerminalHost(configuration: configuration, theme: theme)

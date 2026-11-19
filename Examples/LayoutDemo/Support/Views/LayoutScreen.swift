@@ -3,6 +3,7 @@ import TerminalUI
 @TerminalComponent
 public struct LayoutScreen: TerminalView {
     @State private var model = LayoutViewModel()
+    @State private var previousTheme: Theme?
     @ApplicationContext private var application
 
     public init() {}
@@ -11,7 +12,11 @@ public struct LayoutScreen: TerminalView {
 
     public var body: some TerminalView {
         Column(spacing: 1) {
-            HeaderView(quit: { application.stop() })
+            HeaderView(
+                themeTitle: previousTheme == nil ? "Light theme" : "Restore theme",
+                changeTheme: toggleTheme,
+                quit: { application.stop() }
+            )
             Row(spacing: 1) {
                 MenuBar(id: "navigation", items: Pane.allCases, activeItem: focusedPane)
                     .id("navigation")
@@ -24,7 +29,7 @@ public struct LayoutScreen: TerminalView {
             StatusBar(model.status)
             Column {
                 Text(model.contextualHints(for: focusedPane)).role(.secondary)
-                Text("Alt+1–3 panes · Ctrl-P menu · Tab focus · Ctrl-C quit").role(.secondary)
+                Text("Alt+1–3 panes · Ctrl-P menu · Alt+T theme · Ctrl-C quit").role(.secondary)
             }
         }
         .overlay {
@@ -42,6 +47,16 @@ public struct LayoutScreen: TerminalView {
             if let pane { model.didFocus(pane) }
         }
         .onAction(handle)
+    }
+
+    private func toggleTheme() {
+        if let previousTheme {
+            application.theme = previousTheme
+            self.previousTheme = nil
+        } else {
+            previousTheme = application.theme
+            application.theme = .light
+        }
     }
 
     private func handle(_ action: UIAction) -> Bool {
