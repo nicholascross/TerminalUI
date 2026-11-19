@@ -37,6 +37,9 @@ extension ComponentRuntime {
         default: break
         }
         if let id = value.visibilityID { value.visibilityID = scoped(id) }
+        if let resize = value.panelResize, owner.descriptor != nil {
+            value.panelResize?.id = owner.identity + ":" + resize.id
+        }
         if let id = value.menuResultsID { value.menuResultsID = scoped(id) }
         if let id = value.submitID { value.submitID = scoped(element.localMenuActionIDs[id] ?? id) }
         value.menuShortcutItems = element.menuShortcutItems.map { item in

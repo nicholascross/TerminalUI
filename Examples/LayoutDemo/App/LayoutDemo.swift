@@ -14,6 +14,6 @@ struct LayoutDemo {
     }
 
     var configuration: TerminalConfiguration {
-        .init(mouseEnabled: !CommandLine.arguments.contains("--no-mouse"))
+        .init(mouseEnabled: !CommandLine.arguments.contains("--no-mouse"), mouseDragEnabled: true)
     }
 }

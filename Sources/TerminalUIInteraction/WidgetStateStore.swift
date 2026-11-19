@@ -15,6 +15,7 @@ package struct ViewportState: Equatable {
 package struct WidgetState: Equatable {
     package var editor = EditorState()
     package var viewport = ViewportState()
+    package var panelSize: Int?
 }
 
 /// Owns reset and bounded retention for every kind of transient control state.
@@ -42,7 +43,7 @@ package final class WidgetStateStore {
     }
 
     package func reset(id: String) {
-        let keys = Set(["field:", "editor:", "list:", "table:", "scroll:"].map { $0 + id })
+        let keys = Set(["field:", "editor:", "list:", "table:", "scroll:", "panelResize:width:", "panelResize:height:"].map { $0 + id })
         for key in keys {
             entries.removeValue(forKey: key)
         }

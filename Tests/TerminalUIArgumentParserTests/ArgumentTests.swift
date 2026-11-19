@@ -45,9 +45,13 @@ struct ArgumentTests {
         let omitted = ExampleApplication(arguments: defaults).configuration
         #expect(omitted.mouseEnabled)
         #expect(!omitted.copyOnSelect)
+        #expect(!omitted.mouseDragEnabled)
         #expect(!defaults.terminal.preview)
         let withCopy = try ExampleOptions.parse(["--copy-on-select"])
         #expect(ExampleApplication(arguments: withCopy).configuration.copyOnSelect)
+        let withDrag = try ExampleOptions.parse(["--mouse-drag"])
+        #expect(withDrag.terminal.configuration.mouseDragEnabled)
+        #expect(!withDrag.terminal.configuration.copyOnSelect)
         for (flags, enabled) in [(["--no-mouse"], false), (["--mouse"], true), (["--no-mouse", "--mouse"], true)] {
             let options = try ExampleOptions.parse(flags)
             #expect(ExampleApplication(arguments: options).configuration.mouseEnabled == enabled)

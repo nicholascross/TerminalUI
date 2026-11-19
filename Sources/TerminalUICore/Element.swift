@@ -56,6 +56,8 @@ public struct Element {
     package var layoutHeight: LayoutPreference = .automatic
     package var hasExplicitWidth = false
     package var hasExplicitHeight = false
+    package var panelResize: PanelResize?
+    package var panelResizeDidEnd: (@MainActor (Int) -> Void)?
 
     public static func text(_ value: String) -> Self { .init(kind: .text(value)) }
     public static func paragraph(_ value: String) -> Self { .init(kind: .paragraph(value)) }
@@ -64,6 +66,19 @@ public struct Element {
     public static func column(spacing: Int = 0, _ children: [Self]) -> Self { .init(kind: .column(max(0, spacing), children)) }
     public static func row(spacing: Int = 0, _ children: [Self]) -> Self { .init(kind: .row(max(0, spacing), children)) }
     public static func panel(title: String, content: Self) -> Self { .init(kind: .panel(title, content)) }
+
+    /// Enables dragging one border of this panel in a row or column. Sizes include borders and padding.
+    /// Supply a saved `preferredSize` to restore it. A terminal host calls `onResize` after a changed size is committed.
+    public func resizable(
+        id: String, edge: PanelResizeEdge, minimum: Int = 0, maximum: Int? = nil,
+        preferredSize: Int? = nil, onResize: (@MainActor (Int) -> Void)? = nil,
+    ) -> Self {
+        guard case .panel = kind else { return self }
+        var copy = self
+        copy.panelResize = PanelResize(id: id, edge: edge, minimum: minimum, maximum: maximum, preferredSize: preferredSize)
+        copy.panelResizeDidEnd = onResize
+        return copy
+    }
     public static func button(_ title: String, id: String) -> Self { .init(kind: .button(title, id)) }
     /// Switch sections with Left/Right or Home/End; selection remains application-owned.
     public static func tabs(id: String, tabs: [Tab], selection: String?) -> Self {

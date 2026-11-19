@@ -12,6 +12,7 @@ public typealias LayoutPreference = TerminalUICore.LayoutPreference
 public typealias ListRow = TerminalUICore.ListRow
 public typealias MenuItem = TerminalUICore.MenuItem
 public typealias MouseEvent = TerminalUICore.MouseEvent
+public typealias PanelResizeEdge = TerminalUICore.PanelResizeEdge
 public typealias StyleOverride = TerminalUICore.StyleOverride
 public typealias Tab = TerminalUICore.Tab
 public typealias TableColumn = TerminalUICore.TableColumn

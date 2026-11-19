@@ -8,6 +8,7 @@ package final class LayoutNode {
     package private(set) var children: [LayoutNode]
     package weak var textLayout: TextLayoutCache.Entry?
     package var mouse: MouseGeometry?
+    package var panelResizeAllocation: StackResizeAllocation?
     package let statistics: RenderingStatistics
     private var measurements: [Int: WidgetSize] = [:]
     private var proposals: [LayoutProposal: WidgetSize] = [:]
@@ -82,6 +83,16 @@ package final class LayoutNode {
         if vertical { heightPreference = preference } else { widthPreference = preference }
     }
 
+    /// Invalidate a stack and the measurements of its enclosing layouts.
+    @discardableResult
+    package func invalidateLayout(at node: LayoutNode? = nil) -> Bool {
+        if let node, self !== node, !children.contains(where: { $0.invalidateLayout(at: node) }) { return false }
+        measurements.removeAll(keepingCapacity: true)
+        proposals.removeAll(keepingCapacity: true)
+        if node == nil { for child in children { child.invalidateLayout() } }
+        return true
+    }
+
     package func invalidateMeasurements() {
         measurements.removeAll(keepingCapacity: true)
         proposals.removeAll(keepingCapacity: true)
@@ -118,6 +129,7 @@ package final class LayoutNode {
               element.widthRule == next.widthRule, element.heightRule == next.heightRule,
               element.insets == next.insets,
               element.layoutWidth == next.layoutWidth, element.layoutHeight == next.layoutHeight,
+              element.panelResize == next.panelResize,
               element.hasExplicitWidth == next.hasExplicitWidth, element.hasExplicitHeight == next.hasExplicitHeight else { return false }
         switch (element.kind, next.kind) {
         case let (.text(old), .text(new)), let (.paragraph(old), .paragraph(new)):

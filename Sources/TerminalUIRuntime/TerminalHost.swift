@@ -34,7 +34,8 @@ public final class TerminalHost {
 
     public init(configuration: TerminalConfiguration = .init(), theme: Theme = .init()) {
         self.configuration = configuration
-        engine = UIEngine(theme: theme, textSelectionEnabled: configuration.mouseSelectionEnabled)
+        engine = UIEngine(theme: theme, textSelectionEnabled: configuration.mouseSelectionEnabled,
+                          panelResizingEnabled: configuration.mouseMotionEnabled)
     }
 
     /// Allows interaction tests to share the engine used by programmatic focus requests.
@@ -196,7 +197,10 @@ public final class TerminalHost {
             _ = currentView(source)
             // Resolve effects and geometry before the next pointer event in the same input read.
             engine.prepareMouseInput(width: size.columns, height: size.rows)
-            let result = engine.handleMouseEvent(mouse, copySelection: copySelection)
+            let result = engine.handleMouseEvent(mouse, copySelection: copySelection) { callback, size in
+                callback(size)
+                invalidate()
+            }
             publishFocus(to: source)
             needsRepaint = true
             if case let .rebuild(action) = result {

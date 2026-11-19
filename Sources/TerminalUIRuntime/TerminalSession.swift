@@ -38,7 +38,7 @@ final class TerminalSession: @unchecked Sendable {
         self.outputWriter = outputWriter
         alternateScreen = configuration.alternateScreen
         if configuration.mouseEnabled {
-            mouseMode = configuration.copyOnSelect ? .clicksAndDrags : .clicks
+            mouseMode = configuration.mouseMotionEnabled ? .clicksAndDrags : .clicks
         } else {
             mouseMode = nil
         }

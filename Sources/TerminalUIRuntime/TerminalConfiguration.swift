@@ -12,8 +12,11 @@ public struct TerminalConfiguration: Sendable {
     public var mouseEnabled: Bool
     /// Copies a mouse selection on release in text that opts in. Requires mouse input.
     public var copyOnSelect: Bool
+    /// Requests button-motion reports for gestures such as panel resizing. Requires mouse input.
+    public var mouseDragEnabled: Bool
 
     var mouseSelectionEnabled: Bool { mouseEnabled && copyOnSelect }
+    var mouseMotionEnabled: Bool { mouseEnabled && (mouseDragEnabled || copyOnSelect) }
 
     public var colorCapability: ColorCapability?
     public var extendedAttributes: Bool
@@ -26,12 +29,14 @@ public struct TerminalConfiguration: Sendable {
         extendedAttributes: Bool = false,
         mouseEnabled: Bool = false,
         copyOnSelect: Bool = false,
+        mouseDragEnabled: Bool = false,
     ) {
         self.escapeTimeoutMilliseconds = min(5000, max(1, escapeTimeoutMilliseconds))
         self.pasteLimit = max(0, pasteLimit)
         self.alternateScreen = alternateScreen
         self.mouseEnabled = mouseEnabled
         self.copyOnSelect = copyOnSelect
+        self.mouseDragEnabled = mouseDragEnabled
         self.colorCapability = colorCapability
         self.extendedAttributes = extendedAttributes
     }

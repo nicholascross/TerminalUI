@@ -17,12 +17,13 @@ package extension Element {
     }
 
     var stateKey: String? {
+        if let panelResize { return panelResize.stateKey }
         switch kind {
-        case let .field(id, _, _, multiline): (multiline ? "editor:" : "field:") + id
-        case let .list(id, _, _): "list:" + id
-        case let .table(id, _, _, _, _): "table:" + id
-        case let .scroll(id, _): "scroll:" + id
-        default: nil
+        case let .field(id, _, _, multiline): return (multiline ? "editor:" : "field:") + id
+        case let .list(id, _, _): return "list:" + id
+        case let .table(id, _, _, _, _): return "table:" + id
+        case let .scroll(id, _): return "scroll:" + id
+        default: return nil
         }
     }
 }

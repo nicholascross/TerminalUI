@@ -26,24 +26,29 @@ package extension LayoutMeasurer {
         let inner = LayoutProposal(width: offeredWidth.map { max(0, $0 - horizontal) },
                                    height: offeredHeight.map { max(0, $0 - vertical) })
         var size: WidgetSize
-        switch element.kind {
-        case let .layout(strategy, _):
-            size = strategy.sizeThatFits(inner, subviews: subviews(of: node, theme: theme))
+        if let stack = resizableStack(of: node, theme: theme) {
+            size = stack.plan(inner).size
             size = WidgetSize(width: size.width + horizontal, height: size.height + vertical)
-        case .boundary:
-            let child = measure(node.children[0], proposal: inner, theme: theme)
-            size = WidgetSize(width: child.width + horizontal, height: child.height + vertical)
-        case .panel, .dialog:
-            let child = measure(node.children[0], proposal: LayoutProposal(
-                width: inner.width.map { max(0, $0 - 2) }, height: inner.height.map { max(0, $0 - 2) }), theme: theme)
-            size = WidgetSize(width: child.width + horizontal + 2, height: child.height + vertical + 2)
-        case .scroll:
-            let child = measure(node.children[0], proposal: LayoutProposal(width: inner.width), theme: theme)
-            size = WidgetSize(width: inner.width ?? child.width, height: inner.height ?? child.height)
-            size = WidgetSize(width: size.width + horizontal, height: size.height + vertical)
-        default:
-            let measured = measure(node, width: offeredWidth ?? 4096, theme: theme)
-            size = WidgetSize(width: measured.0, height: measured.1)
+        } else {
+            switch element.kind {
+            case let .layout(strategy, _):
+                size = strategy.sizeThatFits(inner, subviews: subviews(of: node, theme: theme))
+                size = WidgetSize(width: size.width + horizontal, height: size.height + vertical)
+            case .boundary:
+                let child = measure(node.children[0], proposal: inner, theme: theme)
+                size = WidgetSize(width: child.width + horizontal, height: child.height + vertical)
+            case .panel, .dialog:
+                let child = measure(node.children[0], proposal: LayoutProposal(
+                    width: inner.width.map { max(0, $0 - 2) }, height: inner.height.map { max(0, $0 - 2) }), theme: theme)
+                size = WidgetSize(width: child.width + horizontal + 2, height: child.height + vertical + 2)
+            case .scroll:
+                let child = measure(node.children[0], proposal: LayoutProposal(width: inner.width), theme: theme)
+                size = WidgetSize(width: inner.width ?? child.width, height: inner.height ?? child.height)
+                size = WidgetSize(width: size.width + horizontal, height: size.height + vertical)
+            default:
+                let measured = measure(node, width: offeredWidth ?? 4096, theme: theme)
+                size = WidgetSize(width: measured.0, height: measured.1)
+            }
         }
         // Explicit dimensions and caps apply to the complete element, including decoration.
         size.width = constrained(size.width, by: widthPreference)
@@ -75,7 +80,7 @@ package extension LayoutMeasurer {
         }
     }
 
-    private func preference(of node: LayoutNode, vertical: Bool, theme: Theme) -> LayoutPreference {
+    func preference(of node: LayoutNode, vertical: Bool, theme: Theme) -> LayoutPreference {
         if let cached = node.preference(vertical: vertical) { return cached }
         let result = inferPreference(of: node, vertical: vertical, theme: theme)
         node.remember(result, vertical: vertical)

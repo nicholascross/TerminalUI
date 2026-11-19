@@ -32,12 +32,20 @@ public struct StackLayout: ElementLayout {
             .placeSubviews(in: size, subviews: subviews)
     }
 
-    private func plan(_ proposal: LayoutProposal, subviews: [LayoutSubview]) -> (size: WidgetSize, placements: [LayoutPlacement]) {
-        guard !subviews.isEmpty else { return (WidgetSize(width: 0, height: 0), []) }
+    package func plan(
+        _ proposal: LayoutProposal, subviews: [LayoutSubview], panels: [Int: StackPanelResize] = [:],
+        previousResize: StackResizeAllocation? = nil,
+    ) -> (size: WidgetSize, placements: [LayoutPlacement], resize: StackResizeAllocation?) {
+        guard !subviews.isEmpty else { return (WidgetSize(width: 0, height: 0), [], nil) }
         let vertical = axis == .vertical
         let offeredMain = vertical ? proposal.height : proposal.width
         let offeredCross = vertical ? proposal.width : proposal.height
-        let policies = subviews.map { vertical ? $0.height : $0.width }
+        var policies = subviews.map { vertical ? $0.height : $0.width }
+        for (index, panel) in panels {
+            if case let .flexible(_, _, weight) = policies[index] {
+                policies[index] = .flexible(minimum: panel.limits.lowerBound, maximum: panel.limits.upperBound, weight: weight)
+            }
+        }
         let initial = subviews.map {
             $0.sizeThatFits(vertical ? LayoutProposal(width: offeredCross) : LayoutProposal(height: offeredCross))
         }
@@ -46,10 +54,40 @@ public struct StackLayout: ElementLayout {
         var sizes = initial.enumerated().map { index, size in
             preferred(vertical ? size.height : size.width, policy: policies[index], offered: offeredMain != nil)
         }
+        for (index, panel) in panels {
+            sizes[index] = min(panel.limits.upperBound, max(panel.limits.lowerBound, sizes[index]))
+        }
+        var resize: StackResizeAllocation?
         if let offeredMain {
             let budget = max(0, offeredMain - totalGap)
-            compress(&sizes, policies: policies, budget: budget)
-            expand(&sizes, policies: policies, budget: budget)
+            let minimums = panels.isEmpty ? [] : policies.indices.map { panels[$0]?.limits.lowerBound ?? policies[$0].minimumCells }
+            let required = minimums.reduce(0, +)
+            let canResize = !panels.isEmpty && required <= budget
+            if canResize {
+                var excess = zip(sizes, minimums).map(-)
+                compress(&excess, policies: policies, budget: budget - required)
+                sizes = zip(minimums, excess).map(+)
+            } else {
+                compress(&sizes, policies: policies, budget: budget)
+            }
+            let expandable = policies.indices.filter { isFlexible(policies[$0]) }
+            Self.expand(&sizes, policies: policies, remaining: budget - sizes.reduce(0, +), eligible: expandable)
+            if canResize {
+                var allocation = StackResizeAllocation(budget: budget, baseline: sizes, policies: policies, panels: panels)
+                if let previousResize, previousResize.contract == allocation.contract {
+                    allocation = previousResize
+                } else {
+                    allocation.applyPreferences()
+                }
+                sizes = allocation.sizes
+                resize = allocation
+            }
+        } else {
+            for (index, panel) in panels {
+                if let preferred = panel.preferred {
+                    sizes[index] = min(panel.limits.upperBound, max(panel.limits.lowerBound, preferred))
+                }
+            }
         }
 
         // In a row, allocated widths affect wrapping and therefore the row's preferred height.
@@ -64,7 +102,7 @@ public struct StackLayout: ElementLayout {
             let policy: LayoutPreference = subviews[index].isSpacer ? .content : (vertical ? subviews[index].width : subviews[index].height)
             let desired: Int
             if let offeredCross, isFlexible(policy) {
-                desired = min(offeredCross, upperBound(policy))
+                desired = min(offeredCross, policy.maximumCells)
             } else {
                 desired = preferred(ideal, policy: policy, offered: false)
             }
@@ -92,7 +130,7 @@ public struct StackLayout: ElementLayout {
             offset = min(4096, offset + sizes[index] + gap)
             return placement
         }
-        return (size, placements)
+        return (size, placements, resize)
     }
 
     private func preferred(_ ideal: Int, policy: LayoutPreference, offered: Bool) -> Int {
@@ -101,7 +139,7 @@ public struct StackLayout: ElementLayout {
         case .fixed(let value): return bounded(value)
         case .fit(let maximum): return min(ideal, bounded(maximum))
         case .flexible(let minimum, _, _):
-            return min(upperBound(policy), max(bounded(minimum), offered ? 0 : ideal))
+            return min(policy.maximumCells, max(bounded(minimum), offered ? 0 : ideal))
         }
     }
 
@@ -126,20 +164,20 @@ public struct StackLayout: ElementLayout {
         }
     }
 
-    private func expand(_ sizes: inout [Int], policies: [LayoutPreference], budget: Int) {
-        var remaining = max(0, budget - sizes.reduce(0, +))
-        var active = sizes.indices.filter { isFlexible(policies[$0]) && sizes[$0] < upperBound(policies[$0]) }
+    static func expand(_ sizes: inout [Int], policies: [LayoutPreference], remaining: Int, eligible: [Int]) {
+        var remaining = remaining
+        var active = eligible.filter { sizes[$0] < policies[$0].maximumCells }
         while remaining > 0, !active.isEmpty {
             var weightLeft = active.reduce(0) { $0 + weight(policies[$1]) }
             for index in active {
                 let weight = weight(policies[index])
                 let share = remaining * weight / weightLeft
-                let added = min(share, upperBound(policies[index]) - sizes[index])
+                let added = min(share, policies[index].maximumCells - sizes[index])
                 sizes[index] += added
                 remaining -= added
                 weightLeft -= weight
             }
-            active.removeAll { sizes[$0] >= upperBound(policies[$0]) }
+            active.removeAll { sizes[$0] >= policies[$0].maximumCells }
         }
     }
 
@@ -148,11 +186,7 @@ public struct StackLayout: ElementLayout {
         if case .flexible = policy { return true }
         return false
     }
-    private func upperBound(_ policy: LayoutPreference) -> Int {
-        if case .flexible(let minimum, let maximum, _) = policy { return max(bounded(minimum), bounded(maximum ?? 4096)) }
-        return 4096
-    }
-    private func weight(_ policy: LayoutPreference) -> Int {
+    private static func weight(_ policy: LayoutPreference) -> Int {
         if case .flexible(_, _, let value) = policy { return max(1, min(4096, value)) }
         return 1
     }

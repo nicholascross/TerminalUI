@@ -21,6 +21,15 @@ extension TerminalView {
     public func layoutSizing(width: LayoutPreference = .automatic, height: LayoutPreference = .automatic) -> ModifiedView<Self> {
         ModifiedView(content: self) { $0.layoutSizing(width: width, height: height) }
     }
+    /// Enables dragging a panel border along its containing row or column.
+    public func resizable(
+        id: String, edge: PanelResizeEdge, minimum: Int = 0, maximum: Int? = nil,
+        preferredSize: Int? = nil, onResize: (@MainActor (Int) -> Void)? = nil,
+    ) -> ModifiedView<Self> {
+        ModifiedView(content: self, deferToBody: true) {
+            $0.resizable(id: id, edge: edge, minimum: minimum, maximum: maximum, preferredSize: preferredSize, onResize: onResize)
+        }
+    }
     public func padding(_ value: Insets) -> ModifiedView<Self> { ModifiedView(content: self) { $0.padding(value) } }
     public func alignment(_ value: Alignment) -> ModifiedView<Self> { ModifiedView(content: self) { $0.alignment(value) } }
     public func role(_ value: TextRole) -> ModifiedView<Self> { ModifiedView(content: self) { $0.role(value) } }

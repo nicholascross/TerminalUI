@@ -20,6 +20,19 @@ package final class PointerRouter {
         let offset: Int
     }
 
+    private struct PanelDrag {
+        let node: LayoutNode
+        let bounds: MouseRect
+        let index: Int
+        let resize: PanelResize
+        let initial: StackResizeAllocation
+        let previous: StackResizeAllocation?
+        let start: Int
+        var lastSize: Int
+
+        var startSize: Int { initial.sizes[index] }
+    }
+
     private let states: WidgetStateStore
     private let focus: FocusManager
     private let tree: ElementTree
@@ -27,6 +40,7 @@ package final class PointerRouter {
     private var size: WidgetSize?
     private var pressedMouseTarget: (control: String, item: String?, modal: String?)?
     private var drag: Drag?
+    private var panelDrag: PanelDrag?
     package private(set) var textSelection: SelectableCell?
 
     package init(states: WidgetStateStore, focus: FocusManager, tree: ElementTree, coordinates: EditorCoordinates) {
@@ -36,9 +50,22 @@ package final class PointerRouter {
         self.coordinates = coordinates
     }
 
-    package func cancelPress() {
+    @discardableResult
+    package func cancelPress() -> LayoutNode? {
         pressedMouseTarget = nil
         clearSelection()
+        return cancelPanelDrag()
+    }
+
+    package var isResizingPanel: Bool { panelDrag != nil }
+
+    @discardableResult
+    private func cancelPanelDrag() -> LayoutNode? {
+        guard let panelDrag else { return nil }
+        self.panelDrag = nil
+        guard panelDrag.lastSize != panelDrag.startSize else { return nil }
+        panelDrag.node.panelResizeAllocation = panelDrag.previous
+        return panelDrag.node
     }
 
     package func clearSelection() {
@@ -46,17 +73,33 @@ package final class PointerRouter {
         textSelection = nil
     }
 
-    package func resize(to size: WidgetSize) {
-        if self.size != size { cancelPress() }
+    @discardableResult
+    package func resize(to size: WidgetSize) -> LayoutNode? {
+        let restored = self.size != size ? cancelPress() : nil
         self.size = size
+        return restored
+    }
+
+    /// Clear a captured drag if its panel, parent or live geometry changed during a repaint.
+    package func validatePanelDrag(in geometry: RenderedGeometry?) -> LayoutNode? {
+        guard let panelDrag else { return nil }
+        if let root = geometry?.root, panelTarget(for: panelDrag, in: root) != nil { return nil }
+        return cancelPanelDrag()
     }
 
     /// Routes mouse input against the current rendered tree. Render again after geometry-changing input.
     /// Without current geometry, input is ignored. Mouse focus and actions follow the same modal rules as keys.
     package func handle(_ mouse: MouseEvent, geometry: RenderedGeometry?, theme: Theme) -> InteractionOutcome {
         guard let geometry, let root = geometry.root else {
-            cancelPress()
-            return .unchanged
+            return cancelPress().map { .panelResize($0, nil) } ?? .unchanged
+        }
+        if let panelDrag {
+            if mouse.kind == .press {
+                if let restored = cancelPanelDrag() { return .panelResize(restored, nil) }
+            } else {
+                guard mouse.button == .primary, mouse.kind == .drag || mouse.kind == .release else { return .unchanged }
+                return updatePanelDrag(panelDrag, at: mouse, in: root)
+            }
         }
         let wheel = mouse.kind == .scrollUp || mouse.kind == .scrollDown
         if mouse.kind == .press { clearSelection() }
@@ -73,10 +116,7 @@ package final class PointerRouter {
         }
         let path = mousePath(root, at: mouse)
         let activeModal = mouseModalID(root.element)
-        if let activeModal, !path.contains(where: {
-            if case let .dialog(id, _, _) = $0.element.kind { return id == activeModal }
-            return false
-        }) {
+        if !canHit(path, modal: activeModal) {
             pressedMouseTarget = nil
             return .unchanged
         }
@@ -86,6 +126,9 @@ package final class PointerRouter {
         }
         guard mouse.button == .primary else {
             if mouse.kind == .press { pressedMouseTarget = nil }
+            return .unchanged
+        }
+        if mouse.kind == .press, !mouse.shift, !mouse.alt, !mouse.control, beginPanelDrag(at: mouse, on: path) {
             return .unchanged
         }
         if mouse.kind == .press, !mouse.shift, !mouse.alt, !mouse.control,
@@ -119,6 +162,72 @@ package final class PointerRouter {
         }
         states.resumeAutomaticVisibility()
         return pressMouse(mouse, on: target, item: item, theme: theme)
+    }
+
+    private func beginPanelDrag(at mouse: MouseEvent, on path: [LayoutNode]) -> Bool {
+        for node in path.reversed() {
+            guard let geometry = node.mouse, let resize = geometry.resize,
+                  let handle = resize.handles.first(where: { handle in
+                      handle.bounds.contains(mouse) && path.contains { $0 === handle.panel }
+                  }), let panel = handle.panel.element.panelResize else { continue }
+            panelDrag = PanelDrag(node: node, bounds: geometry.bounds, index: handle.index, resize: panel,
+                                  initial: resize.allocation, previous: node.panelResizeAllocation,
+                                  start: resizeCoordinate(mouse, edge: panel.edge), lastSize: resize.allocation.sizes[handle.index])
+            pressedMouseTarget = nil
+            return true
+        }
+        return false
+    }
+
+    private func panelTarget(for drag: PanelDrag, in root: LayoutNode) -> LayoutNode? {
+        let vertical = drag.resize.edge.vertical
+        guard let geometry = drag.node.mouse,
+              vertical ? (geometry.bounds.row, geometry.bounds.height) == (drag.bounds.row, drag.bounds.height)
+                  : (geometry.bounds.column, geometry.bounds.width) == (drag.bounds.column, drag.bounds.width),
+              let resize = geometry.resize,
+              resize.allocation.contract == drag.initial.contract,
+              let handle = resize.handles.first(where: { $0.index == drag.index && $0.panel.element.panelResize == drag.resize }) else { return nil }
+        let position = MouseEvent(.press, column: handle.bounds.column, row: handle.bounds.row)
+        let path = mousePath(root, at: position)
+        guard path.contains(where: { $0 === drag.node }), path.contains(where: { $0 === handle.panel }),
+              canHit(path, modal: mouseModalID(root.element)) else { return nil }
+        return handle.panel
+    }
+
+    private func updatePanelDrag(_ drag: PanelDrag, at mouse: MouseEvent, in root: LayoutNode) -> InteractionOutcome {
+        guard let target = panelTarget(for: drag, in: root) else {
+            return cancelPanelDrag().map { .panelResize($0, nil) } ?? .unchanged
+        }
+        let displacement = resizeCoordinate(mouse, edge: drag.resize.edge) - drag.start
+        let requested = drag.startSize + (drag.resize.edge.isEnd ? displacement : -displacement)
+        var allocation = drag.initial
+        allocation.resize(drag.index, to: requested)
+        let size = allocation.sizes[drag.index]
+        if mouse.kind == .release { panelDrag = nil }
+        if mouse.kind == .release, size != drag.startSize {
+            states[drag.resize.stateKey].panelSize = size
+            allocation.rememberSize(at: drag.index)
+            drag.node.panelResizeAllocation = allocation
+            let commit = target.element.panelResizeDidEnd.map { PanelResizeCommit(callback: $0, size: size) }
+            return .panelResize(drag.node, commit)
+        }
+        guard size != drag.lastSize else { return .unchanged }
+        panelDrag?.lastSize = size
+        drag.node.panelResizeAllocation = size == drag.startSize ? drag.previous : allocation
+        return .panelResize(drag.node, nil)
+    }
+
+    private func resizeCoordinate(_ mouse: MouseEvent, edge: PanelResizeEdge) -> Int {
+        // A release outside the surface can still move to the far limit.
+        min(8192, max(-4096, edge.vertical ? mouse.row : mouse.column))
+    }
+
+    private func canHit(_ path: [LayoutNode], modal: String?) -> Bool {
+        guard let modal else { return true }
+        return path.contains {
+            if case let .dialog(id, _, _) = $0.element.kind { return id == modal }
+            return false
+        }
     }
 
     private func updateSelection(_ drag: Drag, at mouse: MouseEvent, geometry: RenderedGeometry) -> InteractionOutcome {

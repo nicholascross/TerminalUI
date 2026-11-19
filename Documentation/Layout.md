@@ -106,6 +106,28 @@ Use `.padding(.init(leading: 1, trailing: 1))` to inset content. Set `alignment:
 
 Single-line `Text` truncates when it does not fit. Use `Paragraph` for wrapping, and place longer content in a `ScrollView` so it can be read within the available height.
 
+## Resizing panels with the mouse
+
+Enable mouse motion with `TerminalConfiguration(mouseEnabled: true, mouseDragEnabled: true)`, or use `--mouse-drag` in an argument-aware app. Then give each panel you want to resize a stable ID and an edge to drag.
+
+```swift
+Row(spacing: 1) {
+    Panel("Files") {
+        List(id: "files", rows: files, selection: selectedFile)
+    }
+    .resizable(id: "files-pane", edge: .trailing, minimum: 20, maximum: 42, preferredSize: 26)
+
+    Panel("Details") {
+        ScrollView(id: "details") { Paragraph(details) }
+    }
+    .layoutSizing(width: .flexible(minimum: 30))
+}
+```
+
+Drag the marked border. Use `.leading` or `.trailing` in a horizontal stack, and `.top` or `.bottom` in a vertical stack. The bounds and preferred size are measured in terminal cells across the panel, including borders and padding. The stack combines these with its existing size rules. A fixed dimension stays fixed during a drag, and flexible siblings on the dragged side share the change within their own limits. Trailing and bottom edges can also use spare space at the end of a stack. The handle appears when the border is visible and can move. Press Escape during a drag to restore the starting size.
+
+TerminalUI remembers committed sizes for the session by panel ID and axis. Use unique IDs within a component. Sizes adapt to tighter layouts and recover when space returns. To save a size across launches, store it in the optional `onResize` callback and pass it as `preferredSize` when creating the view. The callback runs on the main actor when a release commits a changed size. Resize handles are supported by `Row`, `Column`, `Stack`, and their engine equivalents.
+
 ## Responsive layouts
 
 Read `application.terminalSize` through `@ApplicationContext`. Views that read it update when the terminal changes size.

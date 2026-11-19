@@ -4,6 +4,30 @@ import Testing
 
 @MainActor
 struct MouseHostTests {
+    @Test func `panel resize reports one committed size with clipboard copying disabled`() throws {
+        let host = TerminalHost(configuration: .init(mouseEnabled: true, mouseDragEnabled: true))
+        let app = MouseTestApplication()
+        var saves: [Int] = []
+        app.makeView = {
+            .row([
+                .panel(title: "Files", content: .text("files")).layoutSizing(height: .flexible())
+                    .resizable(id: "files", edge: .trailing, minimum: 8, preferredSize: saves.last ?? 10) { saves.append($0) },
+                .scrollView(id: "details", content: .text("Details")),
+            ])
+        }
+        let size = TerminalSize(columns: 30, rows: 6)
+        _ = try #require(host.renderIfNeeded(app, size: size))
+        host.handleInput(.mouse(.init(.press, column: 9, row: 2)), application: app)
+        host.handleInput(.mouse(.init(.drag, column: 12, row: 2)), application: app)
+        #expect(saves.isEmpty)
+        #expect(app.viewCalls == 1)
+        host.handleInput(.mouse(.init(.release, column: 14, row: 2)), application: app)
+        #expect(saves == [15])
+        let frame = try #require(host.renderIfNeeded(app, size: size))
+        #expect(Array(frame.lines[0]).firstIndex(of: "┐") == 14)
+        #expect(app.actions.isEmpty)
+    }
+
     @Test func `resize before click uses new dimensions before output is painted`() throws {
         let host = TerminalHost(configuration: .init(mouseEnabled: true))
         let app = MouseTestApplication()

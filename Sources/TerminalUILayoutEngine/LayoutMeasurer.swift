@@ -4,10 +4,12 @@ import TerminalUIText
 package struct LayoutMeasurer {
     let textLayouts: NodeTextLayouts
     let metrics: TextMetrics
+    let panelSize: (String) -> Int?
 
-    package init(textLayouts: NodeTextLayouts, metrics: TextMetrics) {
+    package init(textLayouts: NodeTextLayouts, metrics: TextMetrics, panelSize: @escaping (String) -> Int? = { _ in nil }) {
         self.textLayouts = textLayouts
         self.metrics = metrics
+        self.panelSize = panelSize
     }
 
     package func measure(_ node: LayoutNode, width: Int, theme: Theme) -> (Int, Int) {
@@ -16,6 +18,25 @@ package struct LayoutMeasurer {
         let element = node.element
         guard element.isVisible else { return (0, 0) }
         let available = max(1, width - min(width, element.insets.leading + element.insets.trailing))
+        let measured: (Int, Int)
+        if let stack = resizableStack(of: node, theme: theme) {
+            let size = stack.plan(LayoutProposal(width: available)).size
+            measured = (size.width, size.height)
+        } else {
+            measured = intrinsicSize(of: node, width: available, theme: theme)
+        }
+        var result = (min(4096, measured.0 + min(4096, element.insets.leading + element.insets.trailing)),
+                      min(4096, measured.1 + min(4096, element.insets.top + element.insets.bottom)))
+        if case let .fixed(width) = element.widthRule { result.0 = min(4096, max(0, width)) }
+        if case let .fixed(height) = element.heightRule { result.1 = min(4096, max(0, height)) }
+        if case let .fit(maximum) = element.widthRule { result.0 = min(result.0, max(0, maximum)) }
+        if case let .fit(maximum) = element.heightRule { result.1 = min(result.1, max(0, maximum)) }
+        node.remember(WidgetSize(width: result.0, height: result.1), at: width)
+        return result
+    }
+
+    private func intrinsicSize(of node: LayoutNode, width available: Int, theme: Theme) -> (Int, Int) {
+        let element = node.element
         let measured: (Int, Int)
         switch element.kind {
         case let .text(text):
@@ -66,13 +87,6 @@ package struct LayoutMeasurer {
                 sizes.map(\.1).max() ?? 0,
             )
         }
-        var result = (min(4096, measured.0 + min(4096, element.insets.leading + element.insets.trailing)),
-                      min(4096, measured.1 + min(4096, element.insets.top + element.insets.bottom)))
-        if case let .fixed(width) = element.widthRule { result.0 = min(4096, max(0, width)) }
-        if case let .fixed(height) = element.heightRule { result.1 = min(4096, max(0, height)) }
-        if case let .fit(maximum) = element.widthRule { result.0 = min(result.0, max(0, maximum)) }
-        if case let .fit(maximum) = element.heightRule { result.1 = min(result.1, max(0, maximum)) }
-        node.remember(WidgetSize(width: result.0, height: result.1), at: width)
-        return result
+        return measured
     }
 }

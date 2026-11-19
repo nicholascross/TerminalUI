@@ -42,13 +42,14 @@ def screen():
                 column += 1
             index += 1
     return '\n'.join(''.join(row) for row in cells)
-def wait_for(value, row=None, absent=False):
+def wait_for(value, row=None, absent=False, column=None):
     deadline = time.monotonic() + 5
     while time.monotonic() < deadline:
         if select.select([master], [], [], .05)[0]:
             history.extend(os.read(master, 65536))
         rendered = screen()
-        found = value in (rendered if row is None else rendered.splitlines()[row])
+        line = rendered if row is None else rendered.splitlines()[row]
+        found = value in line if column is None else line.startswith(value, column)
         if found != absent:
             return
     raise AssertionError(value + '\n' + screen())
@@ -57,8 +58,19 @@ try:
     wait_for('Inspector')
     wait_for('> Negotiated layout')
     wait_for('select a topic')
-    assert (b'\x1b[?1000h' in history) == mouse_enabled
+    assert (b'\x1b[?1002h' in history) == mouse_enabled
     assert (b'\x1b[?1006h' in history) == mouse_enabled
+    if mouse_enabled:
+        wait_for('┼')
+        row = next(index for index, line in enumerate(screen().splitlines()) if '┼' in line)
+        wait_for('┼', row=row, column=25)
+        os.write(master, f'\x1b[<0;26;{row + 1}M\x1b[<32;32;{row + 1}M'.encode())
+        wait_for('┼', row=row, column=31)
+        os.write(master, f'\x1b[<0;34;{row + 1}m'.encode())
+        wait_for('┼', row=row, column=33)
+        wait_for('> Negotiated layout')
+    else:
+        assert '┼' not in screen()
     os.write(master, b'\x1b3')
     wait_for('Focus: Command')
     wait_for('Shift+Enter newline')
@@ -98,6 +110,7 @@ try:
     os.kill(process.pid, signal.SIGWINCH)
     wait_for('Submitted 20 characters', row=14)
     wait_for('Ctrl-C quit', row=17)
+    wait_for('╮', row=4, column=33 if mouse_enabled else 25)
     # Click the persistent toolbar after resize, using its current cell coordinates.
     if mouse_enabled:
         column = screen().splitlines()[2].index('2 Inspector') + 2
@@ -112,8 +125,10 @@ try:
     for sequence in [b'\x1b[?1049l', b'\x1b[?2004l', b'\x1b[?25h']:
         assert sequence in history
     if mouse_enabled:
-        assert b'\x1b[?1000l' in history and b'\x1b[?1006l' in history
-    print(f'LayoutDemo PTY (mouse={mouse_enabled}): initial focus, contextual hints, pane navigation, command search/dismissal, draft preservation, paste/submit, resize and terminal restoration passed')
+        assert b'\x1b[?1002l' in history and b'\x1b[?1006l' in history
+    print(f'LayoutDemo PTY (mouse={mouse_enabled}): focus, command menu, draft, terminal resize and restoration passed')
+    if mouse_enabled:
+        print('Topics pane drag, release and size retention passed')
 finally:
     if process.poll() is None:
         process.terminate()

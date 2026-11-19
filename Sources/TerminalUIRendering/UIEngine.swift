@@ -30,7 +30,7 @@ public final class UIEngine {
         self.init(theme: theme, textSelectionEnabled: false)
     }
 
-    package init(theme: Theme = .init(), textSelectionEnabled: Bool) {
+    package init(theme: Theme = .init(), textSelectionEnabled: Bool, panelResizingEnabled: Bool = true) {
         self.theme = theme
         let tree = ElementTree()
         self.tree = tree
@@ -46,14 +46,14 @@ public final class UIEngine {
         let cache = TextLayoutCache()
         let layouts = NodeTextLayouts(cache: cache, tracksSource: textSelectionEnabled)
         let metrics = TextMetrics()
-        let measurement = LayoutMeasurer(textLayouts: layouts, metrics: metrics)
+        let measurement = LayoutMeasurer(textLayouts: layouts, metrics: metrics, panelSize: { states[$0].panelSize })
         let allocation = LayoutAllocator(measurement: measurement, metrics: metrics)
         let painters = BuiltInPainters(field: FieldPainter(states: states, coordinates: coordinates),
                                        list: ListPainter(states: states, textLayouts: cache, metrics: metrics),
                                        table: TablePainter(states: states, allocation: allocation, metrics: metrics),
                                        custom: CustomWidgetPainter())
         renderer = FrameRenderer(states: states, tree: tree, textLayouts: layouts, metrics: metrics,
-                                 measurement: measurement, allocation: allocation, painters: painters)
+                                 measurement: measurement, allocation: allocation, painters: painters, panelResizingEnabled: panelResizingEnabled)
     }
 
     /// Focuses an enabled, visible control in the active tree. Returns false if it cannot receive focus.
@@ -61,7 +61,7 @@ public final class UIEngine {
     public func focus(_ id: String, in root: Element) -> Bool {
         synchronizeFocus(root)
         guard focusManager.requestFocus(id, in: root) else { return false }
-        pointer.cancelPress()
+        cancelPointerPress()
         states.resumeAutomaticVisibility()
         renderer.invalidate()
         return true
@@ -74,15 +74,15 @@ public final class UIEngine {
     }
 
     public func resetState(for id: String) {
-        renderer.invalidate()
-        pointer.cancelPress()
+        cancelPointerPress()
         states.reset(id: id)
+        renderer.invalidateLayout()
         if focusedID == id { focusManager.setFocus(nil) }
     }
 
     package func resetFocus() {
         focusManager.reset()
-        pointer.cancelPress()
+        cancelPointerPress()
     }
 
     public func handle(_ key: KeyEvent, in root: Element) -> UIAction? {
@@ -91,7 +91,9 @@ public final class UIEngine {
 
     /// Handles input and identifies changes that can reuse the retained tree.
     public func handleEvent(_ key: KeyEvent, in root: Element) -> UIEventResult {
-        pointer.cancelPress()
+        let cancelledResize = key == .escape && pointer.isResizingPanel
+        cancelPointerPress()
+        if cancelledResize { return .repaint }
         states.resumeAutomaticVisibility()
         renderer.invalidateGeometry()
         return apply(keyboard.handle(key, in: root, theme: theme))
@@ -103,12 +105,17 @@ public final class UIEngine {
         handleMouseEvent(mouse, copySelection: { _ in })
     }
 
-    package func handleMouseEvent(_ mouse: MouseEvent, copySelection: (String) -> Void) -> UIEventResult {
+    package func handleMouseEvent(
+        _ mouse: MouseEvent, copySelection: (String) -> Void,
+        panelResized: (_ callback: @MainActor (Int) -> Void, _ size: Int) -> Void = { _, _ in },
+    ) -> UIEventResult {
         let geometry = renderer.geometry
         if geometry != nil { renderer.cancelPendingRepaint() }
         let outcome = pointer.handle(mouse, geometry: geometry, theme: theme)
         if case let .textSelection(copy?) = outcome, !copy.isEmpty { copySelection(copy) }
-        return apply(outcome)
+        let result = apply(outcome)
+        if case let .panelResize(_, commit?) = outcome { panelResized(commit.callback, commit.size) }
+        return result
     }
 
     /// Returns a snapshot without terminal control sequences.
@@ -131,13 +138,21 @@ public final class UIEngine {
     /// Paints the current tree without reconciling elements or invalidating measurements.
     package func repaintGrid(width: Int, height: Int) -> CellGrid {
         let size = WidgetSize(width: width, height: height)
-        pointer.resize(to: size)
+        if let restored = pointer.resize(to: size) { renderer.invalidateLayout(at: restored) }
         renderedSize = size
-        return renderer.renderGrid(width: width, height: height,
-                                   environment: RenderEnvironment(theme: theme, focusedID: focusedID)) { geometry in
-            if let geometry { pointer.refreshSelection(in: geometry) }
-            return pointer.textSelection
+        func paint() -> CellGrid {
+            renderer.renderGrid(width: width, height: height,
+                                environment: RenderEnvironment(theme: theme, focusedID: focusedID)) { geometry in
+                if let geometry { pointer.refreshSelection(in: geometry) }
+                return pointer.textSelection
+            }
         }
+        let frame = paint()
+        if let restored = pointer.validatePanelDrag(in: renderer.geometry) {
+            renderer.invalidateLayout(at: restored)
+            return paint()
+        }
+        return frame
     }
 
     /// Refreshes input geometry without consuming the host's pending output frame.
@@ -163,6 +178,7 @@ public final class UIEngine {
         case let .viewport(id): renderer.repaintViewport(id)
         case .rebuild: renderer.invalidate()
         case .textSelection: renderer.repaintTextSelection()
+        case let .panelResize(node, _): renderer.invalidateLayout(at: node)
         }
         return outcome.event
     }
@@ -170,7 +186,11 @@ public final class UIEngine {
     private func synchronizeFocus(_ root: Element) {
         if focusManager.synchronize(root) {
             states.resumeAutomaticVisibility()
-            pointer.cancelPress()
+            cancelPointerPress()
         }
+    }
+
+    private func cancelPointerPress() {
+        if let restored = pointer.cancelPress() { renderer.invalidateLayout(at: restored) }
     }
 }

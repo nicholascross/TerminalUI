@@ -60,4 +60,23 @@ with tempfile.TemporaryDirectory(prefix='terminalui-engine-') as directory:
         s.resize(60, 24)
         s.wait('Engine interaction probe')
         s.stop()
+    with TerminalSession(probe, '--resize-probe', columns=50, rows=12) as s:
+        s.wait('Saved width: pending')
+        assert b'\x1b[?1002h' in s.history and b'\x1b[?1006h' in s.history
+        assert s.screen()[0][17] == '╮'
+        s.mouse((17, 1))
+        s.mouse((21, 1), code=32)
+        assert s.screen()[0][21] == '╮'
+        s.mouse((34, 0), release=True)
+        s.wait('Saved width: 27')
+        assert s.screen()[0][26] == '╮'
+        assert b'\x1b]52;' not in s.history
+        s.resize(32, 12)
+        s.wait('Saved width: 27')
+        assert not any('┼' in line for line in s.screen())
+        s.resize(50, 12)
+        s.wait('Saved width: 27')
+        assert s.screen()[0][26] == '╮'
+        s.stop(mouse_mode=1002)
 print('Engine caret placement, multiline paste, nested wheel routing, live theme change and resize passed')
+print('Panel drag without clipboard copying, final release, narrow-terminal recovery and mouse teardown passed')

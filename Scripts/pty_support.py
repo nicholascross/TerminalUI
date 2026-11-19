@@ -135,7 +135,7 @@ class TerminalSession:
         position = self.position(text)
         self.send((f'\x1b[<{65 if down else 64};{position[0] + 1};{position[1] + 1}M' * count).encode())
 
-    def stop(self, by_signal=False, mouse=True):
+    def stop(self, by_signal=False, mouse=True, mouse_mode=1000):
         if by_signal:
             os.kill(self.process.pid, signal.SIGTERM)
         else:
@@ -146,6 +146,6 @@ class TerminalSession:
         for sequence in (b'\x1b[?1049l', b'\x1b[?2004l', b'\x1b[?25h'):
             assert sequence in self.history
         if mouse:
-            assert b'\x1b[?1000l' in self.history and b'\x1b[?1006l' in self.history
+            assert f'\x1b[?{mouse_mode}l'.encode() in self.history and b'\x1b[?1006l' in self.history
         assert termios.tcgetattr(self.slave) == self.before
 

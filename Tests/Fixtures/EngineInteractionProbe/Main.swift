@@ -4,13 +4,30 @@ import TerminalUIEngine
 @MainActor
 final class EngineInteractionProbe: TerminalApplication {
     let host: TerminalHost
+    let resizeProbe: Bool
     var field = "Click to place caret: 界 café"
     var editor = "Editable scratchpad\nPaste multiple lines here."
+    var savedWidth: Int?
 
-    init(host: TerminalHost) { self.host = host }
+    init(host: TerminalHost, resizeProbe: Bool) {
+        self.host = host
+        self.resizeProbe = resizeProbe
+    }
 
     func view() -> Element {
-        .column(
+        if resizeProbe {
+            return .column([
+                .row(spacing: 1, [
+                    .panel(title: "Files", content: .text("File list"))
+                        .layoutSizing(height: .flexible())
+                        .resizable(id: "files", edge: .trailing, minimum: 12, maximum: 30, preferredSize: 18) { self.savedWidth = $0 },
+                    .panel(title: "Details", content: .paragraph("Fill the remaining cells"))
+                        .layoutSizing(width: .flexible(minimum: 22), height: .flexible()),
+                ]).height(.fill()),
+                .statusBar("Saved width: \(savedWidth.map(String.init) ?? "pending")"),
+            ])
+        }
+        return .column(
             spacing: 1,
             [
                 .text("Engine interaction probe").role(.heading),
@@ -55,7 +72,8 @@ final class EngineInteractionProbe: TerminalApplication {
 @main
 struct Main {
     @MainActor static func main() async throws {
-        let host = TerminalHost(configuration: .init(colorCapability: .trueColor, mouseEnabled: true), theme: .nord())
-        try await host.run(EngineInteractionProbe(host: host))
+        let resizeProbe = CommandLine.arguments.contains("--resize-probe")
+        let host = TerminalHost(configuration: .init(colorCapability: .trueColor, mouseEnabled: true, mouseDragEnabled: resizeProbe), theme: .nord())
+        try await host.run(EngineInteractionProbe(host: host, resizeProbe: resizeProbe))
     }
 }

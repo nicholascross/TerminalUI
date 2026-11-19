@@ -17,6 +17,7 @@ final class FrameRenderer {
     private let measurement: LayoutMeasurer
     private let allocation: LayoutAllocator
     private let painters: BuiltInPainters
+    private let panelResizingEnabled: Bool
     private let statistics = RenderingStatistics()
     var renderingMetrics: RenderingMetrics { statistics.metrics }
     private var layoutRoot: LayoutNode?
@@ -40,6 +41,7 @@ final class FrameRenderer {
         measurement: LayoutMeasurer,
         allocation: LayoutAllocator,
         painters: BuiltInPainters,
+        panelResizingEnabled: Bool = true,
     ) {
         self.states = states
         self.tree = tree
@@ -48,6 +50,7 @@ final class FrameRenderer {
         self.measurement = measurement
         self.allocation = allocation
         self.painters = painters
+        self.panelResizingEnabled = panelResizingEnabled
     }
 
     func invalidateGeometry() {
@@ -58,6 +61,11 @@ final class FrameRenderer {
 
     func invalidateMeasurements() {
         layoutRoot?.invalidateMeasurements()
+        invalidate()
+    }
+
+    func invalidateLayout(at node: LayoutNode? = nil) {
+        layoutRoot?.invalidateLayout(at: node)
         invalidate()
     }
 
@@ -208,6 +216,15 @@ final class FrameRenderer {
             let selection = sourceMap.map { Canvas.SelectionSource.mapped(ObjectIdentifier(node), $0) }
             context.write(text, row: row, column: col, style: style, canvas: &canvas, selection: selection)
         }
+        if let stack = measurement.resizableStack(of: node, theme: theme) {
+            let plan = stack.plan(LayoutProposal(width: contentWidth, height: contentHeight))
+            paintLayoutChildren(node, placements: plan.placements, context: context, canvas: &canvas, environment: environment,
+                                inherited: descendants, repaintPath: remainingPath)
+            if panelResizingEnabled, active, let resize = plan.resize {
+                paintResizeHandles(node, allocation: resize, style: resolved(.accent), glyph: theme.borders.cross, canvas: &canvas)
+            }
+            return
+        }
         switch element.kind {
         case .component: preconditionFailure("Resolve components with ComponentApplication before rendering")
         case .boundary:
@@ -349,16 +366,10 @@ final class FrameRenderer {
                 }
             }
         case let .layout(strategy, _):
-            let children = node.children.filter(\.element.isVisible)
             let size = WidgetSize(width: contentWidth, height: contentHeight)
             let placements = strategy.placeSubviews(in: size, subviews: measurement.subviews(of: node, theme: theme), alignment: element.alignment)
-            var placed = Set<Int>()
-            for placement in placements where children.indices.contains(placement.index) && placed.insert(placement.index).inserted {
-                let x = min(contentWidth, placement.x), y = min(contentHeight, placement.y)
-                paint(children[placement.index], x: originX + x, y: originY + y,
-                      width: min(contentWidth - x, placement.size.width), height: min(contentHeight - y, placement.size.height),
-                      canvas: &canvas, environment: environment, inherited: descendants, enabled: active, repaintPath: remainingPath)
-            }
+            paintLayoutChildren(node, placements: placements, context: context, canvas: &canvas, environment: environment,
+                                inherited: descendants, repaintPath: remainingPath)
         case let .column(spacing, _), let .row(spacing, _):
             let vertical = if case .column = element.kind { true } else { false }
             let children = node.children.filter(\.element.isVisible)
@@ -419,6 +430,52 @@ final class FrameRenderer {
                 enabled: active,
             )
         }
+    }
+
+    private func paintLayoutChildren(
+        _ node: LayoutNode, placements: [LayoutPlacement], context: ElementPaintContext, canvas: inout Canvas,
+        environment: RenderEnvironment, inherited: StyleOverride, repaintPath: ArraySlice<LayoutNode>?,
+    ) {
+        let children = node.children.filter(\.element.isVisible)
+        var placed = Set<Int>()
+        for placement in placements where children.indices.contains(placement.index) && placed.insert(placement.index).inserted {
+            let x = min(context.contentWidth, placement.x), y = min(context.contentHeight, placement.y)
+            paint(children[placement.index], x: context.originX + x, y: context.originY + y,
+                  width: min(context.contentWidth - x, placement.size.width), height: min(context.contentHeight - y, placement.size.height),
+                  canvas: &canvas, environment: environment, inherited: inherited, enabled: context.active, repaintPath: repaintPath)
+        }
+    }
+
+    private func paintResizeHandles(
+        _ node: LayoutNode, allocation: StackResizeAllocation, style: TextStyle, glyph: String, canvas: inout Canvas,
+    ) {
+        let children = node.children.filter(\.element.isVisible)
+        let handles = children.enumerated().compactMap { index, child -> PanelResizeHandle? in
+            guard let range = allocation.travel(for: index), range.lowerBound < range.upperBound,
+                  let panel = child.resizablePanel, let edge = panel.element.panelResize?.edge,
+                  let geometry = panel.mouse, geometry.enabled, let clip = child.mouse?.clip else { return nil }
+            let bounds = geometry.bounds
+            let border: MouseRect
+            if edge.vertical {
+                guard bounds.width > 1, bounds.height > 1 else { return nil }
+                let row = edge.isEnd ? bounds.row + bounds.height - 1 : bounds.row
+                border = MouseRect(column: bounds.column, row: row, width: bounds.width, height: 1)
+            } else {
+                guard bounds.width > 1, bounds.height > 2 else { return nil }
+                let column = edge.isEnd ? bounds.column + bounds.width - 1 : bounds.column
+                border = MouseRect(column: column, row: bounds.row + 1, width: 1, height: bounds.height - 2)
+            }
+            let hit = border.intersecting(geometry.clip).intersecting(clip)
+            guard hit.width > 0, hit.height > 0 else { return nil }
+            let column = edge == .top ? hit.column + hit.width - 1 : hit.column + hit.width / 2
+            let row = hit.row + hit.height / 2
+            let x = column - mouseTranslation.column, y = row - mouseTranslation.row
+            var markerStyle = panel.element.styleOverride.applying(to: style)
+            if let cell = canvas.cell(atX: x, y: y) { markerStyle.background = cell.style.background }
+            canvas.write(glyph, x: x, y: y, style: markerStyle, clipWidth: 1)
+            return PanelResizeHandle(index: index, panel: panel, bounds: hit)
+        }
+        if !handles.isEmpty { node.mouse?.resize = StackResizeGeometry(allocation: allocation, handles: handles) }
     }
 
     private func sourceMap(for drawn: String, in original: String) -> TextSourceMap {

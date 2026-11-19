@@ -12,10 +12,13 @@ public struct TerminalOptions: ParsableArguments {
     @Flag(help: "Copy selections in selectable text on mouse release.")
     public var copyOnSelect = false
 
+    @Flag(help: "Enable mouse drag reports for features such as panel resizing.")
+    public var mouseDrag = false
+
     public init() {}
 
     /// The sole terminal configuration used by an argument-aware application.
     public var configuration: TerminalConfiguration {
-        .init(mouseEnabled: mouse, copyOnSelect: copyOnSelect)
+        .init(mouseEnabled: mouse, copyOnSelect: copyOnSelect, mouseDragEnabled: mouseDrag)
     }
 }
