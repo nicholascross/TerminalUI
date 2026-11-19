@@ -17,6 +17,7 @@ Select a file to inspect its working diff; choose Staged diff for index changes.
 | Input | Action |
 | --- | --- |
 | Alt+1–4 | Focus Files, Branches, Commits or Inspect. |
+| e | Open the selected file in an editor from the Files list. |
 | Ctrl-P | Open repository commands. |
 | Escape | Close a dialog. |
 | Tab | Move between controls. |
@@ -24,7 +25,9 @@ Select a file to inspect its working diff; choose Staged diff for index changes.
 
 Mouse input is enabled; use `--no-mouse` to preserve normal terminal text selection. Control+1–4 also navigate when reported distinctly by the terminal. Shortcuts and contextual hints remain visible in the screen.
 
-Refresh reloads external changes while preserving surviving selections. Loading failures offer Retry. The browser only reads repository data; it does not stage, commit, check out branches or edit files.
+Press `e` in the Files list or choose **Open selected file in editor** from the commands menu. The editor runs from the repository root in the same terminal. Closing it returns to the browser and refreshes the diff. The browser selects an editor with `git var GIT_EDITOR`, so it uses `GIT_EDITOR`, `core.editor`, `VISUAL` or `EDITOR` in that order, followed by Git's default. Configure an executable with any editor flags it needs, such as `GIT_EDITOR='vim -f'`. [Git editor configuration](https://git-scm.com/docs/git-var#Documentation/git-var.txt-GITEDITOR)
+
+Refresh reloads external changes while preserving surviving selections. Loading failures offer Retry. Git queries performed by the browser are read-only.
 
 The sidebar moves above the inspector below 85 columns. Resizing preserves the file filter, selection and focus.
 

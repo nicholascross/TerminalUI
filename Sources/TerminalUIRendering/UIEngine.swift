@@ -190,7 +190,7 @@ public final class UIEngine {
         }
     }
 
-    private func cancelPointerPress() {
+    package func cancelPointerPress() {
         if let restored = pointer.cancelPress() { renderer.invalidateLayout(at: restored) }
     }
 }

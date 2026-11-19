@@ -1,5 +1,6 @@
 import TerminalUIComponentRuntime
 import TerminalUICore
+import TerminalUIRuntime
 
 /// Services for the presentation containing a mounted component. Retaining a context does not retain the application.
 @MainActor
@@ -72,5 +73,12 @@ public struct TerminalApplicationContext {
 
     public func stop() {
         services?.stop()
+    }
+
+    /// Gives a foreground command the controlling terminal, then returns to the current application.
+    /// Call from an asynchronous action. Arguments are passed verbatim and nonzero exits throw.
+    public func runInTerminal(_ executable: String, arguments: [String] = []) async throws {
+        guard let services else { throw TerminalCommandError.sessionNotRunning }
+        try await services.runInTerminal(executable, arguments: arguments)
     }
 }

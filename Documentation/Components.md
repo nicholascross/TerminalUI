@@ -157,6 +157,26 @@ For repeated workspaces, apply `.scope("left")` and resolve it with `application
 
 Use `.id(value)` on a view, then `application.reveal(value)`, to bring content into view through its enclosing scroll containers. Reveal preserves state. For direct control lookup, `focusTarget(path:id:)` follows view IDs and `ForEach` item IDs; `id:` is the final control's local ID. Focus handles and scopes belong to the current view lifetime.
 
+## Foreground commands
+
+Use `application.runInTerminal(_:arguments:)` from an asynchronous action to open a file in a terminal editor or launch another interactive program. The command takes over the controlling terminal until it exits. The host then restores terminal modes and redraws the mounted screen with its current state and focus.
+
+```swift
+Button("Open in editor")
+    .onActivate {
+        Task { @MainActor in
+            do {
+                try await application.runInTerminal("vi", arguments: [absoluteFilePath])
+                reloadFile()
+            } catch {
+                status = String(describing: error)
+            }
+        }
+    }
+```
+
+Pass each argument as a separate array entry. The host searches `PATH` for executable names and accepts absolute paths. A running host supports one foreground command at a time. Launch failures and nonzero exits throw `TerminalCommandError`. Cancelling the task terminates the command before returning control to the application. Foreground commands are supported on macOS and Linux.
+
 ## Collections and view lifetime
 
 Use `ForEach(items, id: \.id)` when insertions and reordering should preserve each item's local state. IDs must be unique within that collection. Ordinary `for` loops use position instead.

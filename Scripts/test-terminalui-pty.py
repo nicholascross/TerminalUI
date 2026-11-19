@@ -1,8 +1,12 @@
-"""Read-only repository application PTY checks. Run swift build first."""
+"""Repository application PTY checks. Run swift build first."""
 import os
 from pathlib import Path
+import shlex
+import signal
 import subprocess
+import sys
 import tempfile
+import termios
 
 from pty_support import ENV, TerminalSession
 
@@ -155,6 +159,94 @@ for arguments, by_signal in [((), True), (('--no-mouse',), False)]:
             s.wait('Repository refreshed · read only')
         s.stop(by_signal=by_signal, mouse=mouse)
 print('Mouse opt-out, keyboard navigation, Ctrl-C/SIGTERM cleanup and termios restoration passed')
+
+with tempfile.TemporaryDirectory(prefix='terminalui-editor-') as directory:
+    repo = Path(directory) / 'repository with spaces'
+    repo.mkdir()
+    name = "note 'draft';.txt"
+    working_file = repo / name
+    working_file.write_text('staged version\n')
+
+    def git(*arguments):
+        subprocess.run(['git', '-C', str(repo), *arguments], check=True, capture_output=True)
+
+    git('init', '-b', 'main')
+    git('add', '--', name)
+    working_file.write_text('working version\n')
+    editor = Path(directory) / 'test editor.py'
+    editor.write_text(r"""
+import fcntl
+import os
+from pathlib import Path
+import signal
+import sys
+import termios
+import tty
+
+assert len(sys.argv) == 3 and sys.argv[1] in ('--fixture', '--leave-raw')
+path = Path(sys.argv[2])
+assert path.parent == Path.cwd()
+assert path.name == "note 'draft';.txt"
+assert all(os.isatty(fd) and not fcntl.fcntl(fd, fcntl.F_GETFL) & os.O_NONBLOCK for fd in range(3))
+assert os.tcgetpgrp(0) == os.getpgrp()
+assert termios.tcgetattr(0)[3] & termios.ICANON
+signal.signal(signal.SIGINT, signal.SIG_DFL)
+if sys.argv[1] == '--leave-raw':
+    tty.setraw(0)
+print('\x1b[2J\x1b[1;1HFAKE EDITOR: ', end='', flush=True)
+answer = input()
+if answer == 'fail':
+    sys.exit(7)
+path.write_text(answer + '\n')
+""")
+    configured_editor = shlex.join([sys.executable, str(editor), '--fixture'])
+    git('config', 'core.editor', configured_editor)
+    environment = {key: value for key, value in ENV.items() if key != 'GIT_EDITOR'}
+    with TerminalSession(BINARY, '--repo', str(repo), env=environment) as s:
+        s.wait('Ready · read-only repository')
+        s.wait('+working version')
+        s.click('Filter files')
+        s.send(b'e')
+        s.wait('FAKE EDITOR', absent=True)
+        s.send(b'\x7f\x1b1')
+        s.wait('e open in editor')
+        s.send(b'e')
+        s.wait('FAKE EDITOR')
+        assert termios.tcgetattr(s.slave) == s.before
+        reset = s.history.rindex(b'\x1b[?1049l')
+        assert b'\x1b[?1000l\x1b[?1006l' in s.history[:reset]
+        assert b'\x1b[?2004l\x1b[?25h' in s.history[:reset]
+        s.resize(100, 35)
+        assert b'\x1b[?1049h' not in s.history[reset:]
+        s.send(b'edited in foreground\r')
+        s.wait('+edited in foreground')
+        s.wait('Repository refreshed')
+        s.wait('e open in editor')
+        assert working_file.read_text() == 'edited in foreground\n'
+        assert b'\x1b[?1049h' in s.history[reset:]
+        assert b'\x1b[?1006h\x1b[?1000h' in s.history[reset:]
+        assert termios.tcgetattr(s.slave) != s.before
+
+        s.send(b'\x10')
+        s.send(b'\x1b[200~Open selected file in editor\x1b[201~\r')
+        s.wait('FAKE EDITOR')
+        s.send(b'fail\r')
+        s.wait('Editor: Command exited with status 7')
+        s.send(b'e')
+        s.wait('FAKE EDITOR')
+        s.send(b'\x03')
+        s.wait('Editor: Command terminated by signal 2')
+        s.stop()
+
+    raw_editor = shlex.join([sys.executable, str(editor), '--leave-raw'])
+    with TerminalSession(BINARY, '--repo', str(repo), env=dict(environment, GIT_EDITOR=raw_editor)) as s:
+        s.wait('Ready · read-only repository')
+        s.send(b'e')
+        s.wait('FAKE EDITOR')
+        assert termios.tcgetattr(s.slave) != s.before
+        s.stop(by_signal=True)
+        assert s.history.count(b'\x1b[?1049h') == 1
+print('Foreground editor input, saved diff, full redraw, focus, failures and shutdown passed')
 
 result = subprocess.run([BINARY], stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
                         stderr=subprocess.PIPE, env=ENV, start_new_session=True, timeout=8)

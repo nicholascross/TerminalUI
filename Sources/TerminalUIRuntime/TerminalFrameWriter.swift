@@ -11,6 +11,8 @@ struct TerminalFrameWriter {
         self.write = write
     }
 
+    mutating func invalidate() { encoder.discard() }
+
     mutating func writeFrame(_ frame: CellGrid) async throws {
         let bytes = Array(encoder.prepare(frame).utf8)
         do {

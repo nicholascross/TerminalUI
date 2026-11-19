@@ -6,6 +6,13 @@ import TerminalUIRendering
 /// Hosts one component tree on the controlling terminal. Calls into the application occur on the main actor.
 @MainActor
 public final class TerminalHost {
+    private struct CommandRequest {
+        let id: UUID
+        let command: TerminalCommand
+        let completion: CheckedContinuation<Void, any Error>
+        var cancelled = false
+    }
+
     private static var sessionActive = false
     private let configuration: TerminalConfiguration
     private let engine: UIEngine
@@ -22,6 +29,7 @@ public final class TerminalHost {
     private var lastNotifiedFocus: ScopedFocusTarget?
     private var sourceRevision: UInt64?
     private var updateWakeup: ApplicationUpdateWakeup?
+    private var commandRequest: CommandRequest?
     public private(set) var frameWriteCount = 0
 
     private func presentation(_ application: any TerminalApplication) -> LegacyApplicationPresentation {
@@ -100,6 +108,55 @@ public final class TerminalHost {
         updateWakeup?.signal()
     }
 
+    /// Gives the controlling terminal to a foreground command until it exits, then redraws this host.
+    /// The executable is resolved on PATH and arguments are passed verbatim. Only one command can run at a time.
+    public func runInTerminal(_ executable: String, arguments: [String] = []) async throws {
+        guard running, !stopped else { throw TerminalCommandError.sessionNotRunning }
+        guard commandRequest == nil else { throw TerminalCommandError.commandInProgress }
+        try Task.checkCancellation()
+        let command = try TerminalCommand(executable: executable, arguments: arguments)
+        let id = UUID()
+        try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { continuation in
+                commandRequest = CommandRequest(id: id, command: command, completion: continuation)
+                updateWakeup?.signal()
+            }
+        } onCancel: {
+            Task { @MainActor [weak self] in
+                guard self?.commandRequest?.id == id else { return }
+                self?.commandRequest?.cancelled = true
+            }
+        }
+    }
+
+    private func completeCommand(_ result: Result<Void, any Error>) {
+        let request = commandRequest
+        commandRequest = nil
+        request?.completion.resume(with: result)
+    }
+
+    /// Runs only between I/O operations so the editor is the only terminal reader or writer.
+    private func handOffTerminal(_ request: CommandRequest, session: TerminalSession) async throws {
+        do {
+            try session.suspend()
+            engine.cancelPointerPress()
+            let result: Result<Void, any Error>
+            do {
+                try await request.command.run {
+                    self.commandRequest?.cancelled == true || self.stopped || Task.isCancelled || session.terminationRequested
+                }
+                result = .success(())
+            } catch {
+                result = .failure(error)
+            }
+            if !stopped, !Task.isCancelled, !session.terminationRequested { try session.resume() }
+            completeCommand(result)
+        } catch {
+            completeCommand(.failure(error))
+            throw error
+        }
+    }
+
     /// Connects presentation services without acquiring a TTY or evaluating the root.
     public func connect(_ source: any TerminalPresentationSource) {
         if sourceID != ObjectIdentifier(source) {
@@ -128,6 +185,10 @@ public final class TerminalHost {
         })
         services.theme = { [weak self] in self?.theme ?? .terminalNative }
         services.setTheme = { [weak self] in self?.theme = $0 }
+        services.runInTerminal = { [weak self] executable, arguments in
+            guard let self else { throw TerminalCommandError.sessionNotRunning }
+            try await self.runInTerminal(executable, arguments: arguments)
+        }
         source.connect(services)
     }
 
@@ -243,7 +304,11 @@ public final class TerminalHost {
         Self.sessionActive = true
         stopped = false
         invalidate()
-        defer { running = false; Self.sessionActive = false }
+        defer {
+            running = false
+            Self.sessionActive = false
+            completeCommand(.failure(CancellationError()))
+        }
         let session = try TerminalSession(configuration: configuration)
         defer { session.restore() }
         let wakeup = try ApplicationUpdateWakeup()
@@ -263,11 +328,30 @@ public final class TerminalHost {
         let selectionScrollInterval = Duration.milliseconds(60)
         var nextSelectionScroll: ContinuousClock.Instant?
 
-        while !stopped, !Task.isCancelled {
+        while !stopped, !Task.isCancelled, !session.terminationRequested {
+            if let request = commandRequest {
+                if request.cancelled {
+                    completeCommand(.failure(CancellationError()))
+                    continue
+                }
+                try await handOffTerminal(request, session: session)
+                if stopped || Task.isCancelled || session.terminationRequested { break }
+                output.invalidate()
+                decoder = InputDecoder(pasteLimit: configuration.pasteLimit)
+                escapeDeadline = EscapeDeadline(clock: clock, milliseconds: configuration.escapeTimeoutMilliseconds)
+                nextSelectionScroll = nil
+                let resumedSize = try session.size()
+                if resumedSize != size {
+                    size = resumedSize
+                    deliver(.resized(size), to: source)
+                }
+                needsRepaint = true
+            }
             if let grid = renderIfNeeded(source, size: size) {
                 try await output.writeFrame(grid)
                 frameWriteCount += 1
             }
+            if commandRequest != nil { continue }
             let timeout = escapeDeadline.pollTimeout
             // Await the reader even on cancellation before restoring/closing any descriptors.
             let input = try await withTaskCancellationHandler {
@@ -275,6 +359,7 @@ public final class TerminalHost {
             } onCancel: { wakeup.signal() }
             wakeup.drain()
             if input.terminate || input.endOfFile { break }
+            if commandRequest != nil { continue }
             let newSize = try session.size()
             if newSize != size {
                 size = newSize

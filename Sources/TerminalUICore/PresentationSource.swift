@@ -14,6 +14,7 @@ public struct PresentationServices {
     public var stop: () -> Void
     package var theme: () -> Theme = { .terminalNative }
     package var setTheme: (Theme) -> Void = { _ in }
+    package var runInTerminal: ((String, [String]) async throws -> Void)?
 
     public init(
         requestUpdate: @escaping () -> Void = {},

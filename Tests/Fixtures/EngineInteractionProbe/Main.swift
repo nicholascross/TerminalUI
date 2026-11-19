@@ -7,6 +7,7 @@ final class EngineInteractionProbe: TerminalApplication {
     let resizeProbe: Bool
     var field = "Click to place caret: 界 café"
     var editor = "Editable scratchpad\nPaste multiple lines here."
+    var status = "Probe ready"
     var savedWidth: Int?
 
     init(host: TerminalHost, resizeProbe: Bool) {
@@ -54,7 +55,7 @@ final class EngineInteractionProbe: TerminalApplication {
                             .column((0..<30).map { .text("Outer row \($0)") }),
                         ])
                 ).height(.fill()),
-                .statusBar("Probe ready"),
+                .statusBar(status),
             ])
     }
 
@@ -63,6 +64,17 @@ final class EngineInteractionProbe: TerminalApplication {
         case .textChanged("field", let value): field = value
         case .textChanged("editor", let value): editor = value
         case .activated("theme"): host.theme = .light
+        case .unhandledKey(.altCharacter("x")):
+            Task {
+                do {
+                    try await host.runInTerminal("/dev/null/terminalui-missing-command")
+                } catch TerminalCommandError.launchFailed {
+                    status = "Launch failed"
+                } catch {
+                    status = "Unexpected command error"
+                }
+                host.invalidate()
+            }
         case .unhandledKey(.controlC): host.stop()
         default: break
         }

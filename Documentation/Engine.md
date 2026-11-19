@@ -2,6 +2,8 @@
 
 Use `TerminalUIEngine` when you need raw elements, an explicit terminal host or a custom widget. For declarative applications, start with [views and state](Components.md).
 
+Call `try await host.runInTerminal("vi", arguments: [absoluteFilePath])` from an asynchronous action while `host.run` is active. The host releases the controlling terminal for the command and redraws the current screen on return. See [foreground commands](Components.md#foreground-commands) for argument and error handling.
+
 ## A raw-element application
 
 An engine application returns an `Element` tree and applies actions to its own values. The host manages terminal input, rendering, focus, caret position and scrolling.

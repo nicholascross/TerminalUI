@@ -57,6 +57,7 @@ public typealias UIEngine = TerminalUIRendering.UIEngine
 public typealias TerminalApplication = TerminalUIRuntime.TerminalApplication
 public typealias TerminalConfiguration = TerminalUIRuntime.TerminalConfiguration
 public typealias TerminalError = TerminalUIRuntime.TerminalError
+public typealias TerminalCommandError = TerminalUIRuntime.TerminalCommandError
 public typealias TerminalHost = TerminalUIRuntime.TerminalHost
 
 // Presentation contracts also support optional component sources without importing that product.

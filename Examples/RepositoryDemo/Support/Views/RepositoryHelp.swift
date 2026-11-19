@@ -7,7 +7,7 @@ struct RepositoryHelp: TerminalView {
         Dialog(id: "help", title: "Read-only Git browser") {
             Column(spacing: 1) {
                 Paragraph(
-                    "Files shows Git's index and working tree status columns. Select a file for its working diff; Staged diff shows index changes. Untracked files are listed without a diff. Refresh reloads changes made outside this browser."
+                    "Files shows Git's index and working tree status columns. Select a file for its working diff. Press e in the Files list to open the file in your editor. Staged diff shows index changes. Refresh reloads external changes."
                 )
                 Paragraph(
                     "Select a branch to inspect its recent history without checking it out. Select a commit for its message, author, dates and patch. Newer and Older step through the latest 50 commits on HEAD."

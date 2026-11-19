@@ -14,4 +14,5 @@ package protocol ApplicationServices: AnyObject {
     func focusTarget(path: [AnyHashable], id: String, in scope: ViewScope?) -> ScopedFocusTarget?
     func reveal(id: AnyHashable, in scope: ViewScope?) -> Bool
     func stop()
+    func runInTerminal(_ executable: String, arguments: [String]) async throws
 }

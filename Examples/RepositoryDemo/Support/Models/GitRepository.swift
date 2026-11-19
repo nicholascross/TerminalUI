@@ -77,6 +77,20 @@ struct GitRepository {
         try run(["log", "-20", "--format=%h %s", "refs/heads/" + branch, "--"])
     }
 
+    func editorArguments(for path: String) throws -> [String] {
+        let file = URL(fileURLWithPath: directory, isDirectory: true).appendingPathComponent(path)
+        var isDirectory: ObjCBool = false
+        guard FileManager.default.fileExists(atPath: file.path, isDirectory: &isDirectory), !isDirectory.boolValue else {
+            throw Failure(message: "File is unavailable in the working tree")
+        }
+        let editor = try run(["var", "GIT_EDITOR"]).trimmingCharacters(in: .newlines)
+        guard !editor.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            throw Failure(message: "No editor is configured")
+        }
+        // The repository and filename are positional parameters, separate from the configured command.
+        return ["-c", "cd \"$1\" || exit\nshift\nexec \(editor) \"$1\"", "repository-editor", directory, file.path]
+    }
+
     private func run(_ arguments: [String], allowedExitCodes: Set<Int32> = [0]) throws -> String {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/env")

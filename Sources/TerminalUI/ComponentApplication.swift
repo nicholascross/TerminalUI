@@ -1,6 +1,7 @@
 import Foundation
 import TerminalUIComponentRuntime
 import TerminalUICore
+import TerminalUIRuntime
 
 /// An optional presentation source and terminal-independent component harness.
 @MainActor
@@ -155,6 +156,11 @@ package final class ComponentApplication: TerminalPresentationSource {
     package var context: TerminalApplicationContext { TerminalApplicationContext(services: self) }
 
     package func stop() { services.stop() }
+
+    package func runInTerminal(_ executable: String, arguments: [String]) async throws {
+        guard let run = services.runInTerminal else { throw TerminalCommandError.sessionNotRunning }
+        try await run(executable, arguments)
+    }
 
     /// Ends the generation explicitly, useful when a harness/root is being reused.
     package func unmount() {

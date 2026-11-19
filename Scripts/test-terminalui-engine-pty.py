@@ -59,6 +59,11 @@ with tempfile.TemporaryDirectory(prefix='terminalui-engine-') as directory:
         assert b'48;2;248;249;252' in s.history[previous_frame:]
         s.resize(60, 24)
         s.wait('Engine interaction probe')
+        previous_frame = len(s.history)
+        s.send(b'\x1bx')
+        s.wait('Launch failed')
+        after_launch = s.history[previous_frame:]
+        assert after_launch.index(b'\x1b[?1049l') < after_launch.index(b'\x1b[?1049h')
         s.stop()
     with TerminalSession(probe, '--resize-probe', columns=50, rows=12) as s:
         s.wait('Saved width: pending')
@@ -80,3 +85,4 @@ with tempfile.TemporaryDirectory(prefix='terminalui-engine-') as directory:
         s.stop(mouse_mode=1002)
 print('Engine caret placement, multiline paste, nested wheel routing, live theme change and resize passed')
 print('Panel drag without clipboard copying, final release, narrow-terminal recovery and mouse teardown passed')
+print('The engine resumes after a foreground command fails to launch')

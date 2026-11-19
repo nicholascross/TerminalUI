@@ -44,9 +44,7 @@ struct RepositoryBrowser: TerminalView {
             if modal == .commands {
                 Menu(
                     id: "commands", title: "Repository commands", items: RepositoryCommand.allCases,
-                    unavailableReason: { command in
-                        command == .selectedCommit && model.commit == nil ? "No commits yet in this repository" : nil
-                    }, onActivate: { run($0) }
+                    unavailableReason: unavailableReason, onActivate: { run($0) }
                 )
                 .onDismiss { modal = nil }
             } else if modal == .help {
@@ -57,6 +55,7 @@ struct RepositoryBrowser: TerminalView {
         .onAction { action in
             switch action {
             case .unhandledKey(.controlC): application.stop()
+            case .unhandledKey(.character("e")) where modal == nil && focusedPane == .files: openEditor()
             case .pasteTruncated: model.status = "Paste truncated at configured byte limit"
             default: return false
             }
@@ -68,6 +67,7 @@ struct RepositoryBrowser: TerminalView {
         modal = nil
         switch command {
         case .refresh: model.refresh()
+        case .editFile: openEditor()
         case .workingDiff: model.showWorkingDiff()
         case .stagedDiff: model.showStagedDiff()
         case .selectedCommit: model.showCommit()
@@ -75,10 +75,41 @@ struct RepositoryBrowser: TerminalView {
         }
     }
 
+    private func unavailableReason(_ command: RepositoryCommand) -> String? {
+        switch command {
+        case .editFile where model.file == nil: "Select a file first"
+        case .selectedCommit where model.commit == nil: "No commits yet in this repository"
+        default: nil
+        }
+    }
+
+    private func openEditor() {
+        guard let path = model.file else {
+            model.status = "Select a file to open in the editor"
+            return
+        }
+        do {
+            let arguments = try model.repository.editorArguments(for: path)
+            Task { @MainActor in
+                do {
+                    try await application.runInTerminal("/bin/sh", arguments: arguments)
+                    model.refresh()
+                } catch is CancellationError {
+                    return
+                } catch {
+                    model.refresh()
+                    model.status = "Editor: \(error.localizedDescription)"
+                }
+            }
+        } catch {
+            model.status = "Editor: \(error.localizedDescription)"
+        }
+    }
+
     private var contextualHints: String {
         if modal != nil { return "Type to filter · Enter open · Esc return" }
         switch focusedPane {
-        case .files: return "↑/↓ select a file · Working diff / Staged diff inspect changes"
+        case .files: return "↑/↓ select a file · e open in editor · Working diff / Staged diff inspect changes"
         case .branches: return "↑/↓ inspect branch history · branch stays checked out"
         case .commits: return "↑/↓ inspect a commit · Newer / Older step through history"
         case .inspector: return "↑/↓ scroll · PgUp/PgDn page · Home/End jump"

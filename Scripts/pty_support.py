@@ -32,7 +32,7 @@ def module_objects(bin_path, modules):
     return objects
 
 class TerminalSession:
-    def __init__(self, binary, *arguments, columns=120, rows=40):
+    def __init__(self, binary, *arguments, columns=120, rows=40, env=ENV):
         self.master, self.slave = pty.openpty()
         self.resize(columns, rows, notify=False)
         self.before = termios.tcgetattr(self.slave)
@@ -44,7 +44,7 @@ class TerminalSession:
 
         self.process = subprocess.Popen([str(binary), *arguments], stdin=self.slave,
                                         stdout=self.slave, stderr=self.slave,
-                                        env=ENV, preexec_fn=setup)
+                                        env=env, preexec_fn=setup)
 
     def __enter__(self):
         return self

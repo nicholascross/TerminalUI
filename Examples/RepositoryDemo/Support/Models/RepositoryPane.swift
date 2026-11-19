@@ -15,13 +15,14 @@ enum RepositoryPane: String, CaseIterable, MenuItemDefinition {
 }
 
 enum RepositoryCommand: CaseIterable, MenuItemDefinition {
-    case refresh, workingDiff, stagedDiff, selectedCommit, help
+    case refresh, editFile, workingDiff, stagedDiff, selectedCommit, help
 
     var id: Self { self }
     var menuShortcut: MenuShortcut { .none }
     var title: String {
         switch self {
         case .refresh: "Refresh repository"
+        case .editFile: "Open selected file in editor"
         case .workingDiff: "View working tree diff"
         case .stagedDiff: "View staged diff"
         case .selectedCommit: "View selected commit"

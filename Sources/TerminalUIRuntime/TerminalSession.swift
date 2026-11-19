@@ -27,7 +27,7 @@ final class TerminalSession: @unchecked Sendable {
     private var descriptor: Int32 = -1
     private var signalDescriptor: Int32 = -1
     private var original = termios()
-    private var attributesChanged = false
+    private var needsAttributeRestore = false
     private var enabledScreen = false
     private var acquiredSignals = false
     private var closed = false
@@ -56,15 +56,7 @@ final class TerminalSession: @unchecked Sendable {
             signalDescriptor = tui_signals_open()
             guard signalDescriptor >= 0 else { throw TerminalError.systemCall("signals", errno) }
             acquiredSignals = true
-            var raw = original
-            cfmakeraw(&raw)
-            guard tcsetattr(descriptor, TCSANOW, &raw) == 0 else { throw TerminalError.systemCall("tcsetattr", errno) }
-            attributesChanged = true
-            // Mark before writing so a partially written setup is also reversed.
-            enabledScreen = true
-            let setup = (alternateScreen ? "\u{1b}[?1049h" : "") + "\u{1b}[?2004h\u{1b}[>4;2m\u{1b}[>1u\u{1b}[?25l"
-                + (mouseMode.map { "\u{1b}[?1006h\u{1b}[?\($0.rawValue)h" } ?? "")
-            try writeAll(Array(setup.utf8))
+            try enterApplicationMode(flushInput: false)
         } catch {
             restore()
             throw error
@@ -111,7 +103,7 @@ final class TerminalSession: @unchecked Sendable {
                 input.terminate = signals.prefix(count).contains { $0 == UInt8(SIGTERM) || $0 == UInt8(SIGHUP) || $0 == UInt8(SIGINT) }
             }
         }
-        if tui_signals_termination_requested() != 0 { input.terminate = true }
+        if terminationRequested { input.terminate = true }
         if terminalReady {
             var bytes = [UInt8](repeating: 0, count: 4096)
             let count = read(descriptor, &bytes, bytes.count)
@@ -153,15 +145,56 @@ final class TerminalSession: @unchecked Sendable {
         try writeAll(Array("\u{1b}]52;c;\(encoded)\u{1b}\\".utf8))
     }
 
+    var terminationRequested: Bool { tui_signals_termination_requested() != 0 }
+
+    func suspend() throws {
+        // A terminal-generated Ctrl-C goes to the foreground editor as well as the host.
+        tui_signals_ignore_interrupt(1)
+        try leaveApplicationMode()
+        // A command can change termios and exit without restoring it, including during host shutdown.
+        needsAttributeRestore = true
+    }
+
+    func resume() throws {
+        defer { tui_signals_ignore_interrupt(0) }
+        try enterApplicationMode(flushInput: true)
+    }
+
+    private func enterApplicationMode(flushInput: Bool) throws {
+        var raw = original
+        cfmakeraw(&raw)
+        guard tcsetattr(descriptor, flushInput ? TCSAFLUSH : TCSANOW, &raw) == 0 else {
+            throw TerminalError.systemCall("tcsetattr", errno)
+        }
+        needsAttributeRestore = true
+        // Mark before writing so a partially written setup is also reversed.
+        enabledScreen = true
+        let setup = (alternateScreen ? "\u{1b}[?1049h" : "") + "\u{1b}[?2004h\u{1b}[>4;2m\u{1b}[>1u\u{1b}[?25l"
+            + (mouseMode.map { "\u{1b}[?1006h\u{1b}[?\($0.rawValue)h" } ?? "")
+        try writeAll(Array(setup.utf8))
+    }
+
+    private func leaveApplicationMode() throws {
+        let screen = Result {
+            guard enabledScreen else { return }
+            let reset = (mouseMode.map { "\u{1b}[?\($0.rawValue)l\u{1b}[?1006l" } ?? "")
+                + "\u{1b}[0m\u{1b}[<u\u{1b}[>4m\u{1b}[?2004l\u{1b}[?25h" + (alternateScreen ? "\u{1b}[?1049l" : "")
+            try writeAll(Array(reset.utf8))
+            enabledScreen = false
+        }
+        if needsAttributeRestore {
+            guard tcsetattr(descriptor, TCSANOW, &original) == 0 else {
+                throw TerminalError.systemCall("tcsetattr", errno)
+            }
+            needsAttributeRestore = false
+        }
+        try screen.get()
+    }
+
     func restore() {
         guard !closed else { return }
         closed = true
-        if enabledScreen {
-            let reset = (mouseMode.map { "\u{1b}[?\($0.rawValue)l\u{1b}[?1006l" } ?? "")
-                + "\u{1b}[0m\u{1b}[<u\u{1b}[>4m\u{1b}[?2004l\u{1b}[?25h" + (alternateScreen ? "\u{1b}[?1049l" : "")
-            try? writeAll(Array(reset.utf8))
-        }
-        if attributesChanged { _ = tcsetattr(descriptor, TCSANOW, &original) }
+        try? leaveApplicationMode()
         if acquiredSignals { tui_signals_close() }
         if descriptor >= 0 { _ = close(descriptor); descriptor = -1 }
     }

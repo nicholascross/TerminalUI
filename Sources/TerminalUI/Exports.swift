@@ -27,6 +27,7 @@ public typealias UIAction = TerminalUICore.UIAction
 public typealias UIEventResult = TerminalUICore.UIEventResult
 public typealias TerminalConfiguration = TerminalUIRuntime.TerminalConfiguration
 public typealias TerminalError = TerminalUIRuntime.TerminalError
+public typealias TerminalCommandError = TerminalUIRuntime.TerminalCommandError
 public typealias ScopedFocusTarget = TerminalUICore.ScopedFocusTarget
 public typealias ComponentMetrics = TerminalUIComponentRuntime.ComponentMetrics
 public typealias ViewScope = TerminalUICore.ViewScope
