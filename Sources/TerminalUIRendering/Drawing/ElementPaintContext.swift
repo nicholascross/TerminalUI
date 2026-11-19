@@ -24,9 +24,10 @@ struct ElementPaintContext {
         return element.styleOverride.applying(to: style)
     }
 
-    func write(_ text: String, row: Int, column: Int = 0, style: TextStyle? = nil, canvas: inout Canvas) {
+    func write(_ text: String, row: Int, column: Int = 0, style: TextStyle? = nil, canvas: inout Canvas,
+               selection: Canvas.SelectionSource? = nil) {
         guard row >= 0, row < contentHeight, column >= 0, column < contentWidth else { return }
         canvas.write(text, x: originX + column, y: originY + row,
-                     style: style ?? resolved(element.textRole), clipWidth: contentWidth - column)
+                     style: style ?? resolved(element.textRole), clipWidth: contentWidth - column, selection: selection)
     }
 }

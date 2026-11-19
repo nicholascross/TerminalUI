@@ -1,7 +1,7 @@
 /// A terminal mouse report in zero-based character cells, or widget-local cells during widget dispatch.
 public struct MouseEvent: Equatable, Sendable {
     public enum Kind: Equatable, Sendable {
-        case press, release, scrollUp, scrollDown
+        case press, drag, release, scrollUp, scrollDown
     }
 
     public enum Button: Equatable, Sendable {

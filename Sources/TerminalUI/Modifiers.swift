@@ -33,6 +33,10 @@ extension TerminalView {
     public func underline(_ value: Bool = true) -> ModifiedView<Self> { style(.init(underline: value)) }
     public func visible(_ value: Bool) -> ModifiedView<Self> { ModifiedView(content: self) { $0.visible(value) } }
     public func enabled(_ value: Bool) -> ModifiedView<Self> { ModifiedView(content: self) { $0.enabled(value) } }
+    /// Allows mouse text selection on this Text or Paragraph when the host enables copy on select.
+    public func textSelection(_ enabled: Bool = true) -> ModifiedView<Self> {
+        ModifiedView(content: self, deferToBody: true) { $0.textSelection(enabled) }
+    }
     public func onKey(_ key: KeyEvent, activate id: String) -> ModifiedView<Self> {
         ModifiedView(content: self, deferToBody: true) { $0.onKey(key, activate: id) }
     }

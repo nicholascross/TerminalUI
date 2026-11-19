@@ -36,6 +36,7 @@ public struct Element {
     package var visibilityID: String?
     package var isVisible = true
     package var isEnabled = true
+    package var isTextSelectable = false
     package var submitID: String?
     package var menuResultsID: String?
     package var dismissalButtonID: String?
@@ -174,6 +175,12 @@ public struct Element {
     public func visible(_ value: Bool) -> Self {
         var copy = self
         copy.isVisible = value
+        return copy
+    }
+    /// Allows mouse text selection on this text or paragraph when the host enables copy on select.
+    public func textSelection(_ enabled: Bool = true) -> Self {
+        var copy = self
+        copy.isTextSelectable = enabled
         return copy
     }
     public func enabled(_ value: Bool) -> Self {

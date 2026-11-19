@@ -8,6 +8,8 @@ public struct Canvas {
     public let width: Int
     public let height: Int
     private let rowOffset: Int
+    /// Indexed by grid-local row and column, like the cells in the backing grid.
+    package private(set) var selectableCells: [Int: [Int: SelectableCell]] = [:]
     package var visibleRows: Range<Int> { rowOffset..<(rowOffset + grid.height) }
 
     public init(width: Int, height: Int) {
@@ -44,26 +46,58 @@ public struct Canvas {
     /// Draw on one row. A wide glyph crossing the clip boundary becomes a replacement cell.
     public mutating func write(_ text: String, x: Int, y: Int, style: TextStyle = TextStyle(),
                                clipWidth: Int? = nil) {
+        write(text, x: x, y: y, style: style, clipWidth: clipWidth, selection: nil)
+    }
+
+    package enum SelectionSource {
+        case mapped(ObjectIdentifier, TextSourceMap)
+        case cell(SelectableCell)
+    }
+
+    package mutating func write(_ text: String, x: Int, y: Int, style: TextStyle,
+                                clipWidth: Int?, selection: SelectionSource?) {
         guard visibleRows.contains(y) else { return }
         let y = y - rowOffset
         let limit = min(width, max(0, clipWidth.map { x.addingReportingOverflow($0).overflow ? width : x + $0 } ?? width))
         var column = x
+        var spans: ArraySlice<TextSourceMap.Span> = []
+        var byteOffset = 0
+        if case let .mapped(_, map) = selection { spans = map.spans[...] }
         for char in text {
             guard column < limit else { break }
+            let source: SelectableCell?
+            switch selection {
+            case nil: source = nil
+            case let .cell(cell): source = cell
+            case let .mapped(owner, _):
+                let end = byteOffset + char.utf8.count
+                var range: Range<Int>?
+                while let span = spans.first, span.drawn.lowerBound < end {
+                    let source = span.sourceRange(for: byteOffset ..< end)
+                    range = (range?.lowerBound ?? source.lowerBound) ..< source.upperBound
+                    if span.drawn.upperBound > end { break }
+                    spans.removeFirst()
+                }
+                source = range.map { SelectableCell(owner: owner, source: $0) }
+                byteOffset = end
+            }
             let safe: Character = CellWidth.isSafe(char) && CellWidth.width(of: char) > 0 ? char : "�"
             let characterWidth = CellWidth.width(of: safe)
             if column == -1 && characterWidth == 2 && limit > 0 {
                 eraseFootprint(x: 0, y: y)
                 grid.put(Cell(grapheme: "�", width: 1, style: style), x: 0, y: y)
+                if let source { selectableCells[y, default: [:]][0] = source }
             } else if column >= 0 {
                 eraseFootprint(x: column, y: y)
                 if characterWidth == 2, column + 1 < limit {
                     eraseFootprint(x: column + 1, y: y)
                     grid.put(Cell(grapheme: String(safe), width: 2, style: style), x: column, y: y)
                     grid.put(Cell(grapheme: "", width: 0, style: style), x: column + 1, y: y)
+                    if let source { selectableCells[y, default: [:]][column + 1] = source }
                 } else {
                     grid.put(Cell(grapheme: characterWidth == 2 ? "�" : String(safe), width: 1, style: style), x: column, y: y)
                 }
+                if let source { selectableCells[y, default: [:]][column] = source }
             }
             column += characterWidth
         }
@@ -92,14 +126,25 @@ public struct Canvas {
             eraseFootprint(x: startX, y: localRow)
             eraseFootprint(x: endX - 1, y: localRow)
             grid.fill(startX..<endX, row: localRow, style: style)
+            if selectableCells[localRow] != nil {
+                for column in startX..<endX { selectableCells[localRow]?[column] = nil }
+                if selectableCells[localRow]?.isEmpty == true { selectableCells[localRow] = nil }
+            }
         }
     }
 
     private mutating func eraseFootprint(x: Int, y: Int) {
         guard let old = grid[x, y] else { return }
-        if old.width == 0 { grid.put(.blank, x: x - 1, y: y) }
-        if old.width == 2 { grid.put(.blank, x: x + 1, y: y) }
+        if old.width == 0 {
+            grid.put(.blank, x: x - 1, y: y)
+            selectableCells[y]?[x - 1] = nil
+        }
+        if old.width == 2 {
+            grid.put(.blank, x: x + 1, y: y)
+            selectableCells[y]?[x + 1] = nil
+        }
         grid.put(.blank, x: x, y: y)
+        selectableCells[y]?[x] = nil
     }
 }
 

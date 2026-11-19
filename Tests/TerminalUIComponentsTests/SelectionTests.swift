@@ -33,6 +33,22 @@ private struct Selections: TerminalView {
 
 @MainActor
 struct SelectionTests {
+    @Test(arguments: [false, true])
+    func `text selection requires both host and view opt in`(copyOnSelect: Bool) {
+        let source = ViewPresentation(root: Column {
+            Text("selectable").textSelection()
+            Text("disabled").textSelection().textSelection(false)
+        })
+        let host = TerminalHost(configuration: .init(mouseEnabled: true, copyOnSelect: copyOnSelect))
+        _ = host.preview(source, width: 20, height: 2)
+        var copies: [String] = []
+        for row in 0 ... 1 {
+            host.handleInput(.mouse(.init(.press, column: 0, row: row)), source: source)
+            host.handleInput(.mouse(.init(.release, column: 2, row: row)), source: source) { copies.append($0) }
+        }
+        #expect(copies == (copyOnSelect ? ["sel"] : []))
+    }
+
     @Test func `list table and tabs use existing routers and typed bindings`() throws {
         let probe = SelectionProbe()
         let app = ComponentApplication(root: Selections(probe: probe), schedule: { _ in })

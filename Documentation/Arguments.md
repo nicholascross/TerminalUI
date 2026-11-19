@@ -46,6 +46,7 @@ The macro provides the `arguments` value, application initialization and termina
 | Flag | Behaviour |
 | --- | --- |
 | `--mouse` / `--no-mouse` | Enable or disable mouse input. Default: enabled; the last supplied flag wins. |
+| `--copy-on-select` | Copy a drag selection on release in text that opts in. Requires mouse input. |
 | `--preview` | Print an 80×24 text snapshot without opening a terminal. |
 | `-h` / `--help` | Print generated usage information. |
 

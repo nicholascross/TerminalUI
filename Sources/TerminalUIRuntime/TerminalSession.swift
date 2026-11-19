@@ -12,6 +12,11 @@ import TerminalUICore
 /// Owns one controlling terminal and the process-wide signal wakeup pipe.
 /// Operations are serialized by TerminalHost, including across detached I/O tasks.
 final class TerminalSession: @unchecked Sendable {
+    private enum MouseMode: Int {
+        case clicks = 1000
+        case clicksAndDrags = 1002
+    }
+
     struct Input {
         var bytes: [UInt8] = []
         var terminate = false
@@ -27,12 +32,16 @@ final class TerminalSession: @unchecked Sendable {
     private var acquiredSignals = false
     private var closed = false
     private let alternateScreen: Bool
-    private let mouseEnabled: Bool
+    private let mouseMode: MouseMode?
 
     init(configuration: TerminalConfiguration, outputWriter: TerminalOutputWriter = .init()) throws {
         self.outputWriter = outputWriter
         alternateScreen = configuration.alternateScreen
-        mouseEnabled = configuration.mouseEnabled
+        if configuration.mouseEnabled {
+            mouseMode = configuration.copyOnSelect ? .clicksAndDrags : .clicks
+        } else {
+            mouseMode = nil
+        }
         guard ProcessInfo.processInfo.environment["TERM"] != "dumb" else { throw TerminalError.unsupportedTerminal }
         descriptor = open("/dev/tty", O_RDWR | O_NOCTTY | O_NONBLOCK | O_CLOEXEC)
         guard descriptor >= 0, isatty(descriptor) == 1 else {
@@ -54,7 +63,7 @@ final class TerminalSession: @unchecked Sendable {
             // Mark before writing so a partially written setup is also reversed.
             enabledScreen = true
             let setup = (alternateScreen ? "\u{1b}[?1049h" : "") + "\u{1b}[?2004h\u{1b}[>4;2m\u{1b}[>1u\u{1b}[?25l"
-                + (mouseEnabled ? "\u{1b}[?1006h\u{1b}[?1000h" : "")
+                + (mouseMode.map { "\u{1b}[?1006h\u{1b}[?\($0.rawValue)h" } ?? "")
             try writeAll(Array(setup.utf8))
         } catch {
             restore()
@@ -138,11 +147,17 @@ final class TerminalSession: @unchecked Sendable {
         })
     }
 
+    /// Requests a clipboard write in the attached terminal using OSC 52.
+    func copySelection(_ text: String) throws {
+        let encoded = Data(text.utf8).base64EncodedString()
+        try writeAll(Array("\u{1b}]52;c;\(encoded)\u{1b}\\".utf8))
+    }
+
     func restore() {
         guard !closed else { return }
         closed = true
         if enabledScreen {
-            let reset = (mouseEnabled ? "\u{1b}[?1000l\u{1b}[?1006l" : "")
+            let reset = (mouseMode.map { "\u{1b}[?\($0.rawValue)l\u{1b}[?1006l" } ?? "")
                 + "\u{1b}[0m\u{1b}[<u\u{1b}[>4m\u{1b}[?2004l\u{1b}[?25h" + (alternateScreen ? "\u{1b}[?1049l" : "")
             try? writeAll(Array(reset.utf8))
         }

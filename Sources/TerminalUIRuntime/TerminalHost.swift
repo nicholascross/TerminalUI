@@ -34,7 +34,7 @@ public final class TerminalHost {
 
     public init(configuration: TerminalConfiguration = .init(), theme: Theme = .init()) {
         self.configuration = configuration
-        engine = UIEngine(theme: theme)
+        engine = UIEngine(theme: theme, textSelectionEnabled: configuration.mouseSelectionEnabled)
     }
 
     /// Allows interaction tests to share the engine used by programmatic focus requests.
@@ -186,7 +186,9 @@ public final class TerminalHost {
         handleInput(event, source: presentation(application))
     }
 
-    package func handleInput(_ event: TerminalEvent, source: any TerminalPresentationSource) {
+    package func handleInput(
+        _ event: TerminalEvent, source: any TerminalPresentationSource, copySelection: (String) -> Void = { _ in },
+    ) {
         switch event {
         case let .key(key): handleInput(key, source: source)
         case let .mouse(mouse):
@@ -194,7 +196,7 @@ public final class TerminalHost {
             _ = currentView(source)
             // Resolve effects and geometry before the next pointer event in the same input read.
             engine.prepareMouseInput(width: size.columns, height: size.rows)
-            let result = engine.handleMouseEvent(mouse)
+            let result = engine.handleMouseEvent(mouse, copySelection: copySelection)
             publishFocus(to: source)
             needsRepaint = true
             if case let .rebuild(action) = result {
@@ -248,7 +250,10 @@ public final class TerminalHost {
         }
         var size = try session.size()
         deliver(.resized(size), to: source)
-        var escapeDeadline = EscapeDeadline(clock: ContinuousClock(), milliseconds: configuration.escapeTimeoutMilliseconds)
+        let clock = ContinuousClock()
+        var escapeDeadline = EscapeDeadline(clock: clock, milliseconds: configuration.escapeTimeoutMilliseconds)
+        let selectionScrollInterval = Duration.milliseconds(60)
+        var nextSelectionScroll: ContinuousClock.Instant?
 
         while !stopped, !Task.isCancelled {
             if let grid = renderIfNeeded(source, size: size) {
@@ -271,16 +276,33 @@ public final class TerminalHost {
             if !input.bytes.isEmpty {
                 escapeDeadline.receivedInput()
                 let events = decoder.feedEvents(input.bytes)
+                var copies: [String] = []
                 for event in events {
-                    handleInput(event, source: source)
+                    handleInput(event, source: source) { copies.append($0) }
                 }
                 for _ in 0 ..< decoder.completedTruncatedPastes {
                     deliver(.pasteTruncated, to: source)
+                }
+                for copy in copies {
+                    try await Task.detached { try session.copySelection(copy) }.value
                 }
             } else if escapeDeadline.consumeIfExpired() {
                 for event in decoder.flushEscape() {
                     handleInput(event, source: source)
                 }
+            }
+            if engine.canAutoscrollSelection {
+                let now = clock.now
+                if let next = nextSelectionScroll {
+                    if now >= next {
+                        if engine.autoscrollSelection() { needsRepaint = true }
+                        nextSelectionScroll = now.advanced(by: selectionScrollInterval)
+                    }
+                } else {
+                    nextSelectionScroll = now.advanced(by: selectionScrollInterval)
+                }
+            } else {
+                nextSelectionScroll = nil
             }
         }
     }

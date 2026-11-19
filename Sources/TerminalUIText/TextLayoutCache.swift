@@ -6,6 +6,7 @@ package final class TextLayoutCache {
         let texts: [String]
         let width: Int
         let styled: Bool
+        let tracksSource: Bool
     }
 
     package enum Layout {
@@ -14,9 +15,20 @@ package final class TextLayoutCache {
 
         var cost: Int {
             switch self {
-            case let .plain(text): text.lines.reduce(0) { $0 + $1.utf8.count + 32 }
-            case let .styled(text): text.lines.reduce(0) { $0 + $1.count * MemoryLayout<WrappedStyledText.Glyph>.stride + 32 }
+            case let .plain(text):
+                text.lines.reduce(0) { $0 + $1.utf8.count + 32 }
+                    + (text.sourceMaps?.reduce(0) { $0 + Self.cost(of: $1) } ?? 0)
+            case let .styled(text):
+                text.lines.reduce(0) { cost, line in
+                    cost + 32 + line.runs.reduce(0) {
+                        $0 + $1.text.utf8.count + MemoryLayout<WrappedStyledText.Run>.stride + Self.cost(of: $1.sourceMap)
+                    }
+                }
             }
+        }
+
+        private static func cost(of map: TextSourceMap?) -> Int {
+            (map?.spans.count ?? 0) * MemoryLayout<TextSourceMap.Span>.stride
         }
     }
 
@@ -51,13 +63,13 @@ package final class TextLayoutCache {
         return wrapped
     }
 
-    package func entry(_ text: String, width: Int, reusing cached: Entry? = nil) -> Entry {
-        if let cached, cached.key.width == width, !cached.key.styled {
+    package func entry(_ text: String, width: Int, tracksSource: Bool = false, reusing cached: Entry? = nil) -> Entry {
+        if let cached, cached.key.width == width, !cached.key.styled, cached.key.tracksSource == tracksSource {
             touch(cached)
             return cached
         }
-        let key = Key(texts: [text], width: width, styled: false)
-        return layout(key) { .plain(WrappedText(text, width: width)) }
+        let key = Key(texts: [text], width: width, styled: false, tracksSource: tracksSource)
+        return layout(key) { .plain(WrappedText(text, width: width, tracksSource: tracksSource)) }
     }
 
     package func layout(_ spans: [TextSpan], width: Int) -> WrappedStyledText {
@@ -66,13 +78,13 @@ package final class TextLayoutCache {
         return wrapped
     }
 
-    package func entry(_ spans: [TextSpan], width: Int, reusing cached: Entry? = nil) -> Entry {
-        if let cached, cached.key.width == width, cached.key.styled {
+    package func entry(_ spans: [TextSpan], width: Int, tracksSource: Bool = false, reusing cached: Entry? = nil) -> Entry {
+        if let cached, cached.key.width == width, cached.key.styled, cached.key.tracksSource == tracksSource {
             touch(cached)
             return cached
         }
-        let key = Key(texts: spans.map(\.text), width: width, styled: true)
-        return layout(key) { .styled(WrappedStyledText(key.texts, width: width)) }
+        let key = Key(texts: spans.map(\.text), width: width, styled: true, tracksSource: tracksSource)
+        return layout(key) { .styled(WrappedStyledText(key.texts, width: width, tracksSource: tracksSource)) }
     }
 
     private func layout(_ key: Key, make: () -> Layout) -> Entry {

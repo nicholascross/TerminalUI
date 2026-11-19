@@ -14,6 +14,10 @@ extension InputDecoder {
         case 0 ... 2:
             kind = final == 77 ? .press : .release
             button = base == 0 ? .primary : (base == 1 ? .middle : .secondary)
+        case 32 ... 34:
+            guard final == 77 else { return nil }
+            kind = .drag
+            button = base == 32 ? .primary : (base == 33 ? .middle : .secondary)
         case 64, 65:
             guard final == 77 else { return nil }
             kind = base == 64 ? .scrollUp : .scrollDown

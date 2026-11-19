@@ -7,6 +7,8 @@ struct MouseDecoderTests {
         let reports: [(String, MouseEvent)] = [
             ("0;1;1M", .init(.press, column: 0, row: 0)),
             ("0;2;3m", .init(.release, column: 1, row: 2)),
+            ("32;2;3M", .init(.drag, column: 1, row: 2)),
+            ("46;4;5M", .init(.drag, column: 3, row: 4, button: .secondary, shift: true, alt: true)),
             ("1;400;300M", .init(.press, column: 399, row: 299, button: .middle)),
             ("2;7;8m", .init(.release, column: 6, row: 7, button: .secondary)),
             ("28;2;3M", .init(.press, column: 1, row: 2, shift: true, alt: true, control: true)),
@@ -27,7 +29,7 @@ struct MouseDecoderTests {
         let invalid = [
             "0;0;1M", "0;1;0M", "0;-1;1M", "0;;1M", "0;1;1;1M", "0;1M",
             "999999999999999999999999;1;1M", "0;999999999999999999999999;1M",
-            "32;1;1M", "66;1;1M", "67;1;1M", "128;1;1M", "64;1;1m", "65;1;1m",
+            "32;1;1m", "35;1;1M", "66;1;1M", "67;1;1M", "128;1;1M", "64;1;1m", "65;1;1m",
             "0;" + String(repeating: "0", count: 130) + "1;1M",
         ]
         for report in invalid {

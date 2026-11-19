@@ -4,50 +4,81 @@ import TerminalUICore
 /// Text layout shared by measurement and painting at one available width.
 package struct WrappedText {
     package let lines: [String]
+    package let sourceMaps: [TextSourceMap]?
     package let width: Int
 
-    package init(_ text: String, width available: Int) {
-        let lines = Self.wrap(text, width: available)
+    package init(_ text: String, width available: Int, tracksSource: Bool = false) {
+        let (lines, sourceMaps) = Self.wrap(text, width: available, tracksSource: tracksSource)
         self.lines = lines
+        self.sourceMaps = sourceMaps
         width = lines.map { line in
             line.prefix(4096).reduce(0) { min(4096, $0 + max(1, CellWidth.width(of: $1))) }
         }.max() ?? 0
     }
 
-    private static func wrap(_ text: String, width: Int) -> [String] {
-        guard width > 0 else { return [] }
-        var lines = [""]
+    private static func wrap(_ text: String, width: Int, tracksSource: Bool) -> ([String], [TextSourceMap]?) {
+        guard width > 0 else { return ([], nil) }
+        var lines: [String] = []
+        var maps: [TextSourceMap]? = tracksSource ? [] : nil
+        var line = ""
+        var map: TextSourceMap? = tracksSource ? TextSourceMap() : nil
+        var sourceOffset = 0
         var length = 0
+
+        func finishLine() {
+            lines.append(line)
+            if let map { maps?.append(map) }
+            line = ""
+            map = tracksSource ? TextSourceMap() : nil
+            length = 0
+        }
+
         for character in text.prefix(100000) {
+            let start = sourceOffset
+            if tracksSource { sourceOffset += character.utf8.count }
             if character == "\n" || character == "\r" || character == "\r\n" {
-                lines.append(""); length = 0; continue
+                finishLine()
+                continue
             }
             let characters: [Character] = character == "\t" ? Array(repeating: " ", count: 4 - length % 4) : [character]
             for next in characters {
                 let charWidth = max(1, CellWidth.width(of: next))
                 if length > 0, length + charWidth > width {
                     if next == " " {
-                        lines.append("")
-                        length = 0
+                        finishLine()
                         continue
                     }
-                    if let space = lines[lines.count - 1].lastIndex(of: " ") {
-                        let line = lines.removeLast()
-                        let before = String(line[..<space]).trimmingCharacters(in: .whitespaces)
-                        let after = String(line[line.index(after: space)...]).trimmingCharacters(in: .whitespaces)
-                        lines.append(before)
-                        lines.append(after)
-                        length = after.prefix(4096).reduce(0) { min(4096, $0 + max(1, CellWidth.width(of: $1))) }
+                    if let space = line.lastIndex(of: " ") {
+                        let before = line[..<space]
+                        let after = line[line.index(after: space)...]
+                        let left = before.trimmingCharacters(in: .whitespaces)
+                        let right = after.trimmingCharacters(in: .whitespaces)
+                        let rightMap = map.map { trimmedMap($0, for: after, trimmed: right, in: line) }
+                        map = map.map { trimmedMap($0, for: before, trimmed: left, in: line) }
+                        line = left
+                        finishLine()
+                        line = right
+                        map = rightMap
+                        length = right.prefix(4096).reduce(0) { min(4096, $0 + max(1, CellWidth.width(of: $1))) }
                     } else {
-                        lines.append("")
-                        length = 0
+                        finishLine()
                     }
                     if next == " ", length == 0 { continue }
                 }
-                lines[lines.count - 1].append(next)
+                line.append(next)
+                map?.append(byteCount: next.utf8.count, source: start ..< sourceOffset)
                 length += charWidth
             }
         }
-        return lines
+        finishLine()
+        return (lines, maps)
+    }
+
+    private static func trimmedMap(_ map: TextSourceMap, for part: Substring, trimmed: String, in line: String) -> TextSourceMap {
+        guard let first = part.unicodeScalars.firstIndex(where: { !CharacterSet.whitespaces.contains($0) }) else {
+            return TextSourceMap()
+        }
+        let offset = line.utf8.distance(from: line.startIndex, to: first)
+        return map.slice(offset ..< (offset + trimmed.utf8.count))
     }
 }

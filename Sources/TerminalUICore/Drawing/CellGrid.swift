@@ -29,6 +29,21 @@ public struct CellGrid: Equatable, Sendable {
         for column in columns { cells[row * width + column] = cell }
     }
 
+    /// Paints selection styling on a snapshot while retaining graphemes and their footprints.
+    package func highlighting(
+        _ selection: SelectableCell, in cells: [Int: [Int: SelectableCell]], style: TextStyle,
+    ) -> Self {
+        var result = self
+        for (row, columns) in cells {
+            for (column, cell) in columns where cell.owner == selection.owner && cell.source.overlaps(selection.source) {
+                guard var painted = self[column, row] else { continue }
+                painted.style = style
+                result.put(painted, x: column, y: row)
+            }
+        }
+        return result
+    }
+
     /// Plain text rows for snapshots; continuation cells are represented by the leading glyph.
     public var lines: [String] {
         (0..<height).map { y in

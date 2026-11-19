@@ -10,6 +10,10 @@ public struct TerminalConfiguration: Sendable {
     public var alternateScreen: Bool
     /// Requests mouse clicks and wheel reports. Disabled by default to preserve terminal text selection.
     public var mouseEnabled: Bool
+    /// Copies a mouse selection on release in text that opts in. Requires mouse input.
+    public var copyOnSelect: Bool
+
+    var mouseSelectionEnabled: Bool { mouseEnabled && copyOnSelect }
 
     public var colorCapability: ColorCapability?
     public var extendedAttributes: Bool
@@ -21,11 +25,13 @@ public struct TerminalConfiguration: Sendable {
         colorCapability: ColorCapability? = nil,
         extendedAttributes: Bool = false,
         mouseEnabled: Bool = false,
+        copyOnSelect: Bool = false,
     ) {
         self.escapeTimeoutMilliseconds = min(5000, max(1, escapeTimeoutMilliseconds))
         self.pasteLimit = max(0, pasteLimit)
         self.alternateScreen = alternateScreen
         self.mouseEnabled = mouseEnabled
+        self.copyOnSelect = copyOnSelect
         self.colorCapability = colorCapability
         self.extendedAttributes = extendedAttributes
     }

@@ -22,6 +22,8 @@ A plain application must be constructible without arguments. For command-line in
 
 Mouse input defaults to disabled for plain applications, preserving normal terminal text selection. Enable it through `configuration` when the screen needs clicks and wheel scrolling.
 
+With `TerminalConfiguration(mouseEnabled: true, copyOnSelect: true)`, apply `.textSelection()` to the `Text` and `Paragraph` views that should support dragging to copy. The modifier applies to each text view individually, including when it sits inside a panel or scroll view.
+
 ## State and bindings
 
 A view describes its content with `body: some TerminalView`. Use `@TerminalComponent` on views that own `@State` or access `@ApplicationContext`.

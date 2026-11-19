@@ -21,11 +21,16 @@ public final class UIEngine {
     private let keyboard: KeyboardRouter
     private let pointer: PointerRouter
     private let renderer: FrameRenderer
+    private var renderedSize: WidgetSize?
     var textLayoutCount: Int {
         renderer.textLayoutCount
     }
 
-    public init(theme: Theme = .init()) {
+    public convenience init(theme: Theme = .init()) {
+        self.init(theme: theme, textSelectionEnabled: false)
+    }
+
+    package init(theme: Theme = .init(), textSelectionEnabled: Bool) {
         self.theme = theme
         let tree = ElementTree()
         self.tree = tree
@@ -39,7 +44,7 @@ public final class UIEngine {
                                   collection: CollectionInteraction(states: states), shortcuts: MenuShortcutRouter())
         pointer = PointerRouter(states: states, focus: focus, tree: tree, coordinates: coordinates)
         let cache = TextLayoutCache()
-        let layouts = NodeTextLayouts(cache: cache)
+        let layouts = NodeTextLayouts(cache: cache, tracksSource: textSelectionEnabled)
         let metrics = TextMetrics()
         let measurement = LayoutMeasurer(textLayouts: layouts, metrics: metrics)
         let allocation = LayoutAllocator(measurement: measurement, metrics: metrics)
@@ -84,7 +89,7 @@ public final class UIEngine {
         handleEvent(key, in: root).action
     }
 
-    /// Handles input and explicitly identifies viewport-only changes for retained-tree repainting.
+    /// Handles input and identifies changes that can reuse the retained tree.
     public func handleEvent(_ key: KeyEvent, in root: Element) -> UIEventResult {
         pointer.cancelPress()
         states.resumeAutomaticVisibility()
@@ -95,9 +100,15 @@ public final class UIEngine {
     /// Routes mouse input against the current rendered tree. Render again after geometry-changing input.
     /// Without current geometry, input is ignored. Mouse focus and actions follow the same modal rules as keys.
     public func handleMouseEvent(_ mouse: MouseEvent) -> UIEventResult {
+        handleMouseEvent(mouse, copySelection: { _ in })
+    }
+
+    package func handleMouseEvent(_ mouse: MouseEvent, copySelection: (String) -> Void) -> UIEventResult {
         let geometry = renderer.geometry
         if geometry != nil { renderer.cancelPendingRepaint() }
-        return apply(pointer.handle(mouse, geometry: geometry, theme: theme))
+        let outcome = pointer.handle(mouse, geometry: geometry, theme: theme)
+        if case let .textSelection(copy?) = outcome, !copy.isEmpty { copySelection(copy) }
+        return apply(outcome)
     }
 
     /// Returns a snapshot without terminal control sequences.
@@ -111,6 +122,7 @@ public final class UIEngine {
     }
 
     package func updateTree(_ element: Element) {
+        pointer.clearSelection()
         synchronizeFocus(element)
         states.evictInactive(excluding: Set(tree.stateKeys(element)))
         renderer.updateTree(element)
@@ -118,13 +130,31 @@ public final class UIEngine {
 
     /// Paints the current tree without reconciling elements or invalidating measurements.
     package func repaintGrid(width: Int, height: Int) -> CellGrid {
-        pointer.resize(to: WidgetSize(width: width, height: height))
-        return renderer.renderGrid(width: width, height: height, environment: RenderEnvironment(theme: theme, focusedID: focusedID))
+        let size = WidgetSize(width: width, height: height)
+        pointer.resize(to: size)
+        renderedSize = size
+        return renderer.renderGrid(width: width, height: height,
+                                   environment: RenderEnvironment(theme: theme, focusedID: focusedID)) { geometry in
+            if let geometry { pointer.refreshSelection(in: geometry) }
+            return pointer.textSelection
+        }
     }
 
     /// Refreshes input geometry without consuming the host's pending output frame.
     package func prepareMouseInput(width: Int, height: Int) {
-        if renderer.geometry == nil { _ = repaintGrid(width: width, height: height) }
+        if renderer.geometry == nil || renderedSize != WidgetSize(width: width, height: height) {
+            _ = repaintGrid(width: width, height: height)
+        }
+    }
+
+    package var canAutoscrollSelection: Bool {
+        renderer.geometry != nil && pointer.canAutoscrollSelection
+    }
+
+    package func autoscrollSelection() -> Bool {
+        guard renderer.geometry != nil, case let .viewport(id) = pointer.autoscrollSelection() else { return false }
+        _ = apply(.viewport(id))
+        return true
     }
 
     private func apply(_ outcome: InteractionOutcome) -> UIEventResult {
@@ -132,6 +162,7 @@ public final class UIEngine {
         case .unchanged: break
         case let .viewport(id): renderer.repaintViewport(id)
         case .rebuild: renderer.invalidate()
+        case .textSelection: renderer.repaintTextSelection()
         }
         return outcome.event
     }

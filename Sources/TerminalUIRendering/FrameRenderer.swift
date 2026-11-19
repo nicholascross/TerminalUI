@@ -20,8 +20,9 @@ final class FrameRenderer {
     private let statistics = RenderingStatistics()
     var renderingMetrics: RenderingMetrics { statistics.metrics }
     private var layoutRoot: LayoutNode?
-    private var retainedFrame: CellGrid?
+    private var retainedCanvas: Canvas?
     private var pendingScrollID: String?
+    private var selectionRepaintPending = false
     private var visibilityTarget: String?
     private var focusedBounds: (y: Int, height: Int)?
     private var mouseTranslation = (column: 0, row: 0)
@@ -52,6 +53,7 @@ final class FrameRenderer {
     func invalidateGeometry() {
         geometry?.invalidate()
         geometry = nil
+        selectionRepaintPending = false
     }
 
     func invalidateMeasurements() {
@@ -61,7 +63,7 @@ final class FrameRenderer {
 
     func invalidate() {
         invalidateGeometry()
-        retainedFrame = nil
+        retainedCanvas = nil
         pendingScrollID = nil
     }
 
@@ -72,6 +74,10 @@ final class FrameRenderer {
     func repaintViewport(_ id: String) {
         pendingScrollID = id
         invalidateGeometry()
+    }
+
+    func repaintTextSelection() {
+        selectionRepaintPending = true
     }
 
     func keepVisible(_ id: String) {
@@ -89,20 +95,26 @@ final class FrameRenderer {
     }
 
     /// Paints without reconciling elements or invalidating measurements.
-    func renderGrid(width: Int, height: Int, environment: RenderEnvironment) -> CellGrid {
+    func renderGrid(
+        width: Int, height: Int, environment: RenderEnvironment, selection: (RenderedGeometry?) -> SelectableCell? = { _ in nil },
+    ) -> CellGrid {
         statistics.metrics.frames += 1
-        invalidateGeometry()
         let theme = environment.theme
+        let previous = retainedCanvas.flatMap { $0.width == width && $0.height == height ? $0 : nil }
+        if selectionRepaintPending, let previous, geometry != nil {
+            selectionRepaintPending = false
+            return frame(from: previous, selection: selection(geometry), theme: theme)
+        }
+        invalidateGeometry()
         focusedBounds = nil
         mouseTranslation = (0, 0)
         mouseClip = MouseRect(column: 0, row: 0, width: max(0, width), height: max(0, height))
         let path = pendingScrollID.flatMap { layoutRoot?.repaintPath(toScroll: $0) }
-        let previous = retainedFrame.flatMap { $0.width == width && $0.height == height ? $0 : nil }
         let repaintPath: [LayoutNode]?
         var canvas: Canvas
         if let previous, let path {
             repaintPath = path
-            canvas = Canvas(grid: previous)
+            canvas = previous
         } else {
             repaintPath = nil
             canvas = Canvas(width: width, height: height)
@@ -114,9 +126,16 @@ final class FrameRenderer {
         }
         visibilityTarget = nil
         pendingScrollID = nil
-        retainedFrame = canvas.grid
+        retainedCanvas = canvas
         if width > 0, height > 0, let layoutRoot {
-            geometry = RenderedGeometry(root: layoutRoot)
+            geometry = RenderedGeometry(root: layoutRoot, selectableCells: canvas.selectableCells)
+        }
+        return frame(from: canvas, selection: selection(geometry), theme: theme)
+    }
+
+    private func frame(from canvas: Canvas, selection: SelectableCell?, theme: Theme) -> CellGrid {
+        if let selection {
+            return canvas.grid.highlighting(selection, in: canvas.selectableCells, style: theme.selection)
         }
         return canvas.grid
     }
@@ -184,8 +203,10 @@ final class FrameRenderer {
         func resolved(_ role: TextRole, state: TextRole? = nil) -> TextStyle {
             context.resolved(role, state: state)
         }
-        func write(_ text: String, _ row: Int, _ col: Int = 0, style: TextStyle? = nil) {
-            context.write(text, row: row, column: col, style: style, canvas: &canvas)
+        let selectable = nodeTextLayouts.tracksSource && active && element.isTextSelectable
+        func write(_ text: String, _ row: Int, _ col: Int = 0, style: TextStyle? = nil, sourceMap: TextSourceMap? = nil) {
+            let selection = sourceMap.map { Canvas.SelectionSource.mapped(ObjectIdentifier(node), $0) }
+            context.write(text, row: row, column: col, style: style, canvas: &canvas, selection: selection)
         }
         switch element.kind {
         case .component: preconditionFailure("Resolve components with ComponentApplication before rendering")
@@ -195,16 +216,18 @@ final class FrameRenderer {
         case let .text(text):
             let line = String(text.prefix(100000).prefix { $0 != "\n" && $0 != "\r" && $0 != "\r\n" })
             let truncated = metrics.truncate(line, width: contentWidth)
-            write(truncated, 0, allocation.alignedOffset(contentWidth - metrics.cellLength(truncated), element.alignment))
+            let offset = allocation.alignedOffset(contentWidth - metrics.cellLength(truncated), element.alignment)
+            write(truncated, 0, offset, sourceMap: selectable ? sourceMap(for: truncated, in: line) : nil)
         case let .paragraph(text):
-            let lines = nodeTextLayouts.layout(text, width: contentWidth, retaining: node).lines
+            let layout = nodeTextLayouts.layout(text, width: contentWidth, retaining: node)
+            let lines = layout.lines
             let first = max(0, canvas.visibleRows.lowerBound - originY)
             let end = min(lines.count, contentHeight, canvas.visibleRows.upperBound - originY)
             if first < end {
                 for index in first ..< end {
                     let line = lines[index]
                     let offset = element.alignment == nil ? 0 : allocation.alignedOffset(contentWidth - metrics.cellLength(line), element.alignment)
-                    write(line, index, offset)
+                    write(line, index, offset, sourceMap: selectable ? layout.sourceMaps?[index] : nil)
                 }
             }
         case let .styledParagraph(spans):
@@ -214,12 +237,11 @@ final class FrameRenderer {
             guard first < end else { break }
             for row in first ..< end {
                 let line = lines[row]
-                let length = line.reduce(0) { $0 + max(1, CellWidth.width(of: $1.character)) }
-                var column = allocation.alignedOffset(contentWidth - length, element.alignment)
-                for item in line {
-                    let span = spans[item.spanIndex]
-                    write(String(item.character), row, column, style: span.style.applying(to: resolved(span.role)))
-                    column += max(1, CellWidth.width(of: item.character))
+                let offset = allocation.alignedOffset(contentWidth - line.width, element.alignment)
+                for run in line.runs {
+                    let span = spans[run.spanIndex]
+                    write(run.text, row, offset + run.column, style: span.style.applying(to: resolved(span.role)),
+                          sourceMap: selectable ? run.sourceMap : nil)
                 }
             }
         case let .button(title, id):
@@ -280,7 +302,9 @@ final class FrameRenderer {
             for row in 0 ..< inner.grid.height where canvas.visibleRows.contains(originY + row) {
                 for column in 0 ..< inner.grid.width {
                     guard let cell = inner.grid[column, row], cell.width > 0 else { continue }
-                    canvas.write(cell.grapheme, x: originX + column, y: originY + row, style: cell.style, clipWidth: contentWidth - column)
+                    let selection = inner.selectableCells[row]?[column].map(Canvas.SelectionSource.cell)
+                    canvas.write(cell.grapheme, x: originX + column, y: originY + row, style: cell.style,
+                                 clipWidth: contentWidth - column, selection: selection)
                 }
             }
         case .custom:
@@ -395,5 +419,14 @@ final class FrameRenderer {
                 enabled: active,
             )
         }
+    }
+
+    private func sourceMap(for drawn: String, in original: String) -> TextSourceMap {
+        // The ellipsis added by truncation is decoration.
+        let content = drawn == original ? drawn[...] : drawn.dropLast()
+        var map = TextSourceMap()
+        let count = content.utf8.count
+        map.append(byteCount: count, source: 0 ..< count)
+        return map
     }
 }
