@@ -75,11 +75,17 @@ State assignments are synchronous; rendering updates are scheduled automatically
 
 Attach `.onActivate { ... }` to buttons and `.onSubmit { ... }` to input or collection controls. An editor with a submit handler uses Enter to submit and Shift+Enter for a newline when the terminal distinguishes those keys. Multiline paste inserts text without submitting.
 
-Buttons need an explicit `id:` only when you need to look them up or address a named action. Add a modified shortcut with `.keyboardShortcut(.controlP)` to activate a button from elsewhere in the active screen or dialog.
+Buttons need an explicit `id:` only when you need to look them up or address a named action.
+
+`List` and `Table` manage selection locally when you omit `selection:`. Pass a binding when another view needs the selected value. `initialSelection:` seeds local selection when the control first appears.
+
+### Keyboard shortcuts and overlays
+
+Use `.keyboardShortcut(.controlP)` to activate a button from any focused control on the active screen or dialog. An overlay suspends shortcuts on the content it covers, and an active dialog restricts shortcuts to its own contents.
 
 Button shortcuts accept `.altCharacter(...)` and `.controlCharacter(...)` with printable ASCII (space through `~`), plus `.controlC`, `.controlD` and `.controlP`. The character forms for Control-c/d/p are aliases for those dedicated events. Unsupported declarations, including plain characters, Enter, Tab, Escape, paste and modified Unicode characters, fail a precondition with an explanatory message. Modified character shortcuts require distinct reporting from the terminal.
 
-`List` and `Table` manage selection locally when you omit `selection:`. Pass a binding when another view needs the selected value. `initialSelection:` seeds local selection when the control first appears.
+To handle a key across overlays, use `.onAction` on the root view that contains them. The handler can match `.unhandledKey(...)` after shortcut and control routing, provided a nearer `.onAction` handler has left the action unclaimed. Return `true` to consume the action or `false` to let it continue bubbling. In the example below, Alt+M toggles the menu whether it is open or closed.
 
 ## Menus and pane navigation
 
@@ -121,6 +127,11 @@ struct NavigationWorkspace: TerminalView {
                     .onActivate { commandsOpen = false }
                     .onDismiss { commandsOpen = false }
             }
+        }
+        .onAction { action in
+            guard case .unhandledKey(.altCharacter("m")) = action else { return false }
+            commandsOpen.toggle()
+            return true
         }
     }
 }

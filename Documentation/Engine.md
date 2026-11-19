@@ -74,11 +74,13 @@ Raw menus use `MenuItem` values and application-owned search and selection.
 
 A menu bar's `selection` marks the current destination separately from `focusedItem`. Searchable menus filter titles; Escape emits `.dismissRequested(id)`, while their Return button emits `.activated(id + ".back")`. Close the overlay in response to either dismissal action.
 
-Set `MenuItem.shortcut` for a local character shortcut and `globalShortcuts` for modified keys that work elsewhere in the active screen. A global shortcut emits an action; the application chooses whether to move focus. Dialogs restrict global shortcuts to their contents. Duplicate shortcuts take the first matching item; an unavailable match does not fall through.
+Set `MenuItem.shortcut` for a local character shortcut and `globalShortcuts` for modified keys that work elsewhere in the active screen. A global shortcut emits an action; the application chooses whether to move focus. An overlay suspends shortcuts on the content it covers, and an active dialog restricts shortcuts to its own contents. Duplicate shortcuts take the first matching item; an unavailable match does not fall through.
 
 `globalShortcuts` accepts Alt/Control printable ASCII characters (space through `~`) and `.controlC`, `.controlD`, `.controlP`. `.controlCharacter("c")`, `"d"` and `"p"` normalize to those dedicated events. Unsupported events fail a precondition when the `MenuItem` is initialized, with a message describing supported keys. Modified characters require distinct terminal reporting.
 
 `.onKey(key, activate: id)` binds a key on the focused control. Paste, Tab traversal and dialog Escape retain their built-in meanings.
+
+To handle a key across overlays, match `.unhandledKey(key)` in `TerminalApplication.handle(_:)`. This action is emitted when shortcut and control routing leave the key unhandled. TerminalUI receives keys through the controlling terminal, so shortcuts depend on the terminal forwarding the key.
 
 ## Custom widgets and layouts
 
