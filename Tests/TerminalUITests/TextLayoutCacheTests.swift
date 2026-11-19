@@ -57,6 +57,44 @@ struct TextLayoutCacheTests {
         #expect(engine.textLayoutCount == 5)
     }
 
+    @Test func `long tab-indented styled paragraphs wrap once across viewport repaints`() {
+        let spans = (0 ..< 3400).flatMap { line in
+            [
+                TextSpan("\t\t\t\t\t\t\t\t"),
+                TextSpan("let", role: .syntaxKeyword),
+                TextSpan(" value\(line) = "),
+                TextSpan("\(line)", role: .warning),
+                TextSpan("\n"),
+            ]
+        }
+        let theme = Theme.dark
+        let engine = UIEngine(theme: theme)
+        let root = Element.scrollView(id: "code", content: .paragraph(spans))
+        let top = engine.renderGrid(root, width: 80, height: 8)
+        #expect(top.lines[0].hasPrefix(String(repeating: " ", count: 32) + "let value0 = 0"))
+        #expect(top[32, 0]?.style.foreground == theme.syntaxKeyword.foreground)
+        #expect(engine.textLayoutCount == 1)
+
+        #expect(engine.handleEvent(.end, in: root) == .repaint)
+        let bottom = engine.repaintGrid(width: 80, height: 8)
+        #expect(bottom.lines[6].contains("let value3399 = 3399"))
+        #expect(bottom[32, 6]?.style.foreground == theme.syntaxKeyword.foreground)
+
+        #expect(engine.handleEvent(.home, in: root) == .repaint)
+        #expect(engine.repaintGrid(width: 80, height: 8) == top)
+        #expect(engine.textLayoutCount == 1)
+    }
+
+    @Test func `batched styled runs preserve graphemes around expanded tabs and wrap points`() {
+        let engine = UIEngine()
+        let spans = [TextSpan("\t\u{0301}界"), TextSpan("\u{0301}x")]
+        let grid = engine.renderGrid(.paragraph(spans), width: 9, height: 1)
+        #expect(grid.lines == ["    �界�x"])
+        #expect(grid[5, 0]?.width == 2)
+        #expect(grid[6, 0]?.width == 0)
+        #expect(engine.render(.paragraph([TextSpan("abc d\u{00a0}e")]), width: 6, height: 2) == ["abc   ", "de    "])
+    }
+
     @Test func `cache evicts least recently used layouts within its byte budget`() {
         let cache = TextLayoutCache(budget: 100)
         #expect(cache.layout("one", width: 8).lines == ["one"])

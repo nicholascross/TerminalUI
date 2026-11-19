@@ -18,6 +18,7 @@ let package = Package(
         .executable(name: "RepositoryDemo", targets: ["RepositoryDemo"]),
         .executable(name: "LayoutDemo", targets: ["LayoutDemo"]),
         .executable(name: "EngineDemo", targets: ["EngineDemo"]),
+        .executable(name: "HighlightedScrollDemo", targets: ["HighlightedScrollDemo"]),
     ],
     dependencies: [
         .package(url: "https://github.com/onevcat/Chroma.git", from: "0.3.1"),
@@ -61,6 +62,12 @@ let package = Package(
         .target(name: "LayoutDemoSupport", dependencies: ["TerminalUI"], path: "Examples/LayoutDemo/Support"),
         .executableTarget(name: "LayoutDemo", dependencies: ["LayoutDemoSupport", "TerminalUI"], path: "Examples/LayoutDemo/App"),
         .executableTarget(name: "EngineDemo", dependencies: ["TerminalUIEngine"], path: "Examples/EngineDemo", exclude: ["README.md"]),
+        .executableTarget(
+            name: "HighlightedScrollDemo",
+            dependencies: ["TerminalUIChroma", "TerminalUIEngine"],
+            path: "Examples/HighlightedScrollDemo",
+            exclude: ["README.md"],
+        ),
         .testTarget(name: "TerminalUIComponentRuntimeTests", dependencies: ["TerminalUIComponentRuntime"]),
         .testTarget(name: "TerminalUIComponentsTests", dependencies: ["TerminalUI", "TerminalUIEngine", "TerminalUIBridge", "TerminalUIRuntime", "TerminalUILayoutEngine"]),
         .testTarget(name: "TerminalUIComponentMacrosTests", dependencies: ["TerminalUIComponentMacroSupport", .product(name: "SwiftSyntaxMacrosTestSupport", package: "swift-syntax")]),

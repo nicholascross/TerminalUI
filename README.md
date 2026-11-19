@@ -121,6 +121,8 @@ swift run RepositoryDemo --repo /path/to/repository
 
 The [layout demo](Examples/LayoutDemo/README.md) is a starting point for composing your own screen. The [repository browser](Examples/RepositoryDemo/README.md) shows how to organise a larger application into views and shared state.
 
+The [highlighted scroll demo](Examples/HighlightedScrollDemo/README.md) shows a long Swift document with syntax highlighting and includes a scroll benchmark.
+
 ![The repository browser with branches, commits, files and a detail inspector](Documentation/Images/repository-browser.png)
 
 ## Learn more
