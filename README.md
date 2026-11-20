@@ -18,6 +18,8 @@ Requires **Swift 6.3**. Add the `TerminalUI` library product to your Swift Packa
 
 This notes app binds an editor to a live preview. The draft panel grows to eight rows, while the preview fills the remaining space and scrolls when needed.
 
+Enter submits the draft and clears the editor. The preview shows the last submitted note until you start typing again. Use Shift+Enter for a newline when your terminal reports it as a distinct key.
+
 ```swift
 import TerminalUI
 
@@ -32,6 +34,7 @@ struct NotesApp {
 @TerminalComponent
 struct NotesView: TerminalView {
     @State private var draft = ""
+    @State private var submittedNote: String?
     @ApplicationContext private var application
 
     var body: some TerminalView {
@@ -45,16 +48,21 @@ struct NotesView: TerminalView {
             Panel("Draft") {
                 TextEditor(id: "draft", text: $draft)
                     .initialFocus()
+                    .onSubmit {
+                        guard !draft.isEmpty else { return }
+                        submittedNote = draft
+                        draft = ""
+                    }
             }
             .height(.fit(maximum: 8))
 
             Panel("Preview") {
                 ScrollView(id: "preview") {
-                    Paragraph(draft.isEmpty ? "Your notes appear here." : draft)
+                    Paragraph(draft.isEmpty ? (submittedNote ?? "Your notes appear here.") : draft)
                 }
             }
 
-            StatusBar("Tab: move focus · Shift+Enter: new line")
+            StatusBar("Tab: move focus · Enter: submit · Shift+Enter: new line")
         }
     }
 }
