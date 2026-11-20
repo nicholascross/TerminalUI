@@ -6,6 +6,25 @@ import Testing
 
 struct TextLayoutCacheTests {
     @Test(arguments: [false, true])
+    func `no wrap measures its intrinsic width and source row count at every proposal`(styled: Bool) {
+        let cache = TextLayoutCache()
+        let measurement = LayoutMeasurer(textLayouts: NodeTextLayouts(cache: cache), metrics: TextMetrics())
+        let paragraph = styled ? Element.paragraph([TextSpan("abcdefghij\nxy")]) : .paragraph("abcdefghij\nxy")
+        let node = LayoutNode(paragraph.wrapping(false))
+        for width in [3, 6] {
+            let (columns, rows) = measurement.measure(node, width: width, theme: Theme())
+            #expect(columns == 10)
+            #expect(rows == 2)
+        }
+        #expect(cache.layoutCount == 1)
+        node.update(paragraph)
+        let (columns, rows) = measurement.measure(node, width: 3, theme: Theme())
+        #expect(columns == 3)
+        #expect(rows == 5)
+        #expect(cache.layoutCount == 2)
+    }
+
+    @Test(arguments: [false, true])
     func `scrolling rebuilt content reuses offscreen wrapping`(styled: Bool) {
         func view() -> Element {
             .scrollView(id: "sheet", content: .column(spacing: 1, (0 ..< 12).map { index in

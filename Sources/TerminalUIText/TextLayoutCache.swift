@@ -4,9 +4,16 @@ import TerminalUICore
 package final class TextLayoutCache {
     struct Key: Hashable {
         let texts: [String]
-        let width: Int
+        let width: Int?
         let styled: Bool
         let tracksSource: Bool
+
+        static func == (lhs: Self, rhs: Self) -> Bool {
+            // Source maps use UTF-8 offsets, which can differ for canonically equivalent strings.
+            lhs.width == rhs.width && lhs.styled == rhs.styled && lhs.tracksSource == rhs.tracksSource
+                && lhs.texts.count == rhs.texts.count
+                && zip(lhs.texts, rhs.texts).allSatisfy { $0.utf8.elementsEqual($1.utf8) }
+        }
     }
 
     package enum Layout {
@@ -63,7 +70,7 @@ package final class TextLayoutCache {
         return wrapped
     }
 
-    package func entry(_ text: String, width: Int, tracksSource: Bool = false, reusing cached: Entry? = nil) -> Entry {
+    package func entry(_ text: String, width: Int?, tracksSource: Bool = false, reusing cached: Entry? = nil) -> Entry {
         if let cached, cached.key.width == width, !cached.key.styled, cached.key.tracksSource == tracksSource {
             touch(cached)
             return cached
@@ -78,7 +85,7 @@ package final class TextLayoutCache {
         return wrapped
     }
 
-    package func entry(_ spans: [TextSpan], width: Int, tracksSource: Bool = false, reusing cached: Entry? = nil) -> Entry {
+    package func entry(_ spans: [TextSpan], width: Int?, tracksSource: Bool = false, reusing cached: Entry? = nil) -> Entry {
         if let cached, cached.key.width == width, cached.key.styled, cached.key.tracksSource == tracksSource {
             touch(cached)
             return cached

@@ -37,6 +37,7 @@ public struct Element {
     package var isVisible = true
     package var isEnabled = true
     package var isTextSelectable = false
+    package var wrapsParagraph = true
     package var submitID: String?
     package var menuResultsID: String?
     package var dismissalButtonID: String?
@@ -62,6 +63,17 @@ public struct Element {
     public static func text(_ value: String) -> Self { .init(kind: .text(value)) }
     public static func paragraph(_ value: String) -> Self { .init(kind: .paragraph(value)) }
     public static func paragraph(_ spans: [TextSpan]) -> Self { .init(kind: .styledParagraph(spans)) }
+    /// Set to false to give each source line one row and clip overflow at the right edge.
+    public func wrapping(_ enabled: Bool) -> Self {
+        switch kind {
+        case .paragraph, .styledParagraph:
+            var copy = self
+            copy.wrapsParagraph = enabled
+            return copy
+        default:
+            return self
+        }
+    }
     public static func statusBar(_ value: String) -> Self { .text(value).role(.secondary) }
     public static func column(spacing: Int = 0, _ children: [Self]) -> Self { .init(kind: .column(max(0, spacing), children)) }
     public static func row(spacing: Int = 0, _ children: [Self]) -> Self { .init(kind: .row(max(0, spacing), children)) }

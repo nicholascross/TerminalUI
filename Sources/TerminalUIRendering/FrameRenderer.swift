@@ -93,13 +93,16 @@ final class FrameRenderer {
         invalidate()
     }
 
-    func updateTree(_ element: Element) {
+    @discardableResult
+    func updateTree(_ element: Element) -> LayoutNode {
         invalidate()
         if let layoutRoot {
             layoutRoot.update(element)
-        } else {
-            layoutRoot = LayoutNode(element, statistics: statistics)
+            return layoutRoot
         }
+        let root = LayoutNode(element, statistics: statistics)
+        layoutRoot = root
+        return root
     }
 
     /// Paints without reconciling elements or invalidating measurements.
@@ -216,6 +219,11 @@ final class FrameRenderer {
             let selection = sourceMap.map { Canvas.SelectionSource.mapped(ObjectIdentifier(node), $0) }
             context.write(text, row: row, column: col, style: style, canvas: &canvas, selection: selection)
         }
+        func extendClippedLineSelection(_ row: Int, sourceMap: TextSourceMap?) {
+            guard !element.wrapsParagraph, selectable, let end = sourceMap?.sourceEnd else { return }
+            canvas.extendSelection(through: end, owner: ObjectIdentifier(node), row: originY + row,
+                                   columns: originX ..< originX + contentWidth)
+        }
         if let stack = measurement.resizableStack(of: node, theme: theme) {
             let plan = stack.plan(LayoutProposal(width: contentWidth, height: contentHeight))
             paintLayoutChildren(node, placements: plan.placements, context: context, canvas: &canvas, environment: environment,
@@ -244,7 +252,9 @@ final class FrameRenderer {
                 for index in first ..< end {
                     let line = lines[index]
                     let offset = element.alignment == nil ? 0 : allocation.alignedOffset(contentWidth - metrics.cellLength(line), element.alignment)
-                    write(line, index, offset, sourceMap: selectable ? layout.sourceMaps?[index] : nil)
+                    let sourceMap = selectable ? layout.sourceMaps?[index] : nil
+                    write(line, index, offset, sourceMap: sourceMap)
+                    extendClippedLineSelection(index, sourceMap: sourceMap)
                 }
             }
         case let .styledParagraph(spans):
@@ -256,10 +266,12 @@ final class FrameRenderer {
                 let line = lines[row]
                 let offset = allocation.alignedOffset(contentWidth - line.width, element.alignment)
                 for run in line.runs {
+                    if offset + run.column >= contentWidth { break }
                     let span = spans[run.spanIndex]
                     write(run.text, row, offset + run.column, style: span.style.applying(to: resolved(span.role)),
                           sourceMap: selectable ? run.sourceMap : nil)
                 }
+                extendClippedLineSelection(row, sourceMap: line.runs.last?.sourceMap)
             }
         case let .button(title, id):
             let role: TextRole = if case .normal = element.textRole { .action } else { element.textRole }

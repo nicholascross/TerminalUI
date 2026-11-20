@@ -7,11 +7,25 @@ import TerminalUIText
 package final class PointerRouter {
     private struct Drag {
         let start: MouseEvent
-        let anchor: SelectableCell
-        let target: LayoutNode
-        let viewports: [LayoutNode]
+        let anchor: Range<Int>
         var position: MouseEvent?
         var hasScrolled = false
+        var needsEndpointRefresh = false
+    }
+
+    private struct SelectionTarget {
+        let node: LayoutNode
+        let element: Element
+        let viewports: [LayoutNode]
+
+        init(node: LayoutNode, path: [LayoutNode]) {
+            self.node = node
+            element = node.element
+            viewports = path.filter {
+                if case .scroll = $0.element.kind { return true }
+                return false
+            }
+        }
     }
 
     private struct ScrollStep {
@@ -40,6 +54,7 @@ package final class PointerRouter {
     private var size: WidgetSize?
     private var pressedMouseTarget: (control: String, item: String?, modal: String?)?
     private var drag: Drag?
+    private var selectionTarget: SelectionTarget?
     private var panelDrag: PanelDrag?
     package private(set) var textSelection: SelectableCell?
 
@@ -51,9 +66,9 @@ package final class PointerRouter {
     }
 
     @discardableResult
-    package func cancelPress() -> LayoutNode? {
+    package func cancelPress(preservingSelection: Bool = false) -> LayoutNode? {
         pressedMouseTarget = nil
-        clearSelection()
+        if !preservingSelection { clearSelection() }
         return cancelPanelDrag()
     }
 
@@ -68,9 +83,57 @@ package final class PointerRouter {
         return panelDrag.node
     }
 
-    package func clearSelection() {
+    private func clearSelection() {
         drag = nil
+        selectionTarget = nil
         textSelection = nil
+    }
+
+    package func reconcileSelection(in root: LayoutNode) {
+        guard let target = selectionTarget else { return }
+        let old = target.element
+        let retained = selectionPath(in: root) {
+            $0 === target.node && $0.element.visibilityID == old.visibilityID
+                && $0.element.compositionPath == old.compositionPath
+        }
+        let path = retained ?? old.visibilityID.flatMap { id in
+            guard let path = selectionPath(in: root, matching: { $0.element.visibilityID == id }),
+                  let match = path.last,
+                  selectionPath(in: root, matching: { $0 !== match && $0.element.visibilityID == id }) == nil else { return nil }
+            return path
+        }
+        guard let path, let node = path.last, canHit(path, modal: mouseModalID(root.element)),
+              hasSameSelectionSource(old, node.element) else {
+            clearSelection()
+            return
+        }
+        selectionTarget = SelectionTarget(node: node, path: path)
+        if let textSelection {
+            self.textSelection = SelectableCell(owner: ObjectIdentifier(node), source: textSelection.source)
+        }
+    }
+
+    private func selectionPath(in node: LayoutNode, matching matches: (LayoutNode) -> Bool) -> [LayoutNode]? {
+        guard node.element.isVisible, node.element.isEnabled else { return nil }
+        if node.element.isTextSelectable, matches(node) { return [node] }
+        for child in mouseChildren(of: node) {
+            if let path = selectionPath(in: child, matching: matches) { return [node] + path }
+        }
+        return nil
+    }
+
+    private func hasSameSelectionSource(_ old: Element, _ new: Element) -> Bool {
+        switch (old.kind, new.kind) {
+        case let (.text(a), .text(b)), let (.paragraph(a), .paragraph(b)):
+            return a.utf8.elementsEqual(b.utf8)
+        case let (.styledParagraph(a), .styledParagraph(b)):
+            if a.count == b.count, zip(a, b).allSatisfy({ $0.text.utf8.elementsEqual($1.text.utf8) }) { return true }
+            return a.lazy.flatMap { $0.text.utf8 }.elementsEqual(b.lazy.flatMap { $0.text.utf8 })
+        case let (.paragraph(text), .styledParagraph(spans)), let (.styledParagraph(spans), .paragraph(text)):
+            return text.utf8.elementsEqual(spans.lazy.flatMap { $0.text.utf8 })
+        default:
+            return false
+        }
     }
 
     @discardableResult
@@ -103,9 +166,14 @@ package final class PointerRouter {
         }
         let wheel = mouse.kind == .scrollUp || mouse.kind == .scrollDown
         if mouse.kind == .press { clearSelection() }
-        if wheel, drag != nil {
-            drag?.position = mouse
-            return scrollSelection(wheelRows: mouse.kind == .scrollUp ? -3 : 3)
+        if wheel, let drag {
+            self.drag?.position = mouse
+            let outcome = scrollSelection(wheelRows: mouse.kind == .scrollUp ? -3 : 3)
+            if case .unchanged = outcome, drag.position?.column != mouse.column || drag.position?.row != mouse.row {
+                refreshSelection(in: geometry)
+                return .textSelection(copy: nil)
+            }
+            return outcome
         }
         if mouse.button == .primary, let drag, mouse.kind == .drag || mouse.kind == .release {
             return updateSelection(drag, at: mouse, geometry: geometry)
@@ -135,11 +203,8 @@ package final class PointerRouter {
            let anchor = geometry.selectableCell(at: mouse),
            let target = path.last, ObjectIdentifier(target) == anchor.owner {
             pressedMouseTarget = nil
-            let viewports = path.filter {
-                if case .scroll = $0.element.kind { return true }
-                return false
-            }
-            drag = Drag(start: mouse, anchor: anchor, target: target, viewports: viewports)
+            selectionTarget = SelectionTarget(node: target, path: path)
+            drag = Drag(start: mouse, anchor: anchor.source)
             return .textSelection(copy: nil)
         }
         let target = path.reversed().first { isMouseControl($0.element) }
@@ -232,30 +297,41 @@ package final class PointerRouter {
 
     private func updateSelection(_ drag: Drag, at mouse: MouseEvent, geometry: RenderedGeometry) -> InteractionOutcome {
         self.drag?.position = mouse
-        refreshSelection(in: geometry)
+        if drag.position?.column != mouse.column || drag.position?.row != mouse.row || drag.needsEndpointRefresh {
+            refreshSelection(in: geometry)
+        }
         guard mouse.kind == .release else { return .textSelection(copy: nil) }
         self.drag = nil
-        let text = textSelection.flatMap { selectionText(in: drag.target.element, range: $0.source) }
+        let text = textSelection.flatMap { selection in
+            selectionTarget.flatMap { selectionText(in: $0.node.element, range: selection.source) }
+        }
+        if textSelection == nil { selectionTarget = nil }
         return .textSelection(copy: text)
     }
 
-    /// Resolve the live end of the drag against the latest frame, keeping the source anchor fixed.
-    package func refreshSelection(in geometry: RenderedGeometry) {
-        guard let drag, let position = drag.position else { return }
+    /// Scrolling moves the source under a stationary pointer. Other repaints preserve the source range.
+    package func refreshScrolledSelection(in geometry: RenderedGeometry) {
+        if drag?.needsEndpointRefresh == true { refreshSelection(in: geometry) }
+    }
+
+    private func refreshSelection(in geometry: RenderedGeometry) {
+        guard let drag, let position = drag.position, let target = selectionTarget else { return }
+        self.drag?.needsEndpointRefresh = false
         let atStart = position.column == drag.start.column && position.row == drag.start.row
         if atStart, !drag.hasScrolled {
             textSelection = nil
             return
         }
         // A viewport can briefly contain only blank lines of the selected text.
-        guard let endpoint = geometry.selectionEndpoint(for: drag.anchor.owner, at: position) else { return }
-        let anchor = drag.anchor.source
+        let owner = ObjectIdentifier(target.node)
+        guard let endpoint = geometry.selectionEndpoint(for: owner, at: position) else { return }
+        let anchor = drag.anchor
         if atStart, endpoint.source == anchor {
             textSelection = nil
             return
         }
         let range = min(anchor.lowerBound, endpoint.source.lowerBound) ..< max(anchor.upperBound, endpoint.source.upperBound)
-        textSelection = SelectableCell(owner: drag.anchor.owner, source: range)
+        textSelection = SelectableCell(owner: owner, source: range)
     }
 
     package var canAutoscrollSelection: Bool {
@@ -267,15 +343,17 @@ package final class PointerRouter {
     }
 
     private func scrollSelection(wheelRows: Int?) -> InteractionOutcome {
-        guard let drag, let step = selectionScrollStep(drag, wheelRows: wheelRows) else { return .unchanged }
+        guard let drag, let target = selectionTarget,
+              let step = selectionScrollStep(drag, wheelRows: wheelRows) else { return .unchanged }
         self.drag?.hasScrolled = true
-        return applyScroll(step, along: drag.viewports)
+        self.drag?.needsEndpointRefresh = true
+        return applyScroll(step, along: target.viewports)
     }
 
     private func selectionScrollStep(_ drag: Drag, wheelRows: Int?) -> ScrollStep? {
         guard let position = drag.position, wheelRows != nil || position.kind == .drag,
-              let bounds = drag.target.mouse?.bounds else { return nil }
-        for viewport in drag.viewports.reversed() {
+              let target = selectionTarget, let bounds = target.node.mouse?.bounds else { return nil }
+        for viewport in target.viewports.reversed() {
             guard let clip = viewport.mouse?.clip, clip.height > 0 else { continue }
             let bottom = clip.row + clip.height
             let rows: Int
@@ -328,16 +406,16 @@ package final class PointerRouter {
 
     private func mousePath(_ node: LayoutNode, at mouse: MouseEvent) -> [LayoutNode] {
         guard let geometry = node.mouse, geometry.clip.contains(mouse) else { return [] }
-        let children: [LayoutNode] = if case .overlay = node.element.kind {
-            Array(node.children.suffix(1))
-        } else {
-            node.children
-        }
-        for child in children.reversed() {
+        for child in mouseChildren(of: node).reversed() {
             let path = mousePath(child, at: mouse)
             if !path.isEmpty { return [node] + path }
         }
         return [node]
+    }
+
+    private func mouseChildren(of node: LayoutNode) -> ArraySlice<LayoutNode> {
+        if case .overlay = node.element.kind { return node.children.suffix(1) }
+        return node.children[...]
     }
 
     private func isMouseControl(_ element: Element) -> Bool {

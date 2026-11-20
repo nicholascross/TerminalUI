@@ -43,7 +43,7 @@ package struct LayoutMeasurer {
             measured = (min(available, metrics.cellLength(String(text.prefix(100000).prefix { $0 != "\n" && $0 != "\r" && $0 != "\r\n" }))), 1)
         case let .paragraph(text):
             let layout = textLayouts.layout(text, width: available, retaining: node)
-            measured = (min(available, layout.width), layout.lines.count)
+            measured = (element.wrapsParagraph ? min(available, layout.width) : layout.width, layout.lines.count)
         case let .styledParagraph(spans):
             let layout = textLayouts.layout(spans, width: available, retaining: node)
             measured = (layout.width, layout.lines.count)

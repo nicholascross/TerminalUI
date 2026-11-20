@@ -131,6 +131,8 @@ For [panel resizing](Layout.md#resizing-panels-with-the-mouse), enable `mouseDra
 
 To copy on mouse release, set `TerminalConfiguration(mouseEnabled: true, copyOnSelect: true)` and opt individual text elements in with `Element.text(value).textSelection()` or `Element.paragraph(spans).textSelection()`. Start the drag on visible text within an opted-in element. To select beyond the viewport, hold the pointer at its top or bottom edge or use the mouse wheel during the drag. The selection stays within the starting element and clears on resize. The copy preserves source whitespace and line breaks across visual wraps. Clipboard delivery uses OSC 52 and depends on the attached terminal and any multiplexer allowing clipboard writes.
 
+Use `.wrapping(false)` on a plain or styled paragraph to keep one row per source line and clip at the right edge. A selection that reaches the right edge of a clipped row includes its hidden tail. Rebuilds preserve the selection while the same selectable element has the same source text.
+
 The host requires a controlling TTY and rejects `TERM=dumb`. It restores terminal settings on normal exit, cancellation and handled termination signals. Unicode widths and modified key reporting depend on the emulator; Shift+Enter requires distinct terminal reporting. Job-control suspension and full bidirectional text layout are not implemented. Text measurement is limited to 100,000 graphemes and scrollable content to 4,096 rows.
 
 ## Rendering without a terminal

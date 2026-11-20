@@ -132,10 +132,12 @@ package final class LayoutNode {
               element.panelResize == next.panelResize,
               element.hasExplicitWidth == next.hasExplicitWidth, element.hasExplicitHeight == next.hasExplicitHeight else { return false }
         switch (element.kind, next.kind) {
-        case let (.text(old), .text(new)), let (.paragraph(old), .paragraph(new)):
-            return old == new
+        case let (.text(old), .text(new)): return old == new
+        case let (.paragraph(old), .paragraph(new)):
+            return element.wrapsParagraph == next.wrapsParagraph && old.utf8.elementsEqual(new.utf8)
         case let (.styledParagraph(old), .styledParagraph(new)):
-            return old.count == new.count && zip(old, new).allSatisfy { $0.text == $1.text }
+            return element.wrapsParagraph == next.wrapsParagraph
+                && old.count == new.count && zip(old, new).allSatisfy { $0.text.utf8.elementsEqual($1.text.utf8) }
         case let (.column(old, _), .column(new, _)), let (.row(old, _), .row(new, _)):
             return old == new
         case let (.button(old, _), .button(new, _)): return old == new

@@ -14,6 +14,7 @@ package struct TextSourceMap {
     }
 
     package private(set) var spans: [Span] = []
+    package var sourceEnd: Int? { spans.last?.source.upperBound }
 
     package init() {}
 

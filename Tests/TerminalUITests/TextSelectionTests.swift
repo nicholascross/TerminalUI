@@ -3,6 +3,79 @@ import Testing
 
 struct TextSelectionTests {
     @Test(arguments: [false, true])
+    func `no wrap aligns with a gutter and copies clipped source through the right edge`(styled: Bool) {
+        let theme = Theme()
+        let engine = UIEngine(theme: theme, textSelectionEnabled: true)
+        let text = styled
+            ? Element.paragraph([TextSpan("abcde", role: .syntaxKeyword), TextSpan("TAIL\r"), TextSpan("\n\r\n\t界TAIL\n")])
+            : Element.paragraph("abcdeTAIL\r\n\r\n\t界TAIL\n")
+        let gutter = Element.paragraph("1\n2\n3\n4").width(.fixed(2))
+        let document = Element.row(spacing: 1, [gutter, text.wrapping(false).textSelection().width(.fill())])
+        let root = Element.column([.scrollView(id: "source", content: document), .text("End")])
+        let frame = engine.renderGrid(root, width: 8, height: 5)
+        #expect(frame.lines == ["1  abcde", "2       ", "3      �", "4       ", "End     "])
+        if styled { #expect(frame[3, 0]?.style == theme.syntaxKeyword) }
+
+        var copies: [String] = []
+        _ = engine.handleMouseEvent(.init(.press, column: 4, row: 0))
+        _ = engine.handleMouseEvent(.init(.release, column: 6, row: 0)) { copies.append($0) }
+        #expect(copies == ["bcd"])
+        _ = engine.handleMouseEvent(.init(.press, column: 4, row: 0))
+        _ = engine.handleMouseEvent(.init(.drag, column: 7, row: 2))
+        let highlighted = engine.repaintGrid(width: 8, height: 5)
+        #expect(highlighted[0, 1]?.style == frame[0, 1]?.style)
+        #expect(highlighted[7, 2]?.style == theme.selection)
+        _ = engine.handleMouseEvent(.init(.release, column: 7, row: 2)) { copies.append($0) }
+        #expect(copies == ["bcd", "bcdeTAIL\r\n\r\n\t界TAIL"])
+    }
+
+    @Test func `selection follows an identified paragraph in a rebuilt tree`() {
+        let engine = UIEngine(textSelectionEnabled: true)
+        let source = Element.paragraph("abcdef").textSelection().id("source")
+        let twin = source.id("twin")
+        let original = Element.column([source, twin])
+        let rebuilt = Element.column([
+            twin,
+            .paragraph([TextSpan("ab", role: .syntaxKeyword), TextSpan("cdef")]).textSelection().id("source"),
+        ])
+        _ = engine.renderGrid(original, width: 10, height: 2)
+        _ = engine.handleMouseEvent(.init(.press, column: 1, row: 0))
+        _ = engine.handleMouseEvent(.init(.drag, column: 3, row: 0))
+        let moved = engine.renderGrid(rebuilt, width: 10, height: 2)
+        #expect(moved[1, 0]?.style != engine.theme.selection)
+        #expect(moved[1, 1]?.style == engine.theme.selection)
+        #expect(moved[3, 1]?.style == engine.theme.selection)
+        #expect(moved[4, 1]?.style != engine.theme.selection)
+
+        var copies: [String] = []
+        _ = engine.handleMouseEvent(.init(.release, column: 3, row: 0)) { copies.append($0) }
+        #expect(copies == ["bcd"])
+        let returned = engine.renderGrid(original, width: 10, height: 2)
+        #expect(returned[1, 0]?.style == engine.theme.selection)
+        #expect(returned[1, 1]?.style != engine.theme.selection)
+        let removed = engine.renderGrid(.column([twin]), width: 10, height: 2)
+        #expect(removed[1, 0]?.style != engine.theme.selection)
+    }
+
+    @Test func `rebuilding with different source bytes cancels the drag and refreshes copy offsets`() {
+        let engine = UIEngine(textSelectionEnabled: true)
+        let original = Element.paragraph("éx").textSelection()
+        let decomposed = "e\u{301}x"
+        let rebuilt = Element.paragraph(decomposed).textSelection()
+        _ = engine.renderGrid(original, width: 10, height: 1)
+        _ = engine.handleMouseEvent(.init(.press, column: 0, row: 0))
+        _ = engine.handleMouseEvent(.init(.drag, column: 1, row: 0))
+        let changed = engine.renderGrid(rebuilt, width: 10, height: 1)
+        #expect(changed[0, 0]?.style != engine.theme.selection)
+        var copies: [String] = []
+        _ = engine.handleMouseEvent(.init(.release, column: 1, row: 0)) { copies.append($0) }
+        #expect(copies.isEmpty)
+        _ = engine.handleMouseEvent(.init(.press, column: 0, row: 0))
+        _ = engine.handleMouseEvent(.init(.release, column: 1, row: 0)) { copies.append($0) }
+        #expect(copies.map { Array($0.utf8) } == [Array(decomposed.utf8)])
+    }
+
+    @Test(arguments: [false, true])
     func `wrapped source is highlighted and copied through a panel border`(styled: Bool) {
         let theme = Theme()
         let engine = UIEngine(theme: theme, textSelectionEnabled: true)
@@ -93,6 +166,8 @@ struct TextSelectionTests {
         _ = engine.renderGrid(root, width: 10, height: 2)
         var copies: [String] = []
         _ = engine.handleMouseEvent(.init(.press, column: 1, row: 1))
+        engine.updateTree(root)
+        engine.prepareMouseInput(width: 10, height: 2)
         _ = engine.handleMouseEvent(.init(.scrollDown, column: 1, row: 1))
         let frame = engine.repaintGrid(width: 10, height: 2)
         #expect(frame.lines[0].hasPrefix("three"))

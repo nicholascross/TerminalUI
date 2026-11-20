@@ -103,6 +103,19 @@ public struct Canvas {
         }
     }
 
+    /// Selecting through the rightmost painted glyph of a clipped line reaches its source end.
+    package mutating func extendSelection(through sourceEnd: Int, owner: ObjectIdentifier, row: Int, columns: Range<Int>) {
+        let y = row - rowOffset
+        let visible = columns.clamped(to: 0 ..< width)
+        guard let column = visible.reversed().first(where: { selectableCells[y]?[$0]?.owner == owner }),
+              let cell = selectableCells[y]?[column], cell.source.upperBound < sourceEnd else { return }
+        let extended = SelectableCell(owner: owner, source: cell.source.lowerBound ..< sourceEnd)
+        selectableCells[y]?[column] = extended
+        if column > visible.lowerBound, grid[column, y]?.width == 0 {
+            selectableCells[y]?[column - 1] = extended
+        }
+    }
+
     public mutating func clear(x: Int, y: Int, width: Int, height: Int) {
         guard width > 0, height > 0 else { return }
         let startX = max(0, min(self.width, x))

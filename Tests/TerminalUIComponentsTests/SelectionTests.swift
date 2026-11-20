@@ -33,6 +33,23 @@ private struct Selections: TerminalView {
 
 @MainActor
 struct SelectionTests {
+    @Test func `host invalidation preserves a drag in a declarative no-wrap paragraph`() {
+        let source = ViewPresentation(root: Column {
+            TerminalUI.Paragraph("abcdefghij\nsecond").wrapping(false).textSelection()
+        })
+        let host = TerminalHost(configuration: .init(mouseEnabled: true, copyOnSelect: true))
+        #expect(host.preview(source, width: 6, height: 2) == ["abcdef", "second"])
+        host.handleInput(.mouse(.init(.press, column: 2, row: 0)), source: source)
+        host.handleInput(.mouse(.init(.drag, column: 5, row: 0)), source: source)
+        let revision = source.revision
+        host.invalidate()
+        _ = host.preview(source, width: 6, height: 2)
+        #expect(source.revision != revision)
+        var copies: [String] = []
+        host.handleInput(.mouse(.init(.release, column: 5, row: 0)), source: source) { copies.append($0) }
+        #expect(copies == ["cdefghij"])
+    }
+
     @Test(arguments: [false, true])
     func `text selection requires both host and view opt in`(copyOnSelect: Bool) {
         let source = ViewPresentation(root: Column {

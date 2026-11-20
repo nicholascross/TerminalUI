@@ -7,7 +7,7 @@ package struct WrappedText {
     package let sourceMaps: [TextSourceMap]?
     package let width: Int
 
-    package init(_ text: String, width available: Int, tracksSource: Bool = false) {
+    package init(_ text: String, width available: Int?, tracksSource: Bool = false) {
         let (lines, sourceMaps) = Self.wrap(text, width: available, tracksSource: tracksSource)
         self.lines = lines
         self.sourceMaps = sourceMaps
@@ -16,8 +16,8 @@ package struct WrappedText {
         }.max() ?? 0
     }
 
-    private static func wrap(_ text: String, width: Int, tracksSource: Bool) -> ([String], [TextSourceMap]?) {
-        guard width > 0 else { return ([], nil) }
+    private static func wrap(_ text: String, width: Int?, tracksSource: Bool) -> ([String], [TextSourceMap]?) {
+        if let width, width <= 0 { return ([], nil) }
         var lines: [String] = []
         var maps: [TextSourceMap]? = tracksSource ? [] : nil
         var line = ""
@@ -36,14 +36,14 @@ package struct WrappedText {
         for character in text.prefix(100000) {
             let start = sourceOffset
             if tracksSource { sourceOffset += character.utf8.count }
-            if character == "\n" || character == "\r" || character == "\r\n" {
+            if character == "\n" || character == "\r" || character == "\r\n" || (width == nil && character.isNewline) {
                 finishLine()
                 continue
             }
             let characters: [Character] = character == "\t" ? Array(repeating: " ", count: 4 - length % 4) : [character]
             for next in characters {
                 let charWidth = max(1, CellWidth.width(of: next))
-                if length > 0, length + charWidth > width {
+                if let width, length > 0, length + charWidth > width {
                     if next == " " {
                         finishLine()
                         continue

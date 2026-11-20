@@ -25,18 +25,19 @@ package struct WrappedStyledText {
     package let lines: [Line]
     package let width: Int
 
-    package init(_ texts: [String], width: Int, tracksSource: Bool = false) {
+    package init(_ texts: [String], width: Int?, tracksSource: Bool = false) {
         lines = Self.wrap(texts, width: width, tracksSource: tracksSource)
         self.width = lines.lazy.map(\.width).max() ?? 0
     }
 
-    private static func wrap(_ texts: [String], width: Int, tracksSource: Bool) -> [Line] {
-        guard width > 0 else { return [] }
+    private static func wrap(_ texts: [String], width: Int?, tracksSource: Bool) -> [Line] {
+        if let width, width <= 0 { return [] }
         var lines: [Line] = []
         var glyphs: [Glyph] = []
         var length = 0
         var processed = 0
         var sourceOffset = 0
+        var previousWasCR = false
 
         spans: for (spanIndex, text) in texts.enumerated() {
             var index = text.startIndex
@@ -49,7 +50,12 @@ package struct WrappedStyledText {
                 let sourceStart = sourceOffset
                 if tracksSource { sourceOffset += character.utf8.count }
 
-                if character == "\n" || character == "\r" || character == "\r\n" {
+                if width == nil {
+                    let continuesCRLF = previousWasCR && character == "\n"
+                    previousWasCR = character == "\r"
+                    if continuesCRLF { continue }
+                }
+                if character == "\n" || character == "\r" || character == "\r\n" || (width == nil && character.isNewline) {
                     lines.append(makeLine(glyphs[...], texts: texts))
                     glyphs.removeAll(keepingCapacity: true)
                     length = 0
@@ -66,7 +72,7 @@ package struct WrappedStyledText {
                 )
                 let count = isTab ? 4 - length % 4 : 1
                 for _ in 0 ..< count {
-                    if length > 0, length + glyph.width > width {
+                    if let width, length > 0, length + glyph.width > width {
                         if glyph.character == " " {
                             lines.append(makeLine(glyphs[...], texts: texts))
                             glyphs.removeAll(keepingCapacity: true)

@@ -129,10 +129,9 @@ public final class UIEngine {
     }
 
     package func updateTree(_ element: Element) {
-        pointer.clearSelection()
-        synchronizeFocus(element)
+        synchronizeFocus(element, preservingSelection: true)
         states.evictInactive(excluding: Set(tree.stateKeys(element)))
-        renderer.updateTree(element)
+        pointer.reconcileSelection(in: renderer.updateTree(element))
     }
 
     /// Paints the current tree without reconciling elements or invalidating measurements.
@@ -143,7 +142,7 @@ public final class UIEngine {
         func paint() -> CellGrid {
             renderer.renderGrid(width: width, height: height,
                                 environment: RenderEnvironment(theme: theme, focusedID: focusedID)) { geometry in
-                if let geometry { pointer.refreshSelection(in: geometry) }
+                if let geometry { pointer.refreshScrolledSelection(in: geometry) }
                 return pointer.textSelection
             }
         }
@@ -183,10 +182,12 @@ public final class UIEngine {
         return outcome.event
     }
 
-    private func synchronizeFocus(_ root: Element) {
+    private func synchronizeFocus(_ root: Element, preservingSelection: Bool = false) {
         if focusManager.synchronize(root) {
             states.resumeAutomaticVisibility()
-            cancelPointerPress()
+            if let restored = pointer.cancelPress(preservingSelection: preservingSelection) {
+                renderer.invalidateLayout(at: restored)
+            }
         }
     }
 
