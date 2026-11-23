@@ -1,11 +1,15 @@
+import Foundation
 import TerminalUI
 
 @TerminalComponent
 struct RepositoryBrowser: TerminalView {
     private enum Modal { case commands, help }
+    private enum RefreshNotice { case success(String), failure(String) }
 
     @Binding var model: RepositoryViewModel
     @State private var modal: Modal? = nil
+    @State private var refreshNotice: RefreshNotice? = nil
+    @State private var showingRefreshDetails = false
     @ApplicationContext private var application
 
     private var focusedPane: RepositoryPane? { application.focusedValue(of: RepositoryPane.self) }
@@ -30,11 +34,21 @@ struct RepositoryBrowser: TerminalView {
                 .id("workspace")
                 .height(.fill())
             Row(spacing: 1) {
-                Button("Refresh").onActivate { model.refresh() }
+                Button("Refresh").onActivate { refreshRepository() }
                 Button("Working diff").onActivate { model.showWorkingDiff() }
                 Button("Staged diff").onActivate { model.showStagedDiff() }
             }
             Column {
+                switch refreshNotice {
+                case .success(let id):
+                    Banner("Repository refreshed · read only", style: .success, timeout: .seconds(3), id: id)
+                case .failure:
+                    Banner("Couldn’t refresh the repository.", style: .error, action: .init("Details") {
+                        showingRefreshDetails = true
+                    })
+                case nil:
+                    EmptyView()
+                }
                 StatusBar(model.status)
                 Text(contextualHints).role(.secondary)
                 Text("Alt+1–4 panes · Ctrl-P menu · Tab focus · Ctrl-C quit").role(.secondary)
@@ -52,6 +66,17 @@ struct RepositoryBrowser: TerminalView {
                     .width(.fixed(min(68, size.columns)))
             }
         }
+        .choiceDialog(
+            id: "refresh-failure", title: "Repository refresh failed", message: refreshError,
+            isPresented: $showingRefreshDetails,
+            options: [.init(id: "retry", title: "Retry"), .init(id: "dismiss", title: "Dismiss")], initialOption: "retry",
+        ) { option in
+            if option.id == "retry" {
+                refreshRepository()
+            } else {
+                refreshNotice = nil
+            }
+        }
         .onAction { action in
             switch action {
             case .unhandledKey(.controlC): application.stop()
@@ -66,7 +91,7 @@ struct RepositoryBrowser: TerminalView {
     private func run(_ command: RepositoryCommand) {
         modal = nil
         switch command {
-        case .refresh: model.refresh()
+        case .refresh: refreshRepository()
         case .editFile: openEditor()
         case .workingDiff: model.showWorkingDiff()
         case .stagedDiff: model.showStagedDiff()
@@ -83,6 +108,18 @@ struct RepositoryBrowser: TerminalView {
         }
     }
 
+    private var refreshError: String {
+        if case .failure(let message) = refreshNotice { return message }
+        return ""
+    }
+
+    private func refreshRepository() {
+        switch model.refresh() {
+        case .success: refreshNotice = .success(UUID().uuidString)
+        case .failure(let error): refreshNotice = .failure(error.localizedDescription)
+        }
+    }
+
     private func openEditor() {
         guard let path = model.file else {
             model.status = "Select a file to open in the editor"
@@ -93,7 +130,7 @@ struct RepositoryBrowser: TerminalView {
             Task { @MainActor in
                 do {
                     try await application.runInTerminal("/bin/sh", arguments: arguments)
-                    model.refresh()
+                    refreshRepository()
                 } catch is CancellationError {
                     return
                 } catch {

@@ -14,6 +14,7 @@ swift run LayoutDemo
 | --- | --- |
 | Alt+1 / Alt+2 / Alt+3 | Focus Topics, Inspector or Command. |
 | Ctrl-P | Open the searchable command menu. |
+| Alt+N | Open notification examples. |
 | Alt+T | Switch to the light theme or restore the previous theme. |
 | Drag the marked right border of Topics | Resize the sidebar. |
 | Escape | Cancel the active drag or close the menu and restore focus. |
@@ -23,6 +24,8 @@ swift run LayoutDemo
 | Ctrl-C | Quit. |
 
 Focus starts on Topics. Selecting a topic updates the inspector; moving between panes preserves the selection and command draft. Pasted multiline text stays in the editor without submitting.
+
+Choose **Notifications** in the toolbar or press **Alt+N** to open a compact choice dialog. Use **Tab** and **Enter** to try an acknowledgement dialog with **OK**, or preview an info, success, warning, or error banner. Sample banners disappear after three seconds.
 
 Mouse clicks, wheel scrolling, and drag reports are enabled by default. Run `swift run LayoutDemo --no-mouse` to preserve normal terminal text selection. Control+1–3 also navigate when the terminal reports those combinations distinctly.
 

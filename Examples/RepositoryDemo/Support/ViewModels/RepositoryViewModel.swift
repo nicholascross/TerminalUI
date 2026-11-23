@@ -54,8 +54,9 @@ struct RepositoryViewModel {
         selectCommit(snapshot.commits[index + offset].hash)
     }
 
-    mutating func refresh() {
-        perform { model in
+    @discardableResult
+    mutating func refresh() -> Result<Void, Error> {
+        let result = perform { model in
             model.snapshot = try model.repository.snapshot()
             if !model.snapshot.files.contains(where: { $0.path == model.file }) {
                 model.file = model.snapshot.files.first?.path
@@ -74,12 +75,22 @@ struct RepositoryViewModel {
             case .branch: try model.inspectBranch()
             case .commit: try model.inspectCommit()
             }
-            model.status = "Repository refreshed · read only"
         }
+        if case .failure = result { status = "Showing last loaded data · read only" }
+        return result
     }
 
-    private mutating func perform(_ operation: (inout Self) throws -> Void) {
-        do { try operation(&self) } catch { status = "Git error: \(error.localizedDescription)" }
+    @discardableResult
+    private mutating func perform(_ operation: (inout Self) throws -> Void) -> Result<Void, Error> {
+        var next = self
+        do {
+            try operation(&next)
+            self = next
+            return .success(())
+        } catch {
+            status = "Git error: \(error.localizedDescription)"
+            return .failure(error)
+        }
     }
 
     private mutating func inspectFile(staged: Bool) throws {

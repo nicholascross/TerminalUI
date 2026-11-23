@@ -91,13 +91,21 @@ public struct Dialog<Content: TerminalView>: PrimitiveView {
     let id: String
     let title: String
     let content: Content
+    private let compact: Bool
     public init(id: String, title: String, @ViewBuilder content: () -> Content) {
+        self.init(id: id, title: title, compact: false, content: content)
+    }
+
+    /// A compact dialog displays over the workspace when used as the content of an overlay.
+    public init(id: String, title: String, compact: Bool, @ViewBuilder content: () -> Content) {
         self.id = id
         self.title = title
+        self.compact = compact
         self.content = content()
     }
     package func lower(path: [CompositionAddress]) -> [Element] {
         var element = Element.dialog(id: id, title: title, content: rootElement(lowerView(content, path: path)))
+        element.isCompactDialog = compact
         element.compositionPath = path
         return [element]
     }

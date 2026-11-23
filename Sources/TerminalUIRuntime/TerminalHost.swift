@@ -43,7 +43,7 @@ public final class TerminalHost {
     public init(configuration: TerminalConfiguration = .init(), theme: Theme = .init()) {
         self.configuration = configuration
         engine = UIEngine(theme: theme, textSelectionEnabled: configuration.mouseSelectionEnabled,
-                          panelResizingEnabled: configuration.mouseMotionEnabled)
+                          panelResizingEnabled: configuration.mouseMotionEnabled, backdropFaintEnabled: configuration.extendedAttributes)
     }
 
     /// Allows interaction tests to share the engine used by programmatic focus requests.

@@ -1,9 +1,36 @@
+import Foundation
 import TerminalUI
 
 @TerminalComponent
 public struct LayoutScreen: TerminalView {
+    private enum NotificationExample: String, CaseIterable {
+        case acknowledgement, info, success, warning, error
+
+        var option: DialogOption {
+            .init(id: rawValue, title: self == .acknowledgement ? "Acknowledgement" : "\(rawValue.capitalized) banner")
+        }
+
+        var bannerStyle: Banner.Style? {
+            switch self {
+            case .acknowledgement: nil
+            case .info: .info
+            case .success: .success
+            case .warning: .warning
+            case .error: .error
+            }
+        }
+    }
+
+    private struct BannerPreview {
+        let style: Banner.Style
+        let id = UUID().uuidString
+    }
+
     @State private var model = LayoutViewModel()
     @State private var previousTheme: Theme?
+    @State private var showingNotifications = false
+    @State private var showingAcknowledgement = false
+    @State private var banner: BannerPreview?
     @ApplicationContext private var application
 
     public init() {}
@@ -23,10 +50,18 @@ public struct LayoutScreen: TerminalView {
                 Button("Commands")
                     .onActivate { model.openCommands() }
                     .keyboardShortcut(.controlP)
+                Button("Notifications")
+                    .onActivate { showingNotifications = true }
+                    .keyboardShortcut(.altCharacter("n"))
             }
             WorkspaceView(topics: model.topics, submit: { model.submit($0) })
                 .id("workspace")
-            StatusBar(model.status)
+            Column {
+                if let banner {
+                    Banner("This sample clears after three seconds.", style: banner.style, timeout: .seconds(3), id: banner.id)
+                }
+                StatusBar(model.status)
+            }
             Column {
                 Text(model.contextualHints(for: focusedPane)).role(.secondary)
                 Text("Alt+1–3 panes · Ctrl-P menu · Alt+T theme · Ctrl-C quit").role(.secondary)
@@ -43,10 +78,27 @@ public struct LayoutScreen: TerminalView {
                 .onDismiss { model.dismissCommands() }
             }
         }
+        .choiceDialog(
+            id: "notification-examples", title: "Notifications", message: "Choose a banner style or try an acknowledgement dialog.",
+            isPresented: $showingNotifications, options: NotificationExample.allCases.map(\.option), onChoose: previewNotification,
+        )
+        .choiceDialog(
+            id: "acknowledgement", title: "Acknowledgement", message: "The workspace stays visible behind this dialog. Choose OK to close it.",
+            isPresented: $showingAcknowledgement,
+        )
         .onFocusChange(of: Pane.self) { pane in
             if let pane { model.didFocus(pane) }
         }
         .onAction(handle)
+    }
+
+    private func previewNotification(_ option: DialogOption) {
+        guard let example = NotificationExample(rawValue: option.id) else { return }
+        if let style = example.bannerStyle {
+            banner = BannerPreview(style: style)
+        } else {
+            showingAcknowledgement = true
+        }
     }
 
     private func toggleTheme() {

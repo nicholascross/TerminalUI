@@ -21,4 +21,21 @@ public struct TextStyle: Equatable, Sendable {
         self.bold = bold; self.dim = dim; self.italic = italic
         self.underline = underline; self.reversed = reversed
     }
+
+    func dimmedForBackdrop(faintEnabled: Bool) -> Self {
+        var style = self
+        let ink = reversed ? background : foreground
+        let paper = reversed ? foreground : background
+        if case let .rgb(red, green, blue) = ink, case let .rgb(baseRed, baseGreen, baseBlue) = paper {
+            func midpoint(_ first: UInt8, _ second: UInt8) -> UInt8 {
+                UInt8((UInt16(first) + UInt16(second)) / 2)
+            }
+            let blended = Color.rgb(midpoint(red, baseRed), midpoint(green, baseGreen), midpoint(blue, baseBlue))
+            if reversed { style.background = blended } else { style.foreground = blended }
+        } else if faintEnabled {
+            style.bold = false
+            style.dim = true
+        }
+        return style
+    }
 }

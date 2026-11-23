@@ -72,12 +72,36 @@ State assignments are synchronous; rendering updates are scheduled automatically
 | `Tabs`, `MenuBar` | Persistent choices and pane navigation. |
 | `Menu`, `Dialog` | Searchable commands and modal content. |
 | `Button`, `Progress`, `StatusBar` | Actions, progress and status. |
+| `Banner`, `choiceDialog` | In-layout notifications and compact modal choices. |
 
 Attach `.onActivate { ... }` to buttons and `.onSubmit { ... }` to input or collection controls. An editor with a submit handler uses Enter to submit and Shift+Enter for a newline when the terminal distinguishes those keys. Multiline paste inserts text without submitting.
 
 Buttons need an explicit `id:` only when you need to look them up or address a named action.
 
 `List` and `Table` manage selection locally when you omit `selection:`. Pass a binding when another view needs the selected value. `initialSelection:` seeds local selection when the control first appears.
+
+### Notifications
+
+Place a `Banner` in the layout where the message belongs. The `.info`, `.success`, `.warning`, and `.error` styles use the active theme and include a visible label. An optional timeout starts when the banner mounts. Give a repeated message a new `id` to restart its timer. Omit `timeout` to keep it visible until the app removes it. Add `action: .init("Retry") { retry() }` when the user can act on the message.
+
+```swift
+Banner("Repository refreshed", style: .success, timeout: .seconds(3))
+```
+
+Use `.choiceDialog` on a workspace view when the user must make a choice. Tab moves between controls, Enter confirms the focused option, and the app receives the chosen `DialogOption` after the presentation binding clears. With no options supplied, **OK** is focused and closes the dialog. For multiple options, `initialOption` selects the button that receives focus first. Escape leaves the choice dialog open.
+
+```swift
+workspace.choiceDialog(
+    id: "disk-change", title: "File changed on disk",
+    message: "Choose which version to keep.", isPresented: $showFileConflict,
+    options: [.init(id: "reload", title: "Reload from disk"), .init(id: "keep", title: "Keep editing")],
+    initialOption: "keep"
+) { option in
+    if option.id == "reload" { reloadFile() }
+}
+```
+
+For custom modal contents, place `Dialog(id:title:compact:content:)` with `compact: true` in an overlay. Compact dialogs leave the workspace visible and lower the contrast of cells with explicit RGB colors. To also dim text with terminal-default colors, set `TerminalConfiguration(extendedAttributes: true)` on terminals that support faint text.
 
 ### Keyboard shortcuts and overlays
 

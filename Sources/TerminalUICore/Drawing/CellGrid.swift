@@ -29,6 +29,21 @@ public struct CellGrid: Equatable, Sendable {
         for column in columns { cells[row * width + column] = cell }
     }
 
+    mutating func dimBackdrop(_ columns: Range<Int>, rows: Range<Int>, faintEnabled: Bool) {
+        for row in rows {
+            let offset = row * width
+            // Ignore any partial wide glyph at the edge of the backdrop.
+            let start = cells[offset + columns.lowerBound].width == 0 ? columns.lowerBound + 1 : columns.lowerBound
+            let end = cells[offset + columns.upperBound - 1].width == 2 ? columns.upperBound - 1 : columns.upperBound
+            for index in (offset + start) ..< (offset + max(start, end)) {
+                let cell = cells[index]
+                if cell.grapheme == " ", !cell.style.underline, !cell.style.reversed { continue }
+                let style = cell.style.dimmedForBackdrop(faintEnabled: faintEnabled)
+                if style != cell.style { cells[index].style = style }
+            }
+        }
+    }
+
     /// Paints selection styling on a snapshot while retaining graphemes and their footprints.
     package func highlighting(
         _ selection: SelectableCell, in cells: [Int: [Int: SelectableCell]], style: TextStyle,

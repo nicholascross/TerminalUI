@@ -18,6 +18,7 @@ final class FrameRenderer {
     private let allocation: LayoutAllocator
     private let painters: BuiltInPainters
     private let panelResizingEnabled: Bool
+    private let backdropFaintEnabled: Bool
     private let statistics = RenderingStatistics()
     var renderingMetrics: RenderingMetrics { statistics.metrics }
     private var layoutRoot: LayoutNode?
@@ -42,6 +43,7 @@ final class FrameRenderer {
         allocation: LayoutAllocator,
         painters: BuiltInPainters,
         panelResizingEnabled: Bool = true,
+        backdropFaintEnabled: Bool = true,
     ) {
         self.states = states
         self.tree = tree
@@ -51,6 +53,7 @@ final class FrameRenderer {
         self.allocation = allocation
         self.painters = painters
         self.panelResizingEnabled = panelResizingEnabled
+        self.backdropFaintEnabled = backdropFaintEnabled
     }
 
     func invalidateGeometry() {
@@ -418,6 +421,11 @@ final class FrameRenderer {
             }
         case .overlay:
             let base = node.children[0], top = node.children[1]
+            let title = compactDialogTitle(top.element)
+            if title != nil, repaintPath != nil {
+                // A retained canvas may still contain cells from the previous dialog frame.
+                canvas.fill(x: originX, y: originY, width: contentWidth, height: contentHeight, style: resolved(.normal))
+            }
             paint(
                 base,
                 x: originX,
@@ -429,19 +437,46 @@ final class FrameRenderer {
                 inherited: descendants,
                 enabled: active,
             )
-            canvas.fill(x: originX, y: originY, width: contentWidth, height: contentHeight, style: resolved(.normal))
+            let box: MouseRect
+            if let title {
+                box = compactDialogBounds(top, title: title, within: context.bounds, theme: theme)
+                canvas.dimBackdrop(x: originX, y: originY, width: contentWidth, height: contentHeight, faintEnabled: backdropFaintEnabled)
+            } else {
+                box = context.bounds
+            }
+            let x = box.column - mouseTranslation.column, y = box.row - mouseTranslation.row
+            canvas.fill(x: x, y: y, width: box.width, height: box.height, style: resolved(.normal))
             paint(
                 top,
-                x: originX,
-                y: originY,
-                width: contentWidth,
-                height: contentHeight,
+                x: x,
+                y: y,
+                width: box.width,
+                height: box.height,
                 canvas: &canvas,
                 environment: environment,
                 inherited: descendants,
                 enabled: active,
             )
         }
+    }
+
+    private func compactDialogTitle(_ element: Element) -> String? {
+        switch element.kind {
+        case let .dialog(_, title, _) where element.isCompactDialog: return title
+        case let .boundary(_, child): return compactDialogTitle(child)
+        default: return nil
+        }
+    }
+
+    private func compactDialogBounds(_ node: LayoutNode, title: String, within bounds: MouseRect, theme: Theme) -> MouseRect {
+        let maxWidth = min(64, bounds.width > 8 ? bounds.width - 2 : bounds.width)
+        let maxHeight = bounds.height > 6 ? bounds.height - 2 : bounds.height
+        let idealWidth = measurement.measure(node, width: maxWidth, theme: theme).0
+        let width = min(maxWidth, max(metrics.cellLength(title) + 4, idealWidth))
+        let idealHeight = measurement.measure(node, proposal: .init(width: width, height: maxHeight), theme: theme).height
+        let height = min(maxHeight, idealHeight)
+        return MouseRect(column: bounds.column + (bounds.width - width) / 2, row: bounds.row + (bounds.height - height) / 2,
+                         width: width, height: height)
     }
 
     private func paintLayoutChildren(

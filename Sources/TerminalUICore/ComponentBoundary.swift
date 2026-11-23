@@ -72,6 +72,7 @@ extension Element {
     package func resolvedBoundary(_ boundary: ComponentBoundary, body: Element) -> Element {
         var copy = self
         copy.kind = .boundary(boundary, body)
+        copy.isVisible = isVisible && body.isVisible
         if !hasExplicitWidth { copy.widthRule = body.widthRule }
         if !hasExplicitHeight { copy.heightRule = body.heightRule }
         return copy

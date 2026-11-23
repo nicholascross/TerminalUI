@@ -112,6 +112,27 @@ try:
     os.write(master, b'\x1b3')
     wait_for('Focus: Command')
     wait_for('world1234')
+    if mouse_enabled:
+        column = screen().splitlines()[2].index('[Notifications]') + 2
+        os.write(master, f'\x1b[<0;{column};3M\x1b[<0;{column};3m'.encode())
+    else:
+        os.write(master, b'\x1bn')
+    wait_for('>[Acknowledgement]')
+    wait_for('TerminalUILayout', row=0)
+    os.write(master, b'\r')
+    wait_for('>[OK]')
+    os.write(master, b'\r')
+    if mouse_enabled:
+        wait_for('>[Notifications]', row=2)
+        os.write(master, b'\x1b3')
+    wait_for('Focus: Command')
+    wait_for('world1234')
+    os.write(master, b'\x1bn\t\t')
+    wait_for('>[Success banner]')
+    os.write(master, b'\r')
+    wait_for('Success · This sample clears')
+    wait_for('Success · This sample clears', absent=True)
+    wait_for('world1234')
     # CSI-u Shift+Enter inserts a newline; ordinary Enter submits the complete draft.
     os.write(master, b'\x1b[13;2unext')
     wait_for('world1234')
@@ -139,6 +160,7 @@ try:
     if mouse_enabled:
         assert b'\x1b[?1002l' in history and b'\x1b[?1006l' in history
     print(f'LayoutDemo PTY (mouse={mouse_enabled}): focus, command menu, draft, theme swapping, resize and restoration passed')
+    print('Compact notification dialogs, acknowledgement and transient banner passed')
     if mouse_enabled:
         print('Topics pane drag, release and size retention passed')
 finally:

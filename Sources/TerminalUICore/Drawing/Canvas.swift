@@ -146,6 +146,13 @@ public struct Canvas {
         }
     }
 
+    package mutating func dimBackdrop(x: Int, y: Int, width: Int, height: Int, faintEnabled: Bool) {
+        let columns = (x ..< (x + width)).clamped(to: 0 ..< self.width)
+        let rows = (y ..< (y + height)).clamped(to: visibleRows)
+        guard !columns.isEmpty, !rows.isEmpty else { return }
+        grid.dimBackdrop(columns, rows: (rows.lowerBound - rowOffset) ..< (rows.upperBound - rowOffset), faintEnabled: faintEnabled)
+    }
+
     private mutating func eraseFootprint(x: Int, y: Int) {
         guard let old = grid[x, y] else { return }
         if old.width == 0 {

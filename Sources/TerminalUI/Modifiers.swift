@@ -69,13 +69,13 @@ public struct OverlayView<Content: TerminalView, Overlay: TerminalView>: Primiti
     let overlay: Overlay?
     package func lower(path: [CompositionAddress]) -> [Element] {
         // Keep both slots even when the optional overlay is absent.
-        var base = rootElement(lowerView(content, path: path + [.slot(0)]))
-        if let overlay {
-            let elements = lowerView(overlay, path: path + [.slot(1)])
-            if !elements.isEmpty { base = base.overlay(rootElement(elements)) }
-        }
-        base.compositionPath = path
-        return [base]
+        let base = rootElement(lowerView(content, path: path + [.slot(0)]))
+        guard let overlay else { return [base] }
+        let elements = lowerView(overlay, path: path + [.slot(1)])
+        guard !elements.isEmpty else { return [base] }
+        var layered = base.overlay(rootElement(elements))
+        layered.compositionPath = path
+        return [layered]
     }
 }
 

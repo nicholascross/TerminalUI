@@ -30,7 +30,9 @@ public final class UIEngine {
         self.init(theme: theme, textSelectionEnabled: false)
     }
 
-    package init(theme: Theme = .init(), textSelectionEnabled: Bool, panelResizingEnabled: Bool = true) {
+    package init(
+        theme: Theme = .init(), textSelectionEnabled: Bool, panelResizingEnabled: Bool = true, backdropFaintEnabled: Bool = true,
+    ) {
         self.theme = theme
         let tree = ElementTree()
         self.tree = tree
@@ -53,7 +55,8 @@ public final class UIEngine {
                                        table: TablePainter(states: states, allocation: allocation, metrics: metrics),
                                        custom: CustomWidgetPainter())
         renderer = FrameRenderer(states: states, tree: tree, textLayouts: layouts, metrics: metrics,
-                                 measurement: measurement, allocation: allocation, painters: painters, panelResizingEnabled: panelResizingEnabled)
+                                 measurement: measurement, allocation: allocation, painters: painters,
+                                 panelResizingEnabled: panelResizingEnabled, backdropFaintEnabled: backdropFaintEnabled)
     }
 
     /// Focuses an enabled, visible control in the active tree. Returns false if it cannot receive focus.

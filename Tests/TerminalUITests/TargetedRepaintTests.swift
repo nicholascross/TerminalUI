@@ -35,6 +35,8 @@ struct TargetedRepaintTests {
             TextSpan("界 wide\nshort\n\n🙂 emoji\nlast long row", role: .warning),
         ])
         let scroll = Element.scrollView(id: "scroll", content: text).height(.fixed(3))
+        var compact = Element.dialog(id: "compact", title: "Compact", content: scroll)
+        compact.isCompactDialog = true
         let views: [Element] = [
             .column([.text("header"), scroll, .text("footer")]).background(.blue),
             .row([.text("left").width(.fixed(6)), scroll.width(.fill())]).padding(.all(1)),
@@ -43,6 +45,7 @@ struct TargetedRepaintTests {
                 .text("header"), scroll, .paragraph("tail\nmore\nlast"),
             ])).height(.fixed(4)),
             .text("base content").overlay(.dialog(id: "modal", title: "Dialog", content: scroll)),
+            .text("base content").overlay(compact),
             .text("base content").overlay(.column([.text("overlay header"), scroll])),
             .panel(title: "Dividers", content: .scrollView(id: "scroll", content: .column([
                 .divider(), .text("one"), .divider(), .text("two"), .divider(),

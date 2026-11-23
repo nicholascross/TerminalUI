@@ -40,6 +40,7 @@ public struct Element {
     package var wrapsParagraph = true
     package var submitID: String?
     package var menuResultsID: String?
+    package var isCompactDialog = false
     package var dismissalButtonID: String?
     package var prefersInitialFocus = false
     package var focusValue: ViewID?

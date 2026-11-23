@@ -23,6 +23,7 @@ package final class MountedComponent {
     package var descriptor: (any ComponentDescriptor)?
     package var envelope: Element = .spacer()
     package var state: [String: any AnyStateSlot] = [:]
+    var tasks: [String: Task<Void, Never>] = [:]
     package var dependencies: [ObjectIdentifier: any AnyStateSlot] = [:]
     package var children: [LocalIdentity: MountedComponent] = [:]
     package var orderedChildren: [MountedComponent] = []
@@ -55,6 +56,8 @@ package final class MountedComponent {
         if descriptor != nil { driver.metrics.unmounts += 1 }
         driver.dirty.remove(identity)
         unsubscribe()
+        for task in tasks.values { task.cancel() }
+        tasks.removeAll()
         for slot in state.values {
             slot.detach()
         }

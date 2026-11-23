@@ -56,6 +56,12 @@ package final class MountContext {
 
     package var applicationServices: (any ApplicationServices)? { driver.applicationServices }
 
+    /// Runs once for this mount and cancels when the component is removed.
+    package func startTask(key: String, _ work: @escaping @MainActor () async -> Void) {
+        guard record.tasks[key] == nil else { return }
+        record.tasks[key] = Task { await work() }
+    }
+
     package func install<Value>(key: String, initial: () -> Value, equals: ((Value, Value) -> Bool)?) -> StateSlot<Value> {
         if let old = record.state[key] {
             guard let typed = old as? StateSlot<Value> else {

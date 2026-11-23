@@ -119,6 +119,34 @@ with RepositorySession() as s:
     s.stop()
 print('Read-only Git browsing, diff scrolling, branch/commit inspection, refresh, dialogs and resize passed')
 
+with RepositorySession() as s:
+    s.click('[Refresh]', 2)
+    s.wait('Success · Repository refreshed')
+    s.wait('Success · Repository refreshed', absent=True)
+    git_dir = s.repo / '.git'
+    offline_git_dir = s.repo / '.git-offline'
+    git_dir.rename(offline_git_dir)
+    try:
+        s.click('[Refresh]', 2)
+        s.wait('Error · Couldn’t refresh the repository.')
+        s.wait('Showing last loaded data')
+        s.click('[Details]', 2)
+        s.wait('Repository refresh failed')
+        s.wait('READ ONLY')
+        s.wait('>[Retry]')
+        s.click('[Dismiss]', 2)
+        s.wait('Error · Couldn’t refresh the repository.', absent=True)
+        s.click('[Refresh]', 2)
+        s.click('[Details]', 2)
+        s.wait('>[Retry]')
+    finally:
+        offline_git_dir.rename(git_dir)
+    s.send(b'\r')
+    s.wait('Success · Repository refreshed')
+    s.wait('Repository refresh failed', absent=True)
+    s.stop()
+print('Refresh notifications, timeout, compact choice dialog, dismissal and retry passed')
+
 for columns, rows in [(120, 40), (60, 32)]:
     with RepositorySession(columns=columns, rows=rows) as s:
         s.send(b'\x1b1\x1b[B')
