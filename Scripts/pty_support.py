@@ -32,7 +32,7 @@ def module_objects(bin_path, modules):
     return objects
 
 class TerminalSession:
-    def __init__(self, binary, *arguments, columns=120, rows=40, env=ENV):
+    def __init__(self, binary, *arguments, columns=120, rows=40, env=ENV, redirected_stdio=()):
         self.master, self.slave = pty.openpty()
         self.resize(columns, rows, notify=False)
         self.before = termios.tcgetattr(self.slave)
@@ -42,8 +42,9 @@ class TerminalSession:
             os.setsid()
             fcntl.ioctl(self.slave, termios.TIOCSCTTY, 0)
 
-        self.process = subprocess.Popen([str(binary), *arguments], stdin=self.slave,
-                                        stdout=self.slave, stderr=self.slave,
+        stdin, stdout, stderr = (subprocess.DEVNULL if fd in redirected_stdio else self.slave for fd in range(3))
+        self.process = subprocess.Popen([str(binary), *arguments], stdin=stdin,
+                                        stdout=stdout, stderr=stderr,
                                         env=env, preexec_fn=setup)
 
     def __enter__(self):

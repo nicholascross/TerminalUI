@@ -1,0 +1,17 @@
+name: Foreground terminal input
+
+on: [push, pull_request]
+
+permissions:
+  contents: read
+
+jobs:
+  foreground-pty:
+    runs-on: macos-26
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+      - name: Build RepositoryDemo
+        run: swift build --product RepositoryDemo -j 4
+      - name: Verify foreground kqueue input
+        run: python3 Scripts/test-terminalui-foreground-pty.py "$(swift build --show-bin-path)/RepositoryDemo"

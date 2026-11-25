@@ -216,6 +216,9 @@ path = Path(sys.argv[2])
 assert path.parent == Path.cwd()
 assert path.name == "note 'draft';.txt"
 assert all(os.isatty(fd) and not fcntl.fcntl(fd, fcntl.F_GETFL) & os.O_NONBLOCK for fd in range(3))
+uses_dev_tty = os.environ.get('EDITOR_EXPECT_DEV_TTY') == '1'
+dev_tty = os.stat('/dev/tty').st_rdev
+assert all((os.fstat(fd).st_rdev == dev_tty) == uses_dev_tty for fd in range(3))
 assert os.tcgetpgrp(0) == os.getpgrp()
 assert termios.tcgetattr(0)[3] & termios.ICANON
 signal.signal(signal.SIGINT, signal.SIG_DFL)
@@ -229,7 +232,7 @@ path.write_text(answer + '\n')
 """)
     configured_editor = shlex.join([sys.executable, str(editor), '--fixture'])
     git('config', 'core.editor', configured_editor)
-    environment = {key: value for key, value in ENV.items() if key != 'GIT_EDITOR'}
+    environment = {key: value for key, value in ENV.items() if key not in ('GIT_EDITOR', 'EDITOR_EXPECT_DEV_TTY')}
     with TerminalSession(BINARY, '--repo', str(repo), env=environment) as s:
         s.wait('Ready · read-only repository')
         s.wait('+working version')
@@ -266,6 +269,17 @@ path.write_text(answer + '\n')
         s.wait('Editor: Command terminated by signal 2')
         s.stop()
 
+    for redirected_stdio in [(0, 2), (0, 1, 2)]:
+        working_file.write_text('working version\n')
+        redirected_env = dict(environment, EDITOR_EXPECT_DEV_TTY='1' if len(redirected_stdio) == 3 else '0')
+        with TerminalSession(BINARY, '--repo', str(repo), env=redirected_env, redirected_stdio=redirected_stdio) as s:
+            s.wait('Ready · read-only repository')
+            s.send(b'e')
+            s.wait('FAKE EDITOR')
+            s.send(b'edited with redirects\r')
+            s.wait('+edited with redirects')
+            s.stop()
+
     raw_editor = shlex.join([sys.executable, str(editor), '--leave-raw'])
     with TerminalSession(BINARY, '--repo', str(repo), env=dict(environment, GIT_EDITOR=raw_editor)) as s:
         s.wait('Ready · read-only repository')
@@ -274,7 +288,7 @@ path.write_text(answer + '\n')
         assert termios.tcgetattr(s.slave) != s.before
         s.stop(by_signal=True)
         assert s.history.count(b'\x1b[?1049h') == 1
-print('Foreground editor input, saved diff, full redraw, focus, failures and shutdown passed')
+print('Foreground editor TTY inheritance, redirection, input, redraw, failures and shutdown passed')
 
 result = subprocess.run([BINARY], stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
                         stderr=subprocess.PIPE, env=ENV, start_new_session=True, timeout=8)

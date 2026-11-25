@@ -3,6 +3,8 @@
 #include <fcntl.h>
 #include <signal.h>
 #include <spawn.h>
+#include <stdbool.h>
+#include <sys/ioctl.h>
 #include <sys/wait.h>
 #include <unistd.h>
 
@@ -13,6 +15,62 @@
 #endif
 #else
 extern char **environ;
+#endif
+
+#if !defined(__APPLE__) || TARGET_OS_OSX
+static bool is_controlling_terminal(int fd) {
+    if (tcgetpgrp(fd) == -1) return false;
+
+    // A PTY master can report a foreground group too, but I/O goes to the other end.
+#if defined(__APPLE__)
+    char name[128];
+    return ioctl(fd, TIOCPTYGNAME, name) == -1;
+#elif defined(TIOCGPTN)
+    unsigned int number;
+    return ioctl(fd, TIOCGPTN, &number) == -1;
+#else
+    return true;
+#endif
+}
+
+static int add_terminal_stdio_actions(posix_spawn_file_actions_t *actions) {
+    bool inherit[STDERR_FILENO + 1] = {false};
+    int input_fd = -1;
+    int output_fd = -1;
+
+    // Keep the actual TTY device when possible. macOS kqueue cannot watch /dev/tty.
+    for (int fd = STDIN_FILENO; fd <= STDERR_FILENO; fd++) {
+        int flags = fcntl(fd, F_GETFL);
+        if (flags == -1 || (flags & O_NONBLOCK)) continue;
+        int access = flags & O_ACCMODE;
+        int required = fd == STDIN_FILENO ? O_RDONLY : O_WRONLY;
+        if (access != required && access != O_RDWR) continue;
+        int descriptor_flags = fcntl(fd, F_GETFD);
+        if (descriptor_flags == -1 || (descriptor_flags & FD_CLOEXEC)) continue;
+        if (!is_controlling_terminal(fd)) continue;
+
+        inherit[fd] = true;
+        if (input_fd == -1 && access != O_WRONLY) input_fd = fd;
+        if (output_fd == -1 && access != O_RDONLY) output_fd = fd;
+    }
+
+    // Give redirected streams the controlling terminal too, using a blocking open as a fallback.
+    int fallback_fd = -1;
+    for (int fd = STDIN_FILENO; fd <= STDERR_FILENO; fd++) {
+        if (inherit[fd]) continue;
+        int source = fd == STDIN_FILENO ? input_fd : output_fd;
+        if (source == -1) source = fallback_fd;
+        int error;
+        if (source == -1) {
+            error = posix_spawn_file_actions_addopen(actions, fd, "/dev/tty", O_RDWR | O_NOCTTY, 0);
+            fallback_fd = fd;
+        } else {
+            error = posix_spawn_file_actions_adddup2(actions, source, fd);
+        }
+        if (error) return error;
+    }
+    return 0;
+}
 #endif
 
 int tui_command_spawn(pid_t *child, char *const argv[]) {
@@ -43,9 +101,7 @@ int tui_command_spawn(pid_t *child, char *const argv[]) {
     error = posix_spawnattr_setsigmask(&attributes, &mask);
     if (!error) error = posix_spawnattr_setsigdefault(&attributes, &defaults);
     if (!error) error = posix_spawnattr_setflags(&attributes, POSIX_SPAWN_SETSIGMASK | POSIX_SPAWN_SETSIGDEF);
-    if (!error) error = posix_spawn_file_actions_addopen(&actions, STDIN_FILENO, "/dev/tty", O_RDWR | O_NOCTTY, 0);
-    if (!error) error = posix_spawn_file_actions_adddup2(&actions, STDIN_FILENO, STDOUT_FILENO);
-    if (!error) error = posix_spawn_file_actions_adddup2(&actions, STDIN_FILENO, STDERR_FILENO);
+    if (!error) error = add_terminal_stdio_actions(&actions);
     if (!error) {
 #if defined(__APPLE__)
         char **environment = *_NSGetEnviron();
