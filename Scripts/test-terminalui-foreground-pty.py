@@ -40,7 +40,10 @@ def check_handoff(binary):
                 session.wait('Waiting for foreground input')
                 session.send(b'x\r')
                 session.wait('Repository refreshed')
-                session.stop()
+                # macOS revokes the PTY slave when the session leader exits.
+                session.send(b'\x03')
+                status = session.process.wait(timeout=8)
+                assert status == 0, f'RepositoryDemo exited with status {status}'
             except AssertionError:
                 # The restored dashboard can overwrite the child's traceback on screen.
                 print(session.history.decode(errors='replace'), file=sys.stderr)
