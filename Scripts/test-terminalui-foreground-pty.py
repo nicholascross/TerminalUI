@@ -1,4 +1,5 @@
 """Check macOS kqueue input during a foreground handoff. Build RepositoryDemo first."""
+from contextlib import closing
 import os
 from pathlib import Path
 import select
@@ -11,7 +12,7 @@ from pty_support import ENV, TerminalSession
 
 
 def watch_input():
-    with select.kqueue() as queue:
+    with closing(select.kqueue()) as queue:
         watch = select.kevent(0, filter=select.KQ_FILTER_READ, flags=select.KQ_EV_ADD)
         queue.control([watch], 0, 0)
         if os.fstat(0).st_rdev == os.stat('/dev/tty').st_rdev:
